@@ -1,0 +1,1 @@
+<td tal:content='structure content'></td>

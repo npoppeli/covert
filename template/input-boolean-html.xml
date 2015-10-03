@@ -1,0 +1,9 @@
+<div class="form-group ${['','has-error'][error]">
+  <label for="${name}" class="text-info col-sm-3 col-xs-4 control-label">${label}</label>
+  <div class="col-sm-7 col-xs-7">
+  <label class="radio-inline" for="${name}-0"><input type="radio" name="${name}" id="${name}-0" value="ja"
+         tal:attributes="auto ['disabled', None][auto]; checked [None, 'checked'][content=='ja']"/>ja</label>
+  <label class="radio-inline" for="${name}-1"><input type="radio" name="${name}" id="${name}-1" value="nee"
+         tal:attributes="auto ['disabled', None][auto]; checked [None, 'checked'][content=='nee']"/>nee</label>
+ </div>
+</div>

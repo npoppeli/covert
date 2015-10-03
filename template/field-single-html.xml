@@ -1,0 +1,3 @@
+<tr tal:attributes="class hidden and 'text-muted' or None">
+  <td class="info">${label}</td><td tal:content='structure content'></td>
+</tr>

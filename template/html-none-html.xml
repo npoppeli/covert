@@ -1,0 +1,39 @@
+<!doctype html>
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+  <head>
+    <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
+    <link rel="icon" href="/_static/favicon.ico" />
+    <title>TITLE</title>
+    <!-- ... hook 1: CSS includes -->
+    <link href="/_static/css/bootstrap.min.css"            rel="stylesheet">
+    <!-- link href="/_static/css/bootstrap-theme.min.css"      rel="stylesheet" -->
+    <link href="/_static/css/bootstrap3-wysihtml5.min.css" rel="stylesheet">
+    <link href="/_static/css/font-awesome.min.css"         rel="stylesheet">
+  </head>
+  <body>
+  <span tal:replace="structure content">PAGE</span>
+  <!-- ... hook 2: JS includes -->
+  <script src="/_static/js/jquery.min.js"                  ></script>
+  <script src="/_static/js/bootstrap.min.js"               ></script>
+  <script src="/_static/js/bootbox.min.js"                 ></script>
+  <script src="/_static/js/bootstrap3-wysihtml5.all.min.js"></script>
+  <!-- ... hook 3: JS snippets -->
+  <script>
+  $(document).ready(function() {
+    $("#memo").wysihtml5({toolbar: {fa:true}});
+    $("div#main").on("click", "[data-confirm='yes']", function(event) {
+      event.preventDefault();
+      var href = $(this).attr("href"), prompt = $(this).data("prompt");
+      bootbox.confirm("Are you sure you want to "+prompt+"?", function(result) {
+        if (result) {
+          $.ajax({type: 'DELETE', url: href, success: function(data, status, xhr) {
+            bootbox.alert("Delete status="+status+" data="+JSON.stringify(data));
+            // if (data.ok) { location.reload(true) }
+          }})
+        }
+      })
+    })
+  })
+  </script>
+  </body>
+</html>
