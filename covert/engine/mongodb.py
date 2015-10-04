@@ -9,7 +9,6 @@ from datetime import datetime
 from pymongo.connection import MongoClient
 from ..model import BareItem
 from bson.objectid import ObjectId
-from ..report import logger
 
 store_name = ''
 store_conn, store_db = None, None
@@ -132,4 +131,4 @@ class Item(BareItem):
         Remove document from collection.
         Return value should be {'ok':1.0, 'err':None}.
         """
-        return store_db[cls.name].remove(self['_id'])
+        return store_db[self.name].remove(self['_id'])

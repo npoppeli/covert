@@ -9,6 +9,7 @@ it could be delegated to the client, using Parsley.js (jQuery) for example.
 
 import re, sys, traceback
 from .common import str2int, encode_dict, decode_dict
+from .model import BareItem
 from .template import node
 from .report import logger, print_node, print_doc
 
@@ -45,7 +46,7 @@ def register_view(view):
     icon_map.update(view._icon)
 
 def action_name(view, action):
-     return view+':'+action
+    return view+':'+action
 
 def url_for(view, action, qs={}, **kwarg):
     url = url_map.get(action_name(view, action), '').format(**kwarg)
@@ -189,7 +190,7 @@ class action:
     - method: string identifying HTTP method (e.g. 'GET' or 'GET, POST')
     - pattern: URL pattern, given as a format string
     """
-    def __init__(self, label, icon, method, pattern, alternative=None):
+    def __init__(self, label, icon, method, pattern):
         self.label = label; self.icon = icon
         self.method = method; self.pattern = pattern
     def __call__(self, wrapped):
@@ -203,7 +204,7 @@ class ItemView:
     (create, index, new, update, delete, edit, show) plus extensions.
     The operations 'create', 'index' etcetera are called 'actions'.
     """
-    model = None
+    model = BareItem
     def __init__(self):
         name = self.__class__.__name__
         # view classes must have a name that ends in 'View'
