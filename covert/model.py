@@ -12,11 +12,13 @@ also add references to items of class B inside an item of class A
 ('linking'). A reference to an item is essentially a 2-tuple (collection
 name, item id).
 
-storage -> [JSON document] -> read map -> [item] -> display map -> [item stringified] -> HTML page
-HTML form -> [item stringified] -> convert map -> [item] -> write map -> [JSON document] -> storage
+storage -> [JSON document] -> read -> [item] -> display -> [item stringified] -> HTML page
+HTML form -> [item stringified] -> convert -> [item] -> write -> [JSON document] -> storage
 
-TODO: representation embedding and linking in forms, providing tools for
-adding, modifying and deleting them.
+TODO:
+- embedding and linking in show panels
+- embedding and linking in form panels
+- tools (JS) for adding, modifying and deleting sub-components
 """
 
 from collections import OrderedDict
@@ -25,6 +27,36 @@ from voluptuous import Schema, Optional, MultipleInvalid
 from .atom import atom_map
 from .common import Error
 from copy import deepcopy
+
+def mapdoc(fnmap, doc, debug=False, inner=False):
+    """mapdoc(doc) -> newdoc
+       Map doc using functions in fnmap (mostly for self._cmap, self._dmap, self._rmap and self._wmap).
+    """
+    if debug and not inner:
+        print("input document\n", doc)
+    newdoc = {}
+    for key, value in doc.items():
+        if key in fnmap:
+            if isinstance(value, dict): # embedded document
+                newdoc[key] = mapdoc(fnmap, value, debug=debug, inner=True)
+            elif isinstance(value, list): # list of scalars or documents
+                if len(value) == 0: # empty list
+                    newdoc[key] = []
+                elif isinstance(value[0], dict): # list of documents
+                    newdoc[key] = [mapdoc(fnmap, element, debug=debug, inner=True) for element in value]
+                else: # list of scalars
+                    newdoc[key] = [fnmap[key](element) for element in value]
+                    if debug:
+                        print("{}: {} -> {}".format(key, value, newdoc[key]))
+            else: # scalar
+                newdoc[key] = fnmap[key](value)
+                if debug:
+                    print("{}: {} -> {}".format(key, value, newdoc[key]))
+        else: # no mapping for this element
+            newdoc[key] = value
+    if debug and not inner:
+        print("output document\n", newdoc)
+    return newdoc
 
 # Field = namedtuple('Field', ['label', 'schema', 'optional', 'multiple', 'hidden', 'auto'])
 class Field(tuple):
@@ -93,20 +125,20 @@ class BareItem(dict):
     skeleton['mtime']  = Field(label='Modified', schema='datetime', auto=True, hidden=False)
     skeleton['active'] = Field(label='Active',   schema='boolean',  auto=True, hidden=True )
 
-    def __init__(self, doc={}): # TODO this needs modification for non-flat documents
+    def __init__(self, doc={}):
         """
         __init__(self, doc)
-        Create new instance, initialize from dictionary doc.
+        Create new instance, initialize from 'doc' (item retrieved from storage).
         """
-        for name, field in self.skeleton.items():
-            if field.multiple:
-                self[name] = []
-            elif field.schema == 'dict':
-                self[name] = {}
-            else:
-                self[name] = None
-        for name, value in doc.items():
+        super().__init__()
+        for name, value in mapdoc(self._rmap, doc).items():
             self[name] = value
+
+    def __str__(self):
+        return self.__repr__()
+    def __repr__(self):
+        content = ', '.join(["'{}':'{}'".format(key, self.get(key, '')) for key in self._fields])
+        return '{}({})'.format(self.__class__.__name__, content)
 
     @classmethod
     def fields(cls, kind=''):
@@ -126,35 +158,34 @@ class BareItem(dict):
             _ = validator(doc)
             return {'ok': True, 'error':{} }
         except MultipleInvalid as e:
-            error = dict([('.'.join(el.path), el.msg) for el in e.errors ])
+            # error = dict([('.'.join(el.path), el.msg) for el in e.errors ])
+            error = str(e.errors)
             return {'ok': False, 'error':error }
 
     @classmethod
-    def convert(cls, doc): # TODO this needs modification for non-flat documents
+    def convert(cls, doc):
         """
         convert(cls, doc): newdoc
-        Convert string representation of item to item with typed fields.
+        Convert stringified item to item with typed fields.
         """
-        newdoc = {}
-        # intersect input field set and skeleton field set, i.e. don't set fields that are not
-        # in the input, and ignore input fields that are not in the skeleton (model)
-        for name in set(doc.keys()) & set(cls._fields):
-            converter = cls.skeleton[name].convert # transform(doc, cls._cmap)
-            if cls.skeleton[name].multiple:
-                newdoc[name] = [ converter(e) for e in doc[name].split(',') ]
-            else:
-                newdoc[name] = converter(doc[name])
-        return newdoc
+        return mapdoc(cls._cmap, doc)
+
+    def display(self, doc):
+        """
+        display(cls, doc): newdoc
+        Convert item with typed fields to item with stringified fields.
+        """
+        return mapdoc(self._dmap, doc)
 
     def copy(self):
         """
         copy(self): newdoc
         Make deep copy of document, erasing the 'auto' fields, so that it looks new.
         """
-        cls_ = self.__class__
+        cls = self.__class__
         newdoc = deepcopy(self)
-        for name in cls_._fields:
-            if cls_.skeleton[name].auto:
+        for name in cls._fields:
+            if cls.skeleton[name].auto:
                 newdoc[name] = None
         return newdoc
 
@@ -162,6 +193,10 @@ class ItemRef():
     collection = 'Item'
     def __init__(self, ident):
         self.id = ident
+    def __str__(self):
+        return self.__repr__()
+    def __repr__(self):
+        return "{}('{}')".format(self.__class__.__name__, self.id)
 
 def ref2id(ref):
     return ref.id
@@ -190,14 +225,18 @@ def parse_model_def(model_def, models):
         if not field_hidden:
             field_label = field_label.replace('_', ' ')
         if field_type[0] == '_': # embedded model (comparable to inner class)
-            # TODO: take empty document from inner class and add here
             embedded = parse_model_def(models[field_type], models)
+            pm.empty[field_name] = [ embedded.empty ] if multiple_field else embedded.empty
             pm.qschema[field_name] = embedded.qschema
             pm.schema[schema_key] = [ embedded.schema ] if multiple_field else embedded.schema
             pm.skeleton[field_name] = Field(label=field_label, schema='dict',
                                          hidden=field_hidden, auto=False,
                                          optional=optional_field, multiple=multiple_field)
             pm.names.extend(embedded.names)
+            pm.cmap[field_name] = dict
+            pm.dmap[field_name] = dict
+            pm.rmap[field_name] = dict
+            pm.wmap[field_name] = dict
             pm.cmap.update(embedded.cmap)
             pm.dmap.update(embedded.dmap)
             pm.rmap.update(embedded.rmap)
@@ -205,24 +244,26 @@ def parse_model_def(model_def, models):
             for name in embedded.names: # necessary for preserving order
                 pm.skeleton[name] = embedded.skeleton[name]
         elif field_type[0] == '^': # reference to model
-            # TODO: add key='' to empty document
             ref_name = field_type[1:]+'_ref'
             if ref_name not in model_map:
                 raise Error("reference to unknown model '{0}' in {1}".format(ref_name, line))
-            # no entries in cmap, dmap
+            pm.cmap[field_name] = None # TODO: what to put here?
+            pm.dmap[field_name] = None # TODO: what to put here?
             pm.rmap[field_name] = model_map[ref_name] # rmap: id -> reference
             pm.wmap[field_name] = ref2id              # wmap: reference -> id
-            # qschema[field_name] not set
+            pm.empty[field_name] = [ None ] if multiple_field else None
+            pm.qschema[field_name] = None
             pm.schema[schema_key] = [ model_map[ref_name] ] if multiple_field else model_map[ref_name]
-            pm.skeleton[field_name] = Field(label=field_label, schema=field_type,
+            pm.skeleton[field_name] = Field(label=field_label, schema=ref_name,
                                             hidden=field_hidden, auto=False,
                                             optional=optional_field, multiple=multiple_field)
         else: # atom class
-            # TODO: add key='' or key=None to empty document, make 1-item list if necessary (no repetitions)
             atom = atom_map[field_type]
-            # no entries in rmap, wmap
             if atom.convert: pm.cmap[field_name] = atom.convert
             if atom.display: pm.dmap[field_name] = atom.display
+            if atom.read:    pm.rmap[field_name] = atom.read
+            if atom.write:   pm.wmap[field_name] = atom.write
+            pm.empty[field_name] = [ None ] if multiple_field else None
             pm.qschema[field_name] = atom.schema
             pm.schema[schema_key]  = [ atom.schema ] if multiple_field else atom.schema
             pm.skeleton[field_name] = Field(label=field_label, schema=field_type,
@@ -241,7 +282,6 @@ def register_models(models, parent_class):
     """
     model_names = [name for name in models if name[0].isalpha()]
     for model_name in model_names: # build reference classes
-        # add to atom_map
         ref_name = model_name+'_ref'
         ref_class = type(ref_name, (ItemRef,), {})
         ref_class.collection = model_name
@@ -276,6 +316,7 @@ def register_models(models, parent_class):
         class_dict['_fields']    = pm.names
         class_dict['_mfields']   = mutable_fields
         class_dict['_sfields']   = short_fields
+        class_dict['_empty']     = pm.empty
         class_dict['_schema']    = schema
         class_dict['_qschema']   = qschema
         class_dict['skeleton']   = skeleton

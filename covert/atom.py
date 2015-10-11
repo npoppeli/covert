@@ -3,22 +3,26 @@
 covert.atom
 -----
 Objects and functions related to the atomic constituents of items.
+
+TODO: Atoms have a partial dependence on the storage engine, namely via the read and write maps.
 """
 
 from datetime import datetime, date, time
 from operator import itemgetter
 from collections import OrderedDict
 
-# Atom = namedtuple('Atom', ['schema', 'convert', 'display'])
+# Atom = namedtuple('Atom', ['schema', 'convert', 'display', 'read', 'write'])
 class Atom(tuple):
     __slots__ = ()
-    def __new__(cls, schema, convert, display):
-        return tuple.__new__(cls, (schema, convert, display))
+    def __new__(cls, schema, convert, display, read=None, write=None):
+        return tuple.__new__(cls, (schema, convert, display, read, write))
     def __repr__(self):
-        return 'Atom(schema=%r, convert=%r, display=%r)' % self
-    schema  = property(itemgetter(0), doc='field number 0')
-    convert = property(itemgetter(1), doc='field number 1')
-    display = property(itemgetter(2), doc='field number 2')
+        return 'Atom(schema=%r, convert=%r, display=%r, read=%r, write=%r)' % self
+    schema  = property(itemgetter(0))
+    convert = property(itemgetter(1))
+    display = property(itemgetter(2))
+    read    = property(itemgetter(3))
+    write   = property(itemgetter(4))
 
 atom_map = {}
 def register_atom(name, **kwarg):
@@ -29,7 +33,7 @@ def register_atom(name, **kwarg):
 
 true_strings = ('j', 'y', 'ja', 'yes')
 bool_repr = {True:'ja', False:'nee'}
-# identity = lambda value: value # when we use dense/full transformation maps
+# identity = lambda x: x # when we use dense/full transformation maps
 identity = None # when we use sparse transformation maps (faster)
 
 register_atom('boolean',
@@ -38,10 +42,13 @@ register_atom('boolean',
     display = lambda value: bool_repr[value]
 )
 
+midnight = datetime.min.time()
 register_atom('date',
     schema  = date,
     convert = lambda value: datetime.strptime(value, "%Y-%m-%d"),
-    display = lambda value: datetime.strftime(value, "%Y-%m-%d")
+    display = lambda value: datetime.strftime(value, "%Y-%m-%d"),
+    read    = lambda value: value.date(), # value read from storage should be datetime object
+    write   = lambda value: datetime.combine(value, midnight)
 )
 
 register_atom('datetime',
@@ -52,14 +59,14 @@ register_atom('datetime',
 
 register_atom('float',
     schema  = float,
-    convert = lambda value: float(value),
+    convert = float,
     display = lambda value: '{0:.2}'.format(value)
 )
 
 register_atom('integer',
     schema  = int,
-    convert = lambda value: int(value),
-    display = lambda value: str(value)
+    convert = int,
+    display = str,
 )
 
 register_atom('memo',

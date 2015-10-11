@@ -7,7 +7,7 @@ Objects and functions related to the MongoDB storage engine.
 
 from datetime import datetime
 from pymongo.connection import MongoClient
-from ..model import BareItem
+from ..model import BareItem, mapdoc
 from bson.objectid import ObjectId
 
 store_name = ''
@@ -71,7 +71,7 @@ class Item(BareItem):
         """
         find(cls, qdoc): list
         Find zero or more documents in collection, and return these in the
-        form of a list of instances of 'cls'.
+        form of a list of instances of 'cls'. Assumption: stored documents are valid.
         qdoc: dictionary specifying the query, e.g. {'id': '1234'}
 
         Regular expressions:
@@ -81,7 +81,6 @@ class Item(BareItem):
         """
         cursor = store_db[cls.name].find(spec=cls.query(qdoc), skip=skip, limit=limit,
                                            fields=fields, sort=(sort if sort else cls.index))
-        # result = [ cls(doc) for doc in cursor if cls.validate(doc)['ok'] ]
         result = [ cls(doc) for doc in cursor ]
         return result
 
@@ -90,24 +89,24 @@ class Item(BareItem):
         """
         lookup(cls, idval): doc
         Return first document in collection matching the given primary key (id),
-        or None if no document matches this key.
+        or None if no document matches this key. Assumption: stored documents are valid.
         idval: primary key (string)
         """
         doc = store_db[cls.name].find_one({'id':idval})
-        return cls(doc) if cls.validate(doc)['ok'] else None
+        return cls(doc)
 
     @classmethod
     def read(cls, qdoc):
         """
         read(cls, qdoc): doc
         Return first document in collection matching the given query,
-        or None if no document matches this query.
+        or None if no document matches this query. Assumption: stored documents are valid.
         qdoc: dictionary specifying the query, e.g. {'id': 1234}
         """
         doc = store_db[cls.name].find_one(cls.query(qdoc))
-        return cls(doc) if cls.validate(doc)['ok'] else None
+        return cls(doc)
 
-    def write(self, validate=True):
+    def write(self, validate=True, debug=False):
         """
         write(self): id
         Save document contained in this instance.
@@ -120,10 +119,18 @@ class Item(BareItem):
             self['id'] = str(self['_id'])
             self['active'] = True
             self['ctime'] = now
-        if validate and not self.validate(self)['ok']:
-            return {'ok': False}
-        result = store_db[self.name].save(self)
-        return {'ok': result != None, 'id': result}
+        if validate:
+            validate_result = self.validate(self)
+            if not validate_result['ok']:
+                print("document {}\ndoes not validate because of error\n{}\n".format(self, validate_result['error']))
+                return {'ok': False}
+        doc = mapdoc(self._wmap, self, debug=debug)
+        try:
+            result = store_db[self.name].save(doc)
+            return {'ok': result != None, 'id': result}
+        except Exception as e:
+            print("document {}\ndoes not save because of error\n{}\n".format(doc, str(e)))
+            return {'ok': False, 'id': None}
 
     def remove(self):
         """
