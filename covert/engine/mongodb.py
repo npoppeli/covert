@@ -6,7 +6,7 @@ Objects and functions related to the MongoDB storage engine.
 """
 
 from datetime import datetime
-from pymongo.connection import MongoClient
+from pymongo import MongoClient
 from ..model import BareItem, mapdoc
 from bson.objectid import ObjectId
 
@@ -80,7 +80,7 @@ class Item(BareItem):
             db.collection.find({'family':rx})
         """
         cursor = store_db[cls.name].find(spec=cls.query(qdoc), skip=skip, limit=limit,
-                                           fields=fields, sort=(sort if sort else cls.index))
+                                         fields=fields, sort=(sort if sort else cls.index))
         result = [ cls(doc) for doc in cursor ]
         return result
 

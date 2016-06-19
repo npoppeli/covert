@@ -48,12 +48,15 @@ page in which the button is embedded.
 """
 
 from .common   import encode_dict, decode_dict
-from .config   import load_config
+from .config   import read_config, parse_cmdline
 from .atom     import atom_map
 from .hook     import hook_page_attachments, hook_page_top, hook_page_bottom
-from .model    import model_map, register_models
+from .model    import register_models
 from .server   import http_server, PrefixRouter, PatternRouter
+from .setting  import model_map, action_map, manager_map
+from .manager  import import_managers
 from .report   import logger
-from .view     import action, ItemView, register_view, action_map
+from .view     import action, ItemView, register_view
 from .view     import url_for, label_for, icon_for
-from .template import render, register_templates
+from .template import render, register_layout
+from webob.static import DirectoryApp

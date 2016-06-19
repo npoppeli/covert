@@ -21,41 +21,36 @@ TODO:
 - tools (JS) for adding, modifying and deleting sub-components
 """
 
+model_map = {}
+
+from copy import deepcopy
 from collections import OrderedDict
 from operator import itemgetter
 from voluptuous import Schema, Optional, MultipleInvalid
 from .atom import atom_map
 from .common import Error
-from copy import deepcopy
+from . import setting
 
-def mapdoc(fnmap, doc, debug=False, inner=False):
+def mapdoc(fnmap, doc, inner=False):
     """mapdoc(doc) -> newdoc
        Map doc using functions in fnmap (mostly for self._cmap, self._dmap, self._rmap and self._wmap).
     """
-    if debug and not inner:
-        print("input document\n", doc)
     newdoc = {}
     for key, value in doc.items():
         if key in fnmap:
             if isinstance(value, dict): # embedded document
-                newdoc[key] = mapdoc(fnmap, value, debug=debug, inner=True)
+                newdoc[key] = mapdoc(fnmap, value, inner=True)
             elif isinstance(value, list): # list of scalars or documents
                 if len(value) == 0: # empty list
                     newdoc[key] = []
                 elif isinstance(value[0], dict): # list of documents
-                    newdoc[key] = [mapdoc(fnmap, element, debug=debug, inner=True) for element in value]
+                    newdoc[key] = [mapdoc(fnmap, element, inner=True) for element in value]
                 else: # list of scalars
                     newdoc[key] = [fnmap[key](element) for element in value]
-                    if debug:
-                        print("{}: {} -> {}".format(key, value, newdoc[key]))
             else: # scalar
                 newdoc[key] = fnmap[key](value)
-                if debug:
-                    print("{}: {} -> {}".format(key, value, newdoc[key]))
         else: # no mapping for this element
             newdoc[key] = value
-    if debug and not inner:
-        print("output document\n", newdoc)
     return newdoc
 
 # Field = namedtuple('Field', ['label', 'schema', 'optional', 'multiple', 'hidden', 'auto'])
@@ -80,8 +75,6 @@ class ParsedModel():
         self.empty = {}
         self.schema, self.qschema = {}, {}
         self.rmap, self.wmap, self.dmap, self.cmap = {}, {}, {}, {}
-
-model_map = {}
 
 # Document revisions
 # 1. If the number of revisions is low, keep all of them in the storage,
@@ -285,7 +278,7 @@ def register_models(models, parent_class):
         ref_name = model_name+'_ref'
         ref_class = type(ref_name, (ItemRef,), {})
         ref_class.collection = model_name
-        model_map[ref_name] = ref_class
+        setting.model_map[ref_name] = ref_class
     for model_name in model_names: # build actual (outer) classes
         model_def, class_dict = models[model_name], {}
         class_dict['index'] = [ ('id', 1) ]

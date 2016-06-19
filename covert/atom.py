@@ -27,7 +27,7 @@ class Atom(tuple):
 atom_map = {}
 def register_atom(name, **kwarg):
     if name in atom_map:
-        raise Exception('Atom {0} is already registered'.format(name))
+        raise Error('Atom {0} is already registered'.format(name))
     else:
         atom_map[name] = Atom(**kwarg)
 

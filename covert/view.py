@@ -13,15 +13,6 @@ from .model import BareItem
 from .template import node
 from .report import logger, print_node, print_doc
 
-text1 = """Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod
-tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim
-veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea
-commodo consequat."""
-text2 = """Duis aute irure dolor in reprehenderit in voluptate
-velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint
-occaecat cupidatat non proident, sunt in culpa qui officia deserunt
-mollit anim id est laborum."""
-
 # Maps and functions for actions, URL patterns, labels and icons
 action_map = []
 url_map = {}
@@ -39,6 +30,7 @@ def exception_report(exc):
 
 def register_view(view):
     assert isinstance(view, ItemView)
+    # assert: view.model is in model map
     # view contains _map = [], array of tuples (regex, method, callable)
     action_map.extend(view._action)
     url_map.update(view._url)
