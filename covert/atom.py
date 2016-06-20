@@ -9,7 +9,7 @@ TODO: Atoms have a partial dependence on the storage engine, namely via the read
 
 from datetime import datetime, date, time
 from operator import itemgetter
-from collections import OrderedDict
+from .common import Error
 
 # Atom = namedtuple('Atom', ['schema', 'convert', 'display', 'read', 'write'])
 class Atom(tuple):

@@ -10,8 +10,7 @@ it could be delegated to the client, using Parsley.js (jQuery) for example.
 import re, sys, traceback
 from .common import str2int, encode_dict, decode_dict
 from .model import BareItem
-from .layout import node
-from .report import logger, print_node, print_doc
+from .report import logger
 
 # Maps and functions for actions, URL patterns, labels and icons
 action_map = []
@@ -20,7 +19,7 @@ label_map = {}
 icon_map = {}
 
 def exception_report(exc):
-    """generate exception traceback in HTML form"""
+    """generate exception traceback from exception 'exc' in HTML form"""
     exc_type, exc_value, exc_trace = sys.exc_info()
     head = ["<p>Internal error. Traceback (most recent call last:</p>"]
     body = ["<p>{0}</p>".format(l.replace("\n", "<br/>"))
@@ -70,64 +69,6 @@ def form_button(label, icon):
     return node('button', 'form',
                 icon=icon, label=label, enabled=True, name='$submit', value=label)
 
-# functions for transforming items into render trees
-def build_item(item, genus):
-    """
-    build_item(item, genus, hide): node
-    Create presentation node for display.
-    """
-    result = []
-    for name in item.fields('short' if genus=='grid' else ''):
-        field = item.skeleton[name]
-        field_value = item[name]
-        if field.multiple:
-            childlist = [ node('show', field.schema, value=e) for e in field_value ]
-        else:
-            childlist = [ node('show', field.schema, value=field_value) ]
-        result.append(node('field', genus,
-                           label=field.label, children=childlist,
-                           hidden=field.hidden, multiple=field.multiple))
-    return node('item', genus, label=item.name, children=result, active=item['active'])
-
-def build_form(item, error={}):
-    """
-    build_form(item, error): nodelist
-    Create list of input nodes (included in a form).
-    """
-    result = []
-    for name in item.fields('mutable'):
-        field = item.skeleton[name]
-        field_value = item[name]
-        if field.multiple:
-            childlist =  [ node('show', field.schema, value=e) for e in field_value  ]
-        else:
-            childlist = [ node('show', field.schema, value=field_value) ]
-        #TODO: put error message in placeholder of corresponding form element, and
-        # collect all error messages in text block below form
-        result.append(node('input', field.schema, error=(name in error),
-                      label=field.label, name=name, children=childlist,
-                       auto=field.auto, multiple=field.multiple))
-    return result
-
-def build_empty_form(item, error={}):
-    """
-    build_empty_form(item, error): nodelist
-    Create list of input nodes (included in a form).
-    """
-    result = []
-    for name in item.fields('mutable'):
-        field = item.skeleton[name]
-        if name in error:
-            logger.debug('empty_form: error in field '+name)
-            result.append(node('input', field.schema, error=True,
-                               label=field.label, name=name, content=error[name],
-                               auto=field.auto, multiple=field.multiple))
-        else:
-            result.append(node('input', field.schema, error=False,
-                               label=field.label, name=name, content='',
-                               auto=field.auto, multiple=field.multiple))
-    return result
-
 # Cursor: class to represent state of search through item collection
 class Cursor(dict):
     __slots__ = ('skip', 'limit', 'count', 'inin', 'inins', 'dir',
@@ -172,11 +113,11 @@ class Cursor(dict):
                     enableprev=(self.skip>0), enablenext=(self.skip+self.limit<self.count))
 
 # ItemView class, and decorator used for the view methods
-class action:
+class view:
     """
     action: decorator for methods in a View class. This adds attributes to methods.
     Once set, these attributes cannot be changed anymore.
-    @action(label, icon, method, pattern)
+    @view(label, icon, method, pattern)
     - label: label (visible name) of button
     - icon: identifier of icon used for button
     - method: string identifying HTTP method (e.g. 'GET' or 'GET, POST')
@@ -194,7 +135,6 @@ class ItemView:
     """
     View: class for view objects that implement the Atom Publishing protocol
     (create, index, new, update, delete, edit, show) plus extensions.
-    The operations 'create', 'index' etcetera are called 'actions'.
     """
     model = BareItem
     def __init__(self):
@@ -236,7 +176,7 @@ class ItemView:
         panel_node = node('panel', 'normal', children=[index, modify, delete])
         return item_node, panel_node
 
-    @action('Show', 'photo', 'GET', '/{id}')
+    @view('Show', 'photo', 'GET', '/{id}')
     def show(self, req, **kwarg):
         """display one item"""
         item = self.model.lookup(kwarg['id'])
@@ -245,7 +185,7 @@ class ItemView:
         else:
             return self._show(item)
 
-    @action('Search', 'search', 'GET', '/search')
+    @view('Search', 'search', 'GET', '/search')
     def search(self, req, error={}):
         """GET  /item/search: create empty search form"""
         form_action = url_for(self.name, 'match')
@@ -273,7 +213,7 @@ class ItemView:
             grid.append(item_node)
         return grid
 
-    @action('List', 'list-alt', 'GET,POST', '/index')
+    @view('List', 'list-alt', 'GET,POST', '/index')
     def index(self, req):
         """show index for item collection"""
         cursor = Cursor(self.model) if req.method == 'GET' else Cursor(self.model, req)
@@ -287,7 +227,7 @@ class ItemView:
         bottom_panel = node('panel', 'normal', children=[new])
         return top_panel, grid_node, bottom_panel
 
-    @action('Search', 'eye', 'POST', '/match')
+    @view('Search', 'eye', 'POST', '/match')
     def match(self, req):
         """show result list of search in item collection"""
         cursor = Cursor(self.model, req)
@@ -319,7 +259,7 @@ class ItemView:
         logger.debug('_modify: (re)post form')
         return form_node
 
-    @action('Modify', 'pencil', 'GET', '/{id}/modify')
+    @view('Modify', 'pencil', 'GET', '/{id}/modify')
     def modify(self, req, **kwarg):
         """get form for modify/update action"""
         item_id = kwarg['id']
@@ -327,7 +267,7 @@ class ItemView:
         form_action = url_for(self.name, 'update', id=item_id)
         return self._modify(item, form_action)
 
-    @action('Create', 'plus', 'GET', '/new')
+    @view('Create', 'plus', 'GET', '/new')
     def new(self, req):
         """get form for new/create action"""
         form_action = url_for(self.name, 'create')
@@ -341,7 +281,7 @@ class ItemView:
                         legend=self.model.name, children=childlist, next='')
         return form_node
 
-    @action('Duplicate', 'tags', 'GET', '/{id}/clone')
+    @view('Duplicate', 'tags', 'GET', '/{id}/clone')
     def clone(self, req, **kwarg):
         """get form for clone=modify/create action"""
         item_id     = kwarg['id']
@@ -373,7 +313,7 @@ class ItemView:
             logger.debug('_update: validation not OK, retry modification')
             return self._modify(item, action, result['error']) # show modified item and errors
 
-    @action('OK', 'ok', 'PUT', '/{id}')
+    @view('OK', 'ok', 'PUT', '/{id}')
     def update(self, req, **kwarg):
         """update existing item"""
         item_id = kwarg['id']
@@ -385,7 +325,7 @@ class ItemView:
             logger.debug('update: submit == Cancel')
             return self._show(item) # show unmodified item
 
-    @action('OK', 'ok', 'POST', '')
+    @view('OK', 'ok', 'POST', '')
     def create(self, req):
         """create new item"""
         item = self.model({})
@@ -394,7 +334,7 @@ class ItemView:
         else:
             return self.index(req) # no unmodified item, show index
 
-    @action('Delete', 'trash-o', 'DELETE', '/{id}')
+    @view('Delete', 'trash-o', 'DELETE', '/{id}')
     def delete(self, req, **kwarg):
         """delete one item"""
         item_id = kwarg['id']
@@ -404,7 +344,7 @@ class ItemView:
         return node('block', '', ok=result['ok'], origin=req.referrer)
 
 #TODO import: import one or more items
-    # @action('Import', 'download', 'GET,POST', '/import')
+    # @view('Import', 'download', 'GET,POST', '/import')
     # def import(cls, filename):
     #     """
     #     import(self, filename): n

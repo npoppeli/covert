@@ -47,11 +47,11 @@ The shape of a button (label, icon or both) is decided by the component that bui
 page in which the button is embedded.
 """
 
-from .common   import encode_dict, decode_dict, read_yaml_file
-from .config   import read_config, parse_cmdline
-from .atom     import atom_map
-from .model    import register_models
-from .view     import http_server, PrefixRouter, PatternRouter, view, ItemView,
-               register_view, url_for, label_for, icon_for
-from .         import setting
-from .report   import logger
+from .common     import encode_dict, decode_dict, read_yaml_file, Error
+from .atom       import atom_map
+from .model      import register_models
+from .view       import view, ItemView, register_view
+from .controller import http_server, SwitchRouter, MapRouter
+from .view       import url_for, label_for, icon_for
+from .setting    import version
+from .report     import logger

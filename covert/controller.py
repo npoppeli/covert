@@ -141,7 +141,7 @@ class MapRouter:
                 view_object = views[view_class]()
                 request.matchdict = match.groupdict()
                 route = getattr(view_object, view_method)
-                result = route(request)
+                result = route(request) #TODO: apply view template
             except Exception as e:
                 result = exception_report(e, html=(self.content_type=='text/html'))
                 response.status = 500
