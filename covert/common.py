@@ -8,6 +8,11 @@ Objects and functions common to two or more modules in the package.
 import json, os, os.path, datetime
 import html
 from bson.objectid import ObjectId
+from yaml import load, load_all
+try:
+    from yaml import CLoader as Loader
+except ImportError:
+    from yaml import Loader
 
 # exceptions
 class Error(Exception):
@@ -34,9 +39,20 @@ def redirect_back(req, default):
         target = default
     raise HTTPSeeOther(location=target)
 
-def readfile(name):
-  with open(name, 'r') as f:
-      return ''.join( f.readlines() )
+def read_file(filename):
+    """read entire file, return content as one string"""
+    with open(filename, 'rU') as f:
+        text = ''.join(f.readlines())
+    return text
+
+def read_yaml_file(path, multi=False):
+    """read file, return YAML content as (list of) document(s)"""
+    with open(path, 'r') as f:
+        if multi:
+            result = list(load_all(f, Loader=Loader))
+        else:
+            result = load(f, Loader=Loader)
+    return result
 
 def str2int(s):
     try:

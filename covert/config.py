@@ -15,24 +15,32 @@ except ImportError:
 from . import setting, storage
 from .model import register_models
 
-def read_cmdline():
-    """read command line, return parsed argument list"""
+def parse_cmdline():
+    """parse command line, return parsed argument list"""
     parser = argparse.ArgumentParser()
     parser.add_argument('-d', '--debug',  help='debug',  action='store_true', default=False)
     parser.add_argument('-m', '--models', help='models', action='store_true', default=False)
     parser.add_argument('-r', '--routes', help='routes', action='store_true', default=False)
+    parser.add_argument('site', help='site directory')
     args = parser.parse_args()
+    setting.site   = args.site
     setting.debug  = args.d
     setting.models = args.m
     setting.routes = args.r
     return args
 
-def read_config(path):
+config_default = dict(content='content', layout='layout')
+
+def read_config():
     """read configuration file, define global settings"""
-    with open(path, 'r') as f:
-        config = load(f, Loader=Loader)
-    setting.sitedir = sys.path[0]
-    setting.config = config
+    config_file = join(setting.site, 'config')
+    config = config_default.copy()
+    if exists(config_file) and isfile(config_file):
+        doc0 = read_yaml_file(config_file)[0]
+        config.update(doc0)
+    setting.content = join(setting.site, config['content'])
+    setting.layout  = join(setting.site, config['layout'])
+    setting.config   = config
 
 # TODO: stores should be in a separate file identified in config.yml
 # TODO: kernel.init() should be enough, and all registers should be in the kernel object

@@ -11,6 +11,9 @@ storage_name = ''
 storage_connection = None
 storage_database = None
 
+content = None # (static) content directory
+layout = None # layout directory
 routes = []
 models = {}
 views = {}
+template = {}

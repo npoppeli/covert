@@ -10,7 +10,7 @@ it could be delegated to the client, using Parsley.js (jQuery) for example.
 import re, sys, traceback
 from .common import str2int, encode_dict, decode_dict
 from .model import BareItem
-from .template import node
+from .layout import node
 from .report import logger, print_node, print_doc
 
 # Maps and functions for actions, URL patterns, labels and icons

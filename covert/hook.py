@@ -17,7 +17,7 @@ Hooks are usually registered by modules. TODO: switch to event model of Bass.
 A module is a Python file in the special 'modules' directory.
 """
 
-from .template import node
+from .layout import node
 
 def hook_page_attachments(page_node):
    header  = node('region', 'header',  content='')
