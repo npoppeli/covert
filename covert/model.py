@@ -83,8 +83,6 @@ class ParsedModel():
 # 2. Otherwise, keep only the active revision in the item storage, and store
 #    backward deltas in a separate storage (use libdiff for text).
 
-field_attr = {'':'_fields', 'short':'_sfields', 'mutable':'_mfields'}
-
 class BareItem(dict):
     """
     BareItem: base class for Item.
@@ -125,7 +123,7 @@ class BareItem(dict):
         Create new instance, initialize from 'doc' (if available).
         """
         super().__init__()
-        for field in self._fields:
+        for field in self.fields:
             self[field] = [] if field in self.skeleton[field].multiple else None
         if doc:
             self.update(mapdoc(self._rmap, doc))
@@ -135,7 +133,7 @@ class BareItem(dict):
         return self._format.format(self)
 
     def __repr__(self):
-        content = ', '.join(["'{}':'{}'".format(key, self.get(key, '')) for key in self._fields])
+        content = ', '.join(["'{}':'{}'".format(key, self.get(key, '')) for key in self.fields])
         return '{}({})'.format(self.__class__.__name__, content)
 
     @classmethod
@@ -160,12 +158,20 @@ class BareItem(dict):
     def lookup(cls, oid):
         """
         lookup(cls, oid): doc
-        Return empty document (method is redefined in Item class)
+        Return trivial item (method is redefined in Item class)
         oid: object id (string)
         """
         doc = {'id':oid}
         return cls(doc)
 
+    @classmethod
+    def empty(cls):
+        """
+        empty(cls): doc
+        Create new item from empty document for this class
+        """
+        return cls(cls._empty)
+        
     @classmethod
     def convert(cls, doc):
         """
@@ -188,10 +194,10 @@ class BareItem(dict):
         """
         cls = self.__class__
         newdoc = deepcopy(self)
-        for name in cls._fields:
+        for name in cls.fields:
             if cls.skeleton[name].auto:
                 newdoc[name] = None
-        return newdoc
+        return cls(newdoc)
 
 class ItemRef:
     collection = 'Item'
@@ -203,7 +209,7 @@ class ItemRef:
     def __repr__(self):
         return "{}({} {})".format(self.__class__.__name__, self.collection, self.id)
 
-def ref2id(ref):
+def get_objectid(ref):
     return ref.id
 
 def set_str_field(ref):
@@ -261,10 +267,10 @@ def parse_model_def(model_def, model_defs):
             ref_name = field_type[1:]+'Ref'
             if ref_name not in setting.models:
                 raise Error("reference to unknown model '{0}' in {1}".format(ref_name, line))
-            pm.cmap[field_name] = None # no conversion is necessary
+            # don't add entry to pm.cmap, since conversion is unnecessary
             pm.dmap[field_name] = set_str_field # set itemref.str to str(item)
-            pm.rmap[field_name] = setting.models[ref_name]
-            pm.wmap[field_name] = ref2id
+            pm.rmap[field_name] = setting.models[ref_name] # create ItemRef instance with argument 'objectid'
+            pm.wmap[field_name] = get_objectid # write only objectid to database
             pm.empty[field_name] = [ None ] if multiple_field else None
             pm.qschema[field_name] = None
             pm.schema[schema_key] = [ setting.models[ref_name] ] if multiple_field else setting.models[ref_name]
@@ -337,7 +343,7 @@ def read_models(model_defs):
         class_dict['fields']     = pm.names
         class_dict['mfields']    = mutable_fields
         class_dict['sfields']    = short_fields
-        class_dict['empty']      = pm.empty
+        class_dict['_empty']     = pm.empty
         class_dict['_schema']    = schema
         class_dict['_qschema']   = qschema
         class_dict['_format']    = pm.fmt
