@@ -8,16 +8,14 @@ Objects and functions related to the MongoDB storage engine.
 from datetime import datetime
 from pymongo import MongoClient
 from ..model import BareItem, mapdoc
+from .. import setting
 from bson.objectid import ObjectId
 
-store_name = ''
-store_conn, store_db = None, None
-
 def init_storage():
-    global store_name, store_conn, store_db
-    store_name = 'local'
-    store_conn = MongoClient()
-    store_db = store_conn[store_name]
+    print('setting MongoDB connection')
+    setting.store_connection = MongoClient() # TODO: make this thread-safe
+    print('setting MongoDB database to', setting.store_dbname)
+    setting.store_db = setting.store_connection[setting.store_dbname]
 
 class Item(BareItem):
     """
@@ -30,9 +28,9 @@ class Item(BareItem):
         create_collection(cls)
         Create collection cls.name, unless this is already present.
         """
-        coll_list = store_db.collection_names()
+        coll_list = setting.store_db.collection_names()
         if cls.name not in coll_list:
-            store_db.create_collection(cls.name)
+            setting.store_db.create_collection(cls.name)
 
     @classmethod
     def create_index(cls, index_keys):
@@ -42,7 +40,7 @@ class Item(BareItem):
         index_keys is a list of 2-tuples (name, direction), where direction is 1 or -1
         TODO: text index via coll.ensureIndex({'author': 'text', 'content': 'text'})
         """
-        collection = store_db[cls.name]
+        collection = setting.store_db[cls.name]
         collection.ensure_index(index_keys, unique=False)
 
     @classmethod
@@ -63,7 +61,7 @@ class Item(BareItem):
         Find zero or more documents in collection, and count them.
         qdoc: dictionary specifying the query, e.g. {'id': '1234'}
         """
-        cursor = store_db[cls.name].find(spec=cls.query(qdoc))
+        cursor = setting.store_db[cls.name].find(filter=cls.query(qdoc))
         return cursor.count()
 
     @classmethod
@@ -79,20 +77,20 @@ class Item(BareItem):
             rx = re.compile(r'^Fel')
             db.collection.find({'family':rx})
         """
-        cursor = store_db[cls.name].find(spec=cls.query(qdoc), skip=skip, limit=limit,
+        cursor = setting.store_db[cls.name].find(filter=cls.query(qdoc), skip=skip, limit=limit,
                                          fields=fields, sort=(sort if sort else cls.index))
         result = [ cls(doc) for doc in cursor ]
         return result
 
     @classmethod
-    def lookup(cls, idval):
+    def lookup(cls, oid):
         """
-        lookup(cls, idval): doc
+        lookup(cls, oid): doc
         Return first document in collection matching the given primary key (id),
         or None if no document matches this key. Assumption: stored documents are valid.
-        idval: primary key (string)
+        oid: primary key (string)
         """
-        doc = store_db[cls.name].find_one({'id':idval})
+        doc = setting.store_db[cls.name].find_one({'id':oid})
         return cls(doc)
 
     @classmethod
@@ -103,7 +101,7 @@ class Item(BareItem):
         or None if no document matches this query. Assumption: stored documents are valid.
         qdoc: dictionary specifying the query, e.g. {'id': 1234}
         """
-        doc = store_db[cls.name].find_one(cls.query(qdoc))
+        doc = setting.store_db[cls.name].find_one(cls.query(qdoc))
         return cls(doc)
 
     def write(self, validate=True, debug=False):
@@ -112,13 +110,13 @@ class Item(BareItem):
         Save document contained in this instance.
         Return value {'ok':True, 'id':<document id>} or {'ok':False, 'id':None}.
         """
-        now = datetime.now()
-        self['mtime'] = now
-        if ('_id' not in self) or (self['_id'] == ''): # new item
+        new = not ('id' in self and self['id'])
+        self['mtime'] = datetime.now()
+        if new:
             self['_id'] = ObjectId()
             self['id'] = str(self['_id'])
             self['active'] = True
-            self['ctime'] = now
+            self['ctime'] = self['mtime']
         if validate:
             validate_result = self.validate(self)
             if not validate_result['ok']:
@@ -126,11 +124,27 @@ class Item(BareItem):
                 return {'ok': False}
         doc = mapdoc(self._wmap, self, debug=debug)
         try:
-            result = store_db[self.name].save(doc)
-            return {'ok': result != None, 'id': result}
+            if new:
+                # print('inserting', self.collection, self.tag())
+                result = setting.store_db[self.collection].insert_one(doc)
+                return {'ok':True, 'id':str(result.inserted_id)}
+            else:
+                result = setting.store_db[self.collection].replace_one({'_id':self['_id']}, doc)
+                return {'ok':True, 'id':str(result.upserted_id)}
         except Exception as e:
-            print("document {}\ndoes not save because of error\n{}\n".format(doc, str(e)))
+            print('document {}\nnot written because of error\n{}\n'.format(doc, str(e)))
             return {'ok': False, 'id': None}
+
+    # methods to set references (update database directly)
+    @classmethod
+    def set_field(cls, itemid, key, value):
+        result = setting.store_db[cls.collection].update_one({'id':itemid}, {'$set':{key:value}})
+        return result
+
+    @classmethod
+    def append_field(cls, itemid, key, value):
+        result = setting.store_db[cls.collection].update_one({'id':itemid}, {'$addToSet':{key:value}})
+        return result
 
     def remove(self):
         """
@@ -138,4 +152,4 @@ class Item(BareItem):
         Remove document from collection.
         Return value should be {'ok':1.0, 'err':None}.
         """
-        return store_db[self.name].remove(self['_id'])
+        return setting.store_db[self.name].remove(self['_id'])

@@ -16,8 +16,8 @@ items of different classes.
 
 An action is a pipeline (a concept borrowed from Apache Cocoon):
 1. generator (get primary content, i.e. a Node, from database)
-2. transformer (transform into render array; the same thing happens for the secundary content)
-3. aggregator (all content is combined into a @page render array, in the case of HTML format)
+2. transformer (transform into render array; the same thing happens for the secondary content)
+3. aggregator (all content is combined into a single document that can be rendered)
 4. serializer (serialize to HTML, JSON, XML, ...)
 
 When an action is called from a web page, three elements are relevant:
@@ -31,7 +31,7 @@ each pattern, has a unique identifier. This identifier is used to construct a UR
 a id, key or other field.
 
 The name, style, method, URL pattern and pattern identifier are attached to the method
-or function by means of a decorator: @action(label, icon, method, pattern)
+or function by means of a decorator: @route(pattern, method, template)
 
 There are three types of buttons:
 1. form button      (name,   value, label, icon)
@@ -47,11 +47,10 @@ The shape of a button (label, icon or both) is decided by the component that bui
 page in which the button is embedded.
 """
 
-from .common     import encode_dict, decode_dict, read_yaml_file, Error
-from .atom       import atom_map
-from .model      import register_models
-from .view       import view, ItemView, register_view
-from .controller import http_server, SwitchRouter, MapRouter
-from .view       import url_for, label_for, icon_for
-from .setting    import version
-from .report     import logger
+from .config         import read_config, parse_cmdline, kernel_init
+from .controller     import http_server, SwitchRouter, MapRouter, PageRouter, JSONRouter
+from .layout         import read_templates
+from .model          import mapdoc
+from .report         import logger
+from .view           import route, ItemView, form2query
+from .               import setting

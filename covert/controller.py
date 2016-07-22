@@ -9,7 +9,7 @@ depending on the request parameters.
 
 import waitress, sys, traceback, json
 from webob import BaseRequest as Request, Response # performance of BaseRequest is better
-from .setting import routes, views
+from .setting import routes, views, templates
 from .report import logger
 
 def http_server(app, **kwarg):
@@ -109,10 +109,9 @@ class SwitchRouter:
 class MapRouter:
     """A WSGI application to dispatch on the first component of PATH_INFO using patterns.
        This application uses the global action map to map a regular expression to a view.
-       The view is a method of a view class. The view class is instantiated with
-       the request object as single parameter. Then the method is called, which is expected to
-       return a string that contains a renderable representation of the content to be delivered.
-       In MVC jargon, this application acts as the controller.
+       The view is a method of a view class. The view class is instantiated with two parameters:
+       the request object, and the match dict. Then the view is called, which is expected to
+       return a dictionary containing the content to be rendered and delivered.
     """
 
     def __init__(self):
@@ -127,21 +126,21 @@ class MapRouter:
         req_method = request.params.get('_method', request.method).upper()
         req_path = request.path_info
         # find first route that matches request
-        view_class, view_method = None, None
-        for regex, method, class_name, method_name in routes:
-            match = regex.match(req_path)
-            if req_method == method and match: # exit loop if matching route found
-                view_class, view_method = class_name, method_name
+        view_cls = None
+        for route in routes: # route: regex, pattern, method, cls, name, template
+            match = route.regex.match(req_path)
+            if route.method == req_method and match: # exit loop if matching route found
+                view_cls, route_name, route_template = route.cls, route.name, route.template
                 break
         response = Response(content_type=self.content_type, status=200)
         # run route or send error report
-        if view_class:
+        if view_cls:
             try:
-                logger.debug('{0} {1}'.format(method, request.path_qs))
-                view_object = views[view_class]()
-                request.matchdict = match.groupdict()
-                route = getattr(view_object, view_method)
-                result = route(request) #TODO: apply view template
+                logger.debug('{0} {1}'.format(req_method, request.path_qs))
+                view_object = views[view_cls](request, match.groupdict())
+                #TODO: replace model name with model object
+                route = getattr(view_object, route_name)
+                result = templates[route_template].render(this=route())
             except Exception as e:
                 result = exception_report(e, html=(self.content_type=='text/html'))
                 response.status = 500
@@ -157,10 +156,10 @@ class PageRouter(MapRouter):
 
     def __init__(self, template):
         self.content_type = 'application/json'
-        self.template = template
+        self.template = templates[template]
 
     def renderer(self, result):
-        return template.render(this=result)
+        return self.template.render(this={'content':result})
 
 class JSONRouter(MapRouter):
 
