@@ -22,22 +22,22 @@ class Error(Exception):
         return repr(self.message)
 
 # auxiliary functions
-def is_safe_url(target, req):
-    host_url = urlparse(req.host_url)
-    test_url = urlparse(urljoin(req.host_url, target))
-    return test_url.scheme in ('http', 'https') and (host_url.netloc == test_url.netloc)
+# def is_safe_url(target, req):
+#     host_url = urlparse(req.host_url)
+#     test_url = urlparse(urljoin(req.host_url, target))
+#     return test_url.scheme in ('http', 'https') and (host_url.netloc == test_url.netloc)
 
-def redirect_location(req):
-    if req.referrer and is_safe_url(req.referrer, req):
-        return req.referrer
-    else:
-        return ''
+# def redirect_location(req):
+#     if req.referrer and is_safe_url(req.referrer, req):
+#         return req.referrer
+#     else:
+#         return ''
 
-def redirect_back(req, default):
-    target = req.params['_next']
-    if not target or not is_safe_url(target):
-        target = default
-    raise HTTPSeeOther(location=target)
+# def redirect_back(req, default):
+#     target = req.params['_next']
+#     if not target or not is_safe_url(target):
+#         target = default
+#     raise HTTPSeeOther(location=target)
 
 def read_file(filename):
     """read entire file, return content as one string"""
@@ -73,6 +73,9 @@ def decode_dict(s):
 
 def encode_dict(s):
     return html.escape(json.dumps(s, separators=(',',':'), cls=ComplexEncoder))
+
+def show_dict(s):
+    return json.dumps(s, separators=(',',':'), cls=ComplexEncoder)
 
 # lightweight Trie data structure, based on an example by James Tauber
 # A Trie is a radix or prefix tree, and can be used to represent a dictionary, for example.

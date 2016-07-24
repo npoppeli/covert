@@ -7,40 +7,44 @@ In the present implementation, form validation is performed on the server. In a 
 it could be delegated to the client, using Parsley.js (jQuery) for example.
 """
 
-import re, sys, traceback
+import re
 from inspect import getmembers, isclass
 from itertools import chain
-from .model import mapdoc
 from . import setting
 
-# # Maps and functions for actions, URL patterns, labels and icons
-# url_map = {}
-# label_map = {}
-# icon_map = {}
-#
-# def exception_report(exc):
-#     """generate exception traceback from exception 'exc' in HTML form"""
-#     exc_type, exc_value, exc_trace = sys.exc_info()
-#     head = ["<p>Internal error. Traceback (most recent call last:</p>"]
-#     body = ["<p>{0}</p>".format(l.replace("\n", "<br/>"))
-#               for l in traceback.format_tb(exc_trace)]
-#     tail = ["<p><em>{0}: {1}</em></p>".format(exc_type.__name__, exc_value)]
-#     return ''.join(head+body+tail)
-#
-# def url_for(view, action, qs={}, **kwarg):
-#     url = url_map.get(action_name(view, action), '').format(**kwarg)
-#     if qs:
-#         url = url + '?' + '&'.join(['{0}={1}'.format(k, qs[k]) for k in qs])
-#     return url
-#
-# def label_for(view, action, **kwarg):
-#     return label_map.get(action_name(view, action), '')
-#
-# def icon_for(view, action, **kwarg):
-# #TODO: authorization determines the state (enabled, disabled)
-#     return icon_map.get(action_name(view, action), '')
-#
-# # functions for buttons
+setting.icons = {
+   'show'  : 'fa fa-photo',
+   'index' : 'fa fa-list-alt',
+   'search': 'fa fa-search',
+   'match' : 'fa fa-eye',
+   'modify': 'fa fa-pencil',
+   'update': 'fa fa-pencil',
+   'new'   : 'fa fa-new',
+   'create': 'fa fa-new',
+   'delete': 'fa fa-trash-o',
+   'home'  : 'fa fa-home',
+   'info'  : 'fa fa-info-circle',
+   'ok'    : 'fa fa-check',
+   'cancel': 'fa fa-times'
+}
+def icon_for(view, route, **kwarg):
+#TODO: authorization determines the state (enabled, disabled)
+    return setting.icons.get(route, '')
+
+setting.labels = {
+     'show':   'Show|Toon|Show',
+     'home':   'Home|Begin|Hem',
+}
+def label_for(view, route, **kwarg):
+    return setting.labels.get(route, '')
+
+def url_for(view, route, qs={}, **kwarg):
+    url = setting.routes(view+'_'+route, '').format(**kwarg)
+    if qs:
+        url = url + '?' + '&'.join(['{0}={1}'.format(k, qs[k]) for k in qs])
+    return url
+
+# functions for buttons
 # #TODO: these should become classes (button factories). Instances are partial functions
 # # with URL and other variables as parameters, and can be passed along to grid etcetera.
 # def panel_button(view, action, confirm=None, prompt=None, enabled=True, **kwarg):
@@ -129,15 +133,18 @@ def route2pattern(route):
     return ''.join(parts)
 
 def route2regex(route):
+    def split_lookup(s):
+        before, after = s.split(':')
+        return before, patterns[after]
     parts = cut_route(route)
-    parts[1::2] = list(map(lambda s: '(?P<{0}>{1})'.format(*s.split(':')), parts[1::2]))
+    parts[1::2] = list(map(lambda s: '(?P<{0}>{1})'.format(*split_lookup(s)), parts[1::2]))
     parts.insert(0, '^')
     parts.append('$')
     return ''.join(parts)
 
 def read_views(module):
     for view_name, view_class in getmembers(module, isclass):
-        if view_name == 'ItemView' or not issubclass(view_class, ItemView):
+        if view_name in ['BareItemView', 'ItemView'] or not issubclass(view_class, BareItemView):
             continue
         # view classes must have a name that ends in 'View'
         assert len(view_name) > 4 and view_name.endswith('View')
@@ -146,13 +153,15 @@ def read_views(module):
             member = getattr(view_class, name)
             if hasattr(member, 'pattern'): # decorated method, i.e. a route
                 full_pattern = '/' + prefix + member.pattern
-                regex = re.compile(route2regex(full_pattern))
+                rx = route2regex(full_pattern)
+                regex = re.compile(rx)
                 pattern = route2pattern(full_pattern)
                 template_name = prefix+'_'+member.template
                 if template_name not in setting.templates:
                     template_name = 'default'
                 template = setting.templates[template_name]
                 for method in member.method.split(','):
+                    # print("{} {}: t={} p={}".format(pattern, method, template_name, rx))
                     route = Route(regex, pattern, method, view_class, name, template)
                     setting.routes.append(route)
     #TODO: finishing touch: sort routes table
@@ -180,9 +189,6 @@ class route:
         wrapped.template = self.template
         return wrapped
 
-def display(item):
-    return mapdoc(item.dmap, item)
-
 def store_result(item):
     return item.write()
 
@@ -195,43 +201,48 @@ def form2update(req):
 def form2query(req):
     return req.params
 
-class ItemView:
+class BareItemView:
     """
-    View: class for view objects that implement the Atom Publishing protocol
-    (create, index, new, update, delete, edit, show) plus extensions.
+    BareItemView: superclass for ItemView and for views with specific routes.
     """
-    model = 'Item'
+    model = 'BareItem'
     def __init__(self, request, matchdict):
         self.request = request
         self.matchdict = matchdict
+
+class ItemView(BareItemView):
+    """
+    ItemView: superclass for views that implement the Atom Publishing protocol
+    (create, index, new, update, delete, edit, show) plus extensions.
+    """
+    model = 'Item'
 
     @route('/{id:objectid}', template='show')
     def show(self):
         """display one item"""
         r1 = self.model.lookup(self.matchdict['id'])
-        r2 = display(r1) # use display map of item class
-        # TODO: this should also add str(item) to the display document
-        return r2
+        r2 = r1.display() # use display map of item class
+        return {'fields':self.model.fields, 'item':r2}
 
     @route('/index', template='index')
     def index(self):
         """display multiple items (collection)"""
         r1 = self.model.find({}, limit=10, skip=0)
-        r2 = display(r1)
+        r2 = r1.display()
         return r2
 
     @route('/search', template='search')
     def search(self):
         """create search form"""
         r1 = self.model.empty()
-        r2 = display(r1)
-        return r2 # TODO: action=POST /person/search, buttons = ??, action = url_for(self.name, 'match')
+        return r1 # TODO: action=POST /person/search, buttons = ??, action = url_for(self.name, 'match')
 
     @route('/search', method='POST', template='match')
     def match(self):
         """show result list of search"""
-        r1 = self.model.find(form2query(self.request), limit=10, skip=0)
-        r2 = display(r1)
+        query = form2query(self.request)
+        r1 = self.model.find(query, limit=10, skip=0)
+        r2 = r1.display()
         # cursor = Cursor(self.model, req)
         # if not cursor.query:
         #     logger.debug('match: invalid query '+str(cursor.error))
@@ -245,7 +256,7 @@ class ItemView:
         item_id = self.matchdict['id']
         r1 = self.model.lookup(item_id)
         # form_action = url_for(self.name, 'update', id=item_id)
-        r2 = display(r1)
+        r2 = r1.display()
         return r2 # TODO: action = PUT /person/{id}, buttons = ??
 
     @route('/{id:objectid}', method='PUT', template='update')

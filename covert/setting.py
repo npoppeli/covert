@@ -16,5 +16,6 @@ routes           = []
 models           = {}
 views            = {}
 templates        = {}
+icons            = {}
 config           = {}
 debug            = False

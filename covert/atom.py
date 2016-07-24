@@ -42,12 +42,12 @@ register_atom('boolean',
     display = lambda value: bool_repr[value]
 )
 
-midnight = datetime.min.time()
+midnight = time(0, 0, 0, 0)
 register_atom('date',
     schema  = date,
     convert = lambda value: datetime.strptime(value, "%Y-%m-%d"),
     display = lambda value: datetime.strftime(value, "%Y-%m-%d"),
-    read    = lambda value: value.date(), # value read from storage should be datetime object
+    read    = lambda value: value.date(),
     write   = lambda value: datetime.combine(value, midnight)
 )
 

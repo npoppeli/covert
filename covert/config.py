@@ -80,15 +80,15 @@ def kernel_init():
         print('Application has {0} routes'.format(len(setting.routes)))
         for route in setting.routes:
             print(str(route))
-    if setting.debug:
-        print('Application has {0} models'.format(len(setting.models)))
-        for name, model in setting.models.items():
-            if name.endswith('Ref'):
-                print('Reference class', name)
-            else:
-                print('{0}\n{1}'.format(name, '-'*len(name)))
-                print(str(model._schema))
-                for field_name, field in model.skeleton.items():
-                    print('{0}: "{1}" optional={2} multiple={3}'.\
-                        format(field_name, field.label, field.optional, field.multiple))
-                print('')
+    # if setting.debug:
+    #     print('Application has {0} models'.format(len(setting.models)))
+    #     for name, model in setting.models.items():
+    #         if name.endswith('Ref'):
+    #             print('Reference class', name)
+    #         else:
+    #             print('{0}\n{1}'.format(name, '-'*len(name)))
+    #             print(str(model._schema))
+    #             for field_name, field in model.skeleton.items():
+    #                 print('{0}: "{1}" optional={2} multiple={3}'.\
+    #                     format(field_name, field.label, field.optional, field.multiple))
+    #             print('')

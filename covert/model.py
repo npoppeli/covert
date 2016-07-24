@@ -28,7 +28,7 @@ from collections import OrderedDict
 from operator import itemgetter
 from voluptuous import Schema, Optional, MultipleInvalid
 from .atom import atom_map
-from .common import Error
+from .common import Error, show_dict
 from . import setting
 
 def mapdoc(fnmap, doc, inner=False):
@@ -124,9 +124,19 @@ class BareItem(dict):
         """
         super().__init__()
         for field in self.fields:
-            self[field] = [] if field in self.skeleton[field].multiple else None
+            self[field] = [] if self.skeleton[field].multiple else None
         if doc:
-            self.update(mapdoc(self._rmap, doc))
+            self.update(mapdoc(self.rmap, doc))
+
+    @classmethod
+    def empty(cls):
+        """
+        empty(cls): doc
+        Create new item from empty document for this class
+        """
+        item = cls()
+        item.update(cls._empty)
+        return item
 
     _format = 'Item {id}'
     def __str__(self):
@@ -165,27 +175,19 @@ class BareItem(dict):
         return cls(doc)
 
     @classmethod
-    def empty(cls):
-        """
-        empty(cls): doc
-        Create new item from empty document for this class
-        """
-        return cls(cls._empty)
-        
-    @classmethod
     def convert(cls, doc):
         """
         convert(cls, doc): newdoc
         Convert stringified item to item with typed fields.
         """
-        return mapdoc(cls._cmap, doc)
+        return mapdoc(cls.cmap, doc)
 
-    def display(self, doc):
+    def display(self):
         """
-        display(cls, doc): newdoc
+        display(cls): newdoc
         Convert item with typed fields to item with stringified fields.
         """
-        return mapdoc(self._dmap, doc)
+        return mapdoc(self.dmap, self)
 
     def copy(self):
         """
@@ -271,7 +273,7 @@ def parse_model_def(model_def, model_defs):
             pm.dmap[field_name] = set_str_field # set itemref.str to str(item)
             pm.rmap[field_name] = setting.models[ref_name] # create ItemRef instance with argument 'objectid'
             pm.wmap[field_name] = get_objectid # write only objectid to database
-            pm.empty[field_name] = [ None ] if multiple_field else None
+            pm.empty[field_name] = [ '' ] if multiple_field else ''
             pm.qschema[field_name] = None
             pm.schema[schema_key] = [ setting.models[ref_name] ] if multiple_field else setting.models[ref_name]
             pm.skeleton[field_name] = Field(label=field_label, schema=ref_name,
@@ -283,7 +285,7 @@ def parse_model_def(model_def, model_defs):
             if atom.display: pm.dmap[field_name] = atom.display
             if atom.read:    pm.rmap[field_name] = atom.read
             if atom.write:   pm.wmap[field_name] = atom.write
-            pm.empty[field_name] = [ None ] if multiple_field else None
+            pm.empty[field_name] = [ '' ] if multiple_field else ''
             pm.qschema[field_name] = atom.schema
             pm.schema[schema_key]  = [ atom.schema ] if multiple_field else atom.schema
             pm.skeleton[field_name] = Field(label=field_label, schema=field_type,
@@ -307,6 +309,9 @@ def read_models(model_defs):
         from .engine.rethinkdb import Item
     else:
         raise Error('Storage engine should be MongoDB or RethinkDB')
+    setting.models['BareItem'] = BareItem
+    setting.models['Item'] = Item
+
     model_names = [name for name in model_defs.keys() if name[0].isalpha()]
     for model_name in model_names: # build reference classes
         ref_name = model_name+'Ref'

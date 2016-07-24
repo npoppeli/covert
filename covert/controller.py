@@ -9,8 +9,9 @@ depending on the request parameters.
 
 import waitress, sys, traceback, json
 from webob import BaseRequest as Request, Response # performance of BaseRequest is better
-from .setting import routes, views, templates
+from .setting import routes, templates, models
 from .report import logger
+from .common import encode_dict
 
 def http_server(app, **kwarg):
     logger.debug('starting HTTP server')
@@ -83,10 +84,10 @@ class SwitchRouter:
 
     def __call__(self, environ, start_response):
         request = Request(environ)
-        req_path = request.path_info
         req_method = request.params.get('_method', request.method).upper()
-        if req_path.startswith(self._static):
+        if request.path_info.startswith(self._static):
             mode = self.STATIC_MODE
+            request.path_info = request.path_info.replace(self._static, '', 1)
         elif request.headers.get('X-Requested-With', '') == 'XMLHttpRequest': # jQuery.ajax()
             if 'application/json' in request.accept:
                 mode = self.JSON_MODE
@@ -98,8 +99,8 @@ class SwitchRouter:
             mode = self.PAGE_MODE
         try:
             response = request.get_response(self._app[mode])
-            logger.debug('mode {0}: {1} {2} -> {3}'.\
-                         format(mode, req_method, request.path_qs, response.status))
+            print('mode {0}: {1} {2} -> {3}'.\
+                  format(mode, req_method, request.path_qs, response.status))
         except Exception as e:
             response = Response()
             response.text = exception_report(e)
@@ -136,15 +137,19 @@ class MapRouter:
         # run route or send error report
         if view_cls:
             try:
-                logger.debug('{0} {1}'.format(req_method, request.path_qs))
-                view_object = views[view_cls](request, match.groupdict())
-                #TODO: replace model name with model object
-                route = getattr(view_object, route_name)
-                result = templates[route_template].render(this=route())
+                print('{0}: {1} {2}'.format(self.__class__.__name__, req_method, request.path_qs))
+                # logger.debug('{0} {1}'.format(req_method, request.path_qs))
+                view_obj = view_cls(request, match.groupdict())
+                view_obj.model = models[view_obj.model]
+                route = getattr(view_obj, route_name)
+                result = route()
+                # print('{0}: result={1}'.format(self.__class__.__name__, encode_dict(result)))
+                result = route_template.render(this=result)
             except Exception as e:
-                result = exception_report(e, html=(self.content_type=='text/html'))
+                result = exception_report(e)
                 response.status = 500
         else: # no match with the defined routes
+            print('{0}: {1} {2}'.format(self.__class__.__name__, 'nothing found for', request.path_qs))
             result = 'Nothing found for '+request.path_qs
             response.status = 404
         # encode to UTF8 and return according to WSGI protocol
@@ -155,7 +160,7 @@ class MapRouter:
 class PageRouter(MapRouter):
 
     def __init__(self, template):
-        self.content_type = 'application/json'
+        self.content_type = 'text/html'
         self.template = templates[template]
 
     def renderer(self, result):

@@ -52,5 +52,5 @@ from .controller     import http_server, SwitchRouter, MapRouter, PageRouter, JS
 from .layout         import read_templates
 from .model          import mapdoc
 from .report         import logger
-from .view           import route, ItemView, form2query
+from .view           import route, BareItemView, ItemView, form2query
 from .               import setting
