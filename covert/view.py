@@ -114,7 +114,7 @@ class Route:
         self.template = template
 
     def __str__(self):
-        return("{0} {1} -> {2}:{3}".\
+        return("{0} {1} -> {2}:{3}".
                format(self.pattern, self.method, self.cls.__name__, self.name))
 
 # regular expressions used in routes
@@ -124,19 +124,19 @@ patterns = {
     'objectid': r'\w{24}'
 }
 
-def cut_route(route):
-    return list(chain.from_iterable([p.split('}') for p in route.split('{')]))
+def cut_route(r):
+    return list(chain.from_iterable([p.split('}') for p in r.split('{')]))
 
-def route2pattern(route):
-    parts = cut_route(route)
+def route2pattern(r):
+    parts = cut_route(r)
     parts[1::2] = list(map(lambda s: '{{{0}}}'.format(s.split(':')[0]), parts[1::2]))
     return ''.join(parts)
 
-def route2regex(route):
+def route2regex(r):
     def split_lookup(s):
         before, after = s.split(':')
         return before, patterns[after]
-    parts = cut_route(route)
+    parts = cut_route(r)
     parts[1::2] = list(map(lambda s: '(?P<{0}>{1})'.format(*split_lookup(s)), parts[1::2]))
     parts.insert(0, '^')
     parts.append('$')
@@ -164,7 +164,6 @@ def read_views(module):
                     # print("{} {}: t={} p={}".format(pattern, method, template_name, rx))
                     route = Route(regex, pattern, method, view_class, name, template)
                     setting.routes.append(route)
-    #TODO: finishing touch: sort routes table
     # sorting in reverse alphabetical order ensures words like 'match' and 'index'
     # are not absorbed by {id} or other components of the regex patterns
     setting.routes.sort(key=lambda route: route.pattern, reverse=True)
@@ -222,7 +221,9 @@ class ItemView(BareItemView):
         """display one item"""
         r1 = self.model.lookup(self.matchdict['id'])
         r2 = r1.display() # use display map of item class
-        return {'fields':self.model.fields, 'item':r2}
+        fields = self.model.sfields
+        labels = dict([(field, self.model.skeleton[field].label) for field in fields])
+        return {'fields':fields, 'labels':labels, 'item':r2}
 
     @route('/index', template='index')
     def index(self):

@@ -2,7 +2,15 @@
 """
 covert.setting
 --------------
-Global settings, shared by all modules. The application registry, in fact.
+Global settings, shared by all modules.
+Use like this, to make clear which module defines global variables:
+  from covert import setting
+  setting.models['Item'] = ...
+
+Only in cases where performance matters, save one dictionary lookup with:
+  from covert.setting import routes
+  for route in routes:
+    ....
 """
 
 version          = '0.1'
@@ -18,7 +26,7 @@ views            = {}
 templates        = {}
 labels           = {}
 language         = ''
-languages        = ['EN', 'NL', 'SV']
+languages        = ['en', 'nl'] # TODO: add 'sv'
 icons            = {}
 config           = {}
 debug            = False

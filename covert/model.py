@@ -28,10 +28,10 @@ from collections import OrderedDict
 from operator import itemgetter
 from voluptuous import Schema, Optional, MultipleInvalid
 from .atom import atom_map
-from .common import Error, show_dict
+from .common import Error
 from . import setting
 
-def mapdoc(fnmap, doc, inner=False):
+def mapdoc(fnmap, doc):
     """mapdoc(doc) -> newdoc
        Map doc using functions in fnmap
     """
@@ -39,12 +39,12 @@ def mapdoc(fnmap, doc, inner=False):
     for key, value in doc.items():
         if key in fnmap: # apply mapping function
             if isinstance(value, dict): # embedded document
-                newdoc[key] = mapdoc(fnmap, value, inner=True)
+                newdoc[key] = mapdoc(fnmap, value)
             elif isinstance(value, list): # list of scalars or documents
                 if len(value) == 0: # empty list
                     newdoc[key] = []
                 elif isinstance(value[0], dict): # list of documents
-                    newdoc[key] = [mapdoc(fnmap, element, inner=True) for element in value]
+                    newdoc[key] = [mapdoc(fnmap, element) for element in value]
                 else: # list of scalars
                     newdoc[key] = [fnmap[key](element) for element in value]
             else: # scalar
@@ -67,7 +67,7 @@ class Field(tuple):
     hidden   = property(itemgetter(4))
     auto     = property(itemgetter(5))
 
-class ParsedModel():
+class ParsedModel:
     """ParsedModel: result of parsing model definition."""
     def __init__(self):
         self.names, self.index = [], []
@@ -101,7 +101,7 @@ class BareItem(dict):
     # all, all mutable, and all short fields
     fields  = ['id', 'ctime', 'mtime', 'active']
     mfields = []
-    sfields = ['ctime', 'mtime', 'active']
+    sfields = []
     # schemata for normal and query validation
     _schema  = {'id':sa.schema, 'ctime':da.schema, 'mtime':da.schema, 'active': ba.schema}
     _qschema = {}
@@ -112,6 +112,7 @@ class BareItem(dict):
     wmap = {}
     # skeleton
     skeleton = OrderedDict()
+    # TODO: labels should become language-dependent
     skeleton['id']     = Field(label='Id',       schema='string',   auto=True, hidden=True )
     skeleton['ctime']  = Field(label='Created',  schema='datetime', auto=True, hidden=False)
     skeleton['mtime']  = Field(label='Modified', schema='datetime', auto=True, hidden=False)
@@ -223,6 +224,7 @@ def set_str_field(ref):
 def parse_model_def(model_def, model_defs):
     """parse definition of one model"""
     pm = ParsedModel() # parsed model definition
+    label_index = setting.languages.index(setting.language)
     for line in model_def:
         field_def = line.split()
         if len(field_def) not in (3, 4):
@@ -239,13 +241,15 @@ def parse_model_def(model_def, model_defs):
                 direction = -1 if field_card == '<' else 1
                 pm.index.append( (field_name, direction) )
         if field_name == '_format':
-            pm.fmt = field_label
+            pm.fmt = field_label.replace('_', ' ')
             continue
         schema_key = Optional(field_name) if optional_field else field_name
         pm.names.append(field_name)
-        field_hidden = field_label == '_'
+        field_hidden = field_label.startswith('_')
         if not field_hidden:
             field_label = field_label.replace('_', ' ')
+            parts = field_label.split('|')
+            field_label = parts[label_index]
         if field_type[0] == '_': # embedded model (comparable to inner class)
             embedded = parse_model_def(model_defs[field_type], model_defs)
             pm.empty[field_name] = [ embedded.empty ] if multiple_field else embedded.empty

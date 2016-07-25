@@ -24,7 +24,7 @@ def parse_cmdline():
     return args
 
 config_default = dict(content='content', layout='layout',
-                      models='models', views='views')
+                      models='models', views='views', language='en')
 
 def read_config():
     """read configuration file, define global settings"""
@@ -39,6 +39,7 @@ def read_config():
     setting.layout  = join(setting.site, config['layout'])
     setting.store_dbname  = config['dbname']
     setting.dbtype  = config['dbtype']
+    setting.language = config['language'] if config['language'] in setting.languages else config_default['language']
     setting.config  = config
 
 def kernel_init():

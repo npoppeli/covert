@@ -9,9 +9,8 @@ depending on the request parameters.
 
 import waitress, sys, traceback, json
 from webob import BaseRequest as Request, Response # performance of BaseRequest is better
-from .setting import routes, templates, models
+from . import setting
 from .report import logger
-from .common import encode_dict
 
 def http_server(app, **kwarg):
     logger.debug('starting HTTP server')
@@ -128,7 +127,7 @@ class MapRouter:
         req_path = request.path_info
         # find first route that matches request
         view_cls = None
-        for route in routes: # route: regex, pattern, method, cls, name, template
+        for route in setting.routes: # route: regex, pattern, method, cls, name, template
             match = route.regex.match(req_path)
             if route.method == req_method and match: # exit loop if matching route found
                 view_cls, route_name, route_template = route.cls, route.name, route.template
@@ -140,7 +139,7 @@ class MapRouter:
                 print('{0}: {1} {2}'.format(self.__class__.__name__, req_method, request.path_qs))
                 # logger.debug('{0} {1}'.format(req_method, request.path_qs))
                 view_obj = view_cls(request, match.groupdict())
-                view_obj.model = models[view_obj.model]
+                view_obj.model = setting.models[view_obj.model]
                 route = getattr(view_obj, route_name)
                 result = route()
                 # print('{0}: result={1}'.format(self.__class__.__name__, encode_dict(result)))
@@ -148,7 +147,7 @@ class MapRouter:
             except Exception as e:
                 result = exception_report(e)
                 response.status = 500
-        else: # no match with the defined routes
+        else: # no match with the defined setting.routes
             print('{0}: {1} {2}'.format(self.__class__.__name__, 'nothing found for', request.path_qs))
             result = 'Nothing found for '+request.path_qs
             response.status = 404
@@ -160,8 +159,9 @@ class MapRouter:
 class PageRouter(MapRouter):
 
     def __init__(self, template):
+        super().__init__()
         self.content_type = 'text/html'
-        self.template = templates[template]
+        self.template = setting.templates[template]
 
     def renderer(self, result):
         return self.template.render(this={'content':result})
@@ -169,6 +169,7 @@ class PageRouter(MapRouter):
 class JSONRouter(MapRouter):
 
     def __init__(self):
+        super().__init__()
         self.content_type = 'application/json'
 
     def renderer(self, result):
