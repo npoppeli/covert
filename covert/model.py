@@ -141,7 +141,7 @@ class BareItem(dict):
 
     _format = 'Item {id}'
     def __str__(self):
-        return self._format.format(self)
+        return self._format.format(**self)
 
     def __repr__(self):
         content = ', '.join(["'{}':'{}'".format(key, self.get(key, '')) for key in self.fields])
