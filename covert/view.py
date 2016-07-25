@@ -11,6 +11,7 @@ import re
 from inspect import getmembers, isclass
 from itertools import chain
 from . import setting
+from .common import show_dict
 
 setting.icons = {
    'show'  : 'fa fa-photo',
@@ -221,6 +222,7 @@ class ItemView(BareItemView):
         """display one item"""
         r1 = self.model.lookup(self.matchdict['id'])
         r2 = r1.display() # use display map of item class
+        print('item:', show_dict(r2))
         fields = self.model.sfields
         labels = dict([(field, self.model.skeleton[field].label) for field in fields])
         return {'fields':fields, 'labels':labels, 'item':r2}

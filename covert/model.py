@@ -215,11 +215,10 @@ class ItemRef:
 def get_objectid(ref):
     return ref.id
 
-def set_str_field(ref):
+def ref_tuple(ref):
     model = setting.models[ref.collection]
     item = model.lookup(ref.id)
-    ref.str = str(item)
-    return ref
+    return str(item), '/{}/{}'.format(ref.collection.lower(), ref.id) # label, url
     
 def parse_model_def(model_def, model_defs):
     """parse definition of one model"""
@@ -274,7 +273,7 @@ def parse_model_def(model_def, model_defs):
             if ref_name not in setting.models:
                 raise Error("reference to unknown model '{0}' in {1}".format(ref_name, line))
             # don't add entry to pm.cmap, since conversion is unnecessary
-            pm.dmap[field_name] = set_str_field # set itemref.str to str(item)
+            pm.dmap[field_name] = ref_tuple # create tuple (label, url)
             pm.rmap[field_name] = setting.models[ref_name] # create ItemRef instance with argument 'objectid'
             pm.wmap[field_name] = get_objectid # write only objectid to database
             pm.empty[field_name] = [ '' ] if multiple_field else ''
