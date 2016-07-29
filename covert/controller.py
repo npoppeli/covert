@@ -3,7 +3,7 @@
 covert.server
 -----
 Objects and functions related to WSGI and HTTP servers.
-The switchingrouter creates a response object with full HTML, partial HTML or JSON,
+The switching router creates a response object with full HTML, partial HTML or JSON,
 depending on the request parameters.
 """
 
@@ -44,7 +44,7 @@ def exception_report(exc, html=True):
     return ''.join(head+body+tail)
 
 class SwitchRouter:
-    """A WSGI application that servers as front-end to a web application"""
+    """A WSGI application that serves as front-end to a web application"""
     # Operating modes
     STATIC_MODE  = 0 # static file
     PAGE_MODE    = 1 # complete HTML page
@@ -108,10 +108,10 @@ class SwitchRouter:
 
 class MapRouter:
     """A WSGI application to dispatch on the first component of PATH_INFO using patterns.
-       This application uses the global action map to map a regular expression to a view.
-       The view is a method of a view class. The view class is instantiated with two parameters:
-       the request object, and the match dict. Then the view is called, which is expected to
-       return a dictionary containing the content to be rendered and delivered.
+       This application uses a global route map to map a regular expression to a view and a route.
+       The route is a method of a view class. The view class is instantiated with two parameters:
+       the request object, and the match dict. Then the route method is called, which is expected to
+       return a render tree, a dictionary containing the content to be rendered and delivered.
     """
 
     def __init__(self):
@@ -142,7 +142,7 @@ class MapRouter:
                 view_obj.model = setting.models[view_obj.model]
                 route = getattr(view_obj, route_name)
                 result = route()
-                # print('{0}: result={1}'.format(self.__class__.__name__, encode_dict(result)))
+                # TODO: result = serialize(result), where serialize adds labels, icons, fields etcetera
                 result = route_template.render(this=result)
             except Exception as e:
                 result = exception_report(e)
@@ -158,10 +158,12 @@ class MapRouter:
 
 class PageRouter(MapRouter):
 
-    def __init__(self, template):
+    def __init__(self, name):
+    """"PageRouter is a specialized MapRouter. The 'name' parameter is the name of the template
+    used to render the content to HTML. This should be a template for a complete HTML page.""""
         super().__init__()
         self.content_type = 'text/html'
-        self.template = setting.templates[template]
+        self.template = setting.templates[name]
 
     def renderer(self, result):
         return self.template.render(this={'content':result})

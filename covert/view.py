@@ -11,7 +11,6 @@ import re
 from inspect import getmembers, isclass
 from itertools import chain
 from . import setting
-from .common import show_dict
 
 setting.icons = {
    'show'  : 'fa fa-photo',
@@ -221,9 +220,13 @@ class ItemView(BareItemView):
     def show(self):
         """display one item"""
         r1 = self.model.lookup(self.matchdict['id'])
-        r2 = r1.display() # use display map of item class
-        print('item:', show_dict(r2))
-        fields = self.model.sfields
+        r2 = r1.display()
+        # return of the render tree:
+        # buttons: modify button (label, icon, url)
+        # fields and labels should be added by function 'serialize'
+        # fields can be self.model.fields (scalar) or self.model.sfields (list)
+        # {'item': r2, 'buttons': {...}, 'fields:'fields, 'labels':labels}
+        fields = self.model.fields
         labels = dict([(field, self.model.skeleton[field].label) for field in fields])
         return {'fields':fields, 'labels':labels, 'item':r2}
 
@@ -232,13 +235,21 @@ class ItemView(BareItemView):
         """display multiple items (collection)"""
         r1 = self.model.find({}, limit=10, skip=0)
         r2 = r1.display()
+        # return of the render tree:
+        # global buttons: add button (label, icon, url)
+        # row buttons: modify, delete (label, icon, url per item)
+        # row action: url per item (for anchor on first column)
+        # {'item': r2, 'feedback':message, 'buttons': {...}, 'fields:'fields, 'labels':labels}
         return r2
 
     @route('/search', template='search')
     def search(self):
         """create search form"""
         r1 = self.model.empty()
-        return r1 # TODO: action=POST /person/search, buttons = ??, action = url_for(self.name, 'match')
+       # return of the render tree:
+        # global buttons: search button (label, icon, url) action=/[class]/search POST
+        # {'item': r2, 'feedback':message, 'buttons': {...}, 'fields:'fields, 'labels':labels}        
+        return r1
 
     @route('/search', method='POST', template='match')
     def match(self):
