@@ -10,99 +10,105 @@ it could be delegated to the client, using Parsley.js (jQuery) for example.
 import re
 from inspect import getmembers, isclass
 from itertools import chain
+from .common import str2int, decode_dict
 from . import setting
 
 setting.icons = {
-   'show'  : 'fa fa-photo',
-   'index' : 'fa fa-list-alt',
-   'search': 'fa fa-search',
-   'match' : 'fa fa-eye',
-   'modify': 'fa fa-pencil',
-   'update': 'fa fa-pencil',
-   'new'   : 'fa fa-new',
-   'create': 'fa fa-new',
-   'delete': 'fa fa-trash-o',
-   'home'  : 'fa fa-home',
-   'info'  : 'fa fa-info-circle',
-   'ok'    : 'fa fa-check',
-   'cancel': 'fa fa-times'
+   'show'   : 'fa fa-photo',
+   'index'  : 'fa fa-list-alt',
+   'search' : 'fa fa-search',
+   'match'  : 'fa fa-eye',
+   'modify' : 'fa fa-pencil',
+   'update' : 'fa fa-pencil',
+   'new'    : 'fa fa-new',
+   'create' : 'fa fa-new',
+   'delete' : 'fa fa-trash-o',
+   'home'   : 'fa fa-home',
+   'info'   : 'fa fa-info-circle',
+   'ok'     : 'fa fa-check',
+   'refresh': 'fa fa-refresh',
+   'cancel' : 'fa fa-times'
 }
-def icon_for(view, route, **kwarg):
+
+def icon_for(name):
 #TODO: authorization determines the state (enabled, disabled)
-    return setting.icons.get(route, '')
+    return setting.icons.get(name, 'fa fa-flash')
 
 setting.labels = {
-     'show':   'Show|Toon|Show',
-     'home':   'Home|Begin|Hem',
+     'show'   : 'Show|Toon|Show',
+     'index'  : 'Index|Index|..',
+     'search' : 'Search|Zoek|..',
+     'match'  : 'Match|Resultaat|..',
+     'modify' : 'Modify|Wijzig|..',
+     'update' : 'Update|Wijzig|..',
+     'new'    : 'New|..|Nieuw',
+     'create' : 'Create|Creeer|..',
+     'delete' : 'Delete|Verwijder|..',
+     'home'   : 'Home|Begin|Hem',
+     'info'   : 'Info|Info|Info',
+     'ok'     : 'OK|OK|..',
+     'refresh': 'Refresh|Ververs|..',
+     'cancel' : 'Cancel|Annuleer|..'
 }
-def label_for(view, route, **kwarg):
-    return setting.labels.get(route, '')
 
-def url_for(view, route, qs={}, **kwarg):
-    url = setting.routes(view+'_'+route, '').format(**kwarg)
-    if qs:
-        url = url + '?' + '&'.join(['{0}={1}'.format(k, qs[k]) for k in qs])
+def label_for(name):
+    return setting.labels.get(name, 'unknown')
+
+def url_for(view, name, item):
+    url = setting.routes(view+'_'+name, '').format(**item)
     return url
 
 # functions for buttons
-# #TODO: these should become classes (button factories). Instances are partial functions
-# # with URL and other variables as parameters, and can be passed along to grid etcetera.
-# def panel_button(view, action, confirm=None, prompt=None, enabled=True, **kwarg):
-#     return node('button', 'panel',
-#                 icon=icon_for(view, action), label=label_for(view, action),
-#                 enabled=enabled, action=url_for(view, action, **kwarg),
-#                 confirm=confirm, prompt=prompt)
-# def grid_button(view, action, confirm=None, prompt=None, enabled=True, **kwarg):
-#     return node('button', 'grid',
-#                 icon=icon_for(view, action), label=label_for(view, action)[0],
-#                 enabled=enabled, action=url_for(view, action, **kwarg),
-#                 confirm=confirm, prompt=prompt)
-# def form_button(label, icon):
-#     return node('button', 'form',
-#                 icon=icon, label=label, enabled=True, name='$submit', value=label)
+def panel_button(name, action, enabled=True):
+    # TODO: add data-confirm and data-prompt (Bootstrap JS)
+    return {'label': label_for(name), 'icon': icon_for(name), 'action': action}
 
-# # Cursor: class to represent state of search through item collection
-# class Cursor(dict):
-#     __slots__ = ('skip', 'limit', 'count', 'inin', 'inins', 'dir',
-#                  'query', 'bquery', 'equery', 'submit', 'error')
-#     _numbers  = ('skip', 'limit', 'count', 'inin', 'inins', 'dir')
-#     def __init__(self, model, request=None):
-#         self.skip, self.limit, self.count = 0, 10, 0
-#         self.inin, self.inins, self.dir = 0, 0, 0
-#         if request:
-#             query = {}
-#             for key, value in request.params.items():
-#                 if key.startswith('$'):
-#                     newkey = key[1:]
-#                     setattr(self, newkey, str2int(value) if newkey in self._numbers else value)
-#                 elif value:
-#                     query[key] = value
-#             if self.query == '': # initial post
-#                 valid = self.modelvalidate(query, 'query')
-#                 if valid['ok']:
-#                     self.query = query
-#                     self.error = {}
-#                 else:
-#                     self.query = {}
-#                     self.error = valid['error']
-#             else: # follow-up post
-#                 self.query = decode_dict(self.query)
-#         else:
-#             self.query = {}
-#         # equery = bquery (base query)+ query (user query)
-#         #   - bquery depends on active toggle
-#         #   - query is specified in form, or {}
-#         self.equery = {'active':'' if self.inin == 1 else True}
-#         self.equery.update(self.query)
-#         if (self.count == 0) or (self.inin != self.inins): # count absent or toggle has changed
-#             self.count = self.modelcount(self.equery)
-#         if request:
-#             self.skip = max(0, min(self.count, self.skip+self.dir*self.limit))
-#     def form(self, action):
-#         qs = encode_dict(self.query) if self.query else ''
-#         return node('form', 'cursor', action=action, inin=self.inin, inins=self.inin,
-#                     skip=self.skip, count=self.count, limit=self.limit, query=qs,
-#                     enableprev=(self.skip>0), enablenext=(self.skip+self.limit<self.count))
+def grid_button(name, action, enabled=True):
+    # TODO: add data-confirm and data-prompt (Bootstrap JS)
+    return {'label': label_for(name), 'icon': icon_for(name), 'action': action}
+
+def form_button(name, action):
+    return {'label': label_for(name), 'icon': icon_for(name), 'action': action}
+
+# Cursor: class to represent state of browsing through item collection
+class Cursor(dict):
+    __slots__ = ('skip', 'limit', 'count', 'incl', 'incl0', 'dir',
+                 'query', 'equery', 'submit')
+    _numbers  = ('skip', 'limit', 'count', 'incl', 'incl0', 'dir')
+    def __init__(self, model, request=None):
+        self.skip, self.limit, self.count = 0, 10, 0
+        self.incl, self.incl0, self.dir = 0, 0, 0
+        if request:
+            query = {}
+            for key, value in request.params.items():
+                if key.startswith('_'):
+                    newkey = key[1:]
+                    setattr(self, newkey, str2int(value) if newkey in self._numbers else value)
+                elif value:
+                    query[key] = value
+            if self.query == '': # initial post
+                valid = self.model.validate(query, 'query')
+                if valid['ok']:
+                    self.query = query
+                    self.error = {}
+                else:
+                    self.query = {}
+                    self.error = valid['error']
+            else: # follow-up post
+                self.query = decode_dict(self.query)
+        else:
+            self.query = {}
+        # equery = query (user query) + extra criterium depending on 'incl'
+        self.equery = {'active':''} if self.incl == 1 else {}
+        self.equery.update(self.query)
+        if (self.count == 0) or (self.incl != self.incl0): # no count or 'incl' has changed
+            self.count = self.model.count(self.equery)
+        if request:
+            self.skip = max(0, min(self.count, self.skip+self.dir*self.limit))
+    # in form template:
+    # action, incl (toggle), incl0 (hidden), skip (hidden), count (hidden), limit (menu),
+    # query (hidden), prev_on (boolean), next_on (boolean)
+    # prev_on = self.skip>0, next_on = self.skip+self.limit<self.count
 
 class Route:
     def __init__(self,regex, pattern, method, cls, name, template):
@@ -124,19 +130,19 @@ patterns = {
     'objectid': r'\w{24}'
 }
 
-def cut_route(r):
-    return list(chain.from_iterable([p.split('}') for p in r.split('{')]))
+def split_route(pattern):
+    return list(chain.from_iterable([p.split('}') for p in pattern.split('{')]))
 
-def route2pattern(r):
-    parts = cut_route(r)
+def route2pattern(pattern):
+    parts = split_route(pattern)
     parts[1::2] = list(map(lambda s: '{{{0}}}'.format(s.split(':')[0]), parts[1::2]))
     return ''.join(parts)
 
-def route2regex(r):
+def route2regex(pattern):
     def split_lookup(s):
         before, after = s.split(':')
         return before, patterns[after]
-    parts = cut_route(r)
+    parts = split_route(pattern)
     parts[1::2] = list(map(lambda s: '(?P<{0}>{1})'.format(*split_lookup(s)), parts[1::2]))
     parts.insert(0, '^')
     parts.append('$')
@@ -149,6 +155,7 @@ def read_views(module):
         # view classes must have a name that ends in 'View'
         assert len(view_name) > 4 and view_name.endswith('View')
         prefix = view_name.replace('View', '', 1).lower()
+        view_class.prefix = prefix
         for name in dir(view_class):
             member = getattr(view_class, name)
             if hasattr(member, 'pattern'): # decorated method, i.e. a route
@@ -161,12 +168,11 @@ def read_views(module):
                     template_name = 'default'
                 template = setting.templates[template_name]
                 for method in member.method.split(','):
-                    # print("{} {}: t={} p={}".format(pattern, method, template_name, rx))
                     route = Route(regex, pattern, method, view_class, name, template)
                     setting.routes.append(route)
     # sorting in reverse alphabetical order ensures words like 'match' and 'index'
     # are not absorbed by {id} or other components of the regex patterns
-    setting.routes.sort(key=lambda route: route.pattern, reverse=True)
+    setting.routes.sort(key=lambda r: r.pattern, reverse=True)
 
 # ItemView class, and decorator used for the routes (view methods)
 class route:
@@ -202,9 +208,11 @@ def form2query(req):
 
 class BareItemView:
     """
-    BareItemView: superclass for ItemView and for views with specific routes.
+    BareItemView: bare view that does not define routes. It serves as superclass for ItemView and
+    for view classes that define their own specific routes.
     """
     model = 'BareItem'
+    prefix = ''
     def __init__(self, request, matchdict):
         self.request = request
         self.matchdict = matchdict
@@ -221,35 +229,28 @@ class ItemView(BareItemView):
         """display one item"""
         r1 = self.model.lookup(self.matchdict['id'])
         r2 = r1.display()
-        # return of the render tree:
-        # buttons: modify button (label, icon, url)
-        # fields and labels should be added by function 'serialize'
-        # fields can be self.model.fields (scalar) or self.model.sfields (list)
-        # {'item': r2, 'buttons': {...}, 'fields:'fields, 'labels':labels}
-        fields = self.model.fields
-        labels = dict([(field, self.model.skeleton[field].label) for field in fields])
-        return {'fields':fields, 'labels':labels, 'item':r2}
+        buttons = {'index':  panel_button('index',  url_for(self.prefix, 'index',  self)),
+                   'update': panel_button('update', url_for(self.prefix, 'update', self)),
+                   'delete': panel_button('delete', url_for(self.prefix, 'delete', self))}
+        return {'item':r2, 'buttons': buttons}
 
     @route('/index', template='index')
     def index(self):
         """display multiple items (collection)"""
         r1 = self.model.find({}, limit=10, skip=0)
         r2 = r1.display()
-        # return of the render tree:
-        # global buttons: add button (label, icon, url)
-        # row buttons: modify, delete (label, icon, url per item)
-        # row action: url per item (for anchor on first column)
-        # {'item': r2, 'feedback':message, 'buttons': {...}, 'fields:'fields, 'labels':labels}
-        return r2
+        for row in r2:
+            # add grid_buttons per item: show, modify, update, delete
+            row['_buttons'] = {}
+        buttons = {'new':  panel_button('new',  url_for(self.prefix, 'new',  self))}
+        return {'items': r2, 'buttons': buttons}
 
     @route('/search', template='search')
     def search(self):
         """create search form"""
         r1 = self.model.empty()
-       # return of the render tree:
-        # global buttons: search button (label, icon, url) action=/[class]/search POST
-        # {'item': r2, 'feedback':message, 'buttons': {...}, 'fields:'fields, 'labels':labels}        
-        return r1
+        buttons = {'search':  panel_button('search',  url_for(self.prefix, 'search',  self))}
+        return {'item':r1, 'buttons': buttons}
 
     @route('/search', method='POST', template='match')
     def match(self):
@@ -262,6 +263,7 @@ class ItemView(BareItemView):
         #     logger.debug('match: invalid query '+str(cursor.error))
         #     return self.search(self.request, cursor.error) # show search form and errors
         # #TODO: $key $op $value, where $op is 'in' for 'text' and 'memo', otherwise 'eq'
+        # buttons per item: show item, modify, update item, delete item
         return r2
 
     @route('/{id:objectid}/modify', template='modify')
@@ -269,12 +271,14 @@ class ItemView(BareItemView):
         """get form for modify/update action"""
         item_id = self.matchdict['id']
         r1 = self.model.lookup(item_id)
-        # form_action = url_for(self.name, 'update', id=item_id)
         r2 = r1.display()
-        return r2 # TODO: action = PUT /person/{id}, buttons = ??
+        buttons = {'ok':     form_button('ok',     url_for(self.prefix, 'update',  self)),
+                   'cancel': form_button('cancel', url_for(self.prefix, 'update', self))}
+        return {'item':r2, 'buttons': buttons}
 
     @route('/{id:objectid}', method='PUT', template='update')
     def update(self): # update person
+        # TODO: update if 'OK' was clicked, else use unmodified item
         r1 = self.model.update({'id':self.matchdict['id']}, form2update(self.request))
         r2 = store_result(r1)
         return r2
@@ -283,14 +287,14 @@ class ItemView(BareItemView):
     def new(self):
         """get form for new/create action"""
         r1 = self.model.empty()
-        # TODO: form_action = url_for(self.name, 'create')
-        # TODO: buttons: ok, cancel
-        return r1 # TODO: action = POST /person, buttons = ??
+        buttons = {'ok':     form_button('ok',     url_for(self.prefix, 'create',  self)),
+                   'cancel': form_button('cancel', url_for(self.prefix, 'create', self))}
+        return {'item':r1, 'buttons': buttons}
 
     @route('', method='POST', template='create')
     def create(self):
         """create new item"""
-        # TODO: if 'OK' was clicked, else use unmodified item
+        # TODO: create if 'OK' was clicked, else do nothing
         r1 = self.model.insert(form2doc(self.request))
         r2 = store_result(r1)
         return r2
@@ -299,6 +303,7 @@ class ItemView(BareItemView):
     def delete(self):
         """delete one item"""
         r1 = self.set_field(self.matchdict['id'], 'active', False) # item.remove() only during clean-up
+        # TODO: button index collection
         return r1
 
     #TODO import: import one or more items

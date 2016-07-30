@@ -31,14 +31,12 @@ def exception_report(exc, html=True):
     """generate exception traceback"""
     exc_type, exc_value, exc_trace = sys.exc_info()
     if html:
-        head = ["<h2>Internal error</h2>",
-                "<p>Traceback (most recent call last:</p>"]
+        head = ["<h2>Internal error</h2>", "<p>Traceback (most recent call last:</p>"]
         body = ["<p>{0}</p>".format(l.replace("\n", "<br/>"))
                 for l in traceback.format_tb(exc_trace)]
         tail = ["<p><em>{0}: {1}</em></p>".format(exc_type.__name__, exc_value)]
     else:
-        head = ["Internal error. ",
-                "Traceback (most recent call last:"]
+        head = ["Internal error. ", "Traceback (most recent call last:"]
         body = []
         tail = ["{0}: {1}".format(exc_type.__name__, exc_value)]
     return ''.join(head+body+tail)
@@ -142,7 +140,13 @@ class MapRouter:
                 view_obj.model = setting.models[view_obj.model]
                 route = getattr(view_obj, route_name)
                 result = route()
-                # TODO: result = serialize(result), where serialize adds labels, icons, fields etcetera
+                # add fields and labels TODO: add icons and any other UI information
+                if 'items' in result: # list of items
+                    result['fields'] = view_obj.model.fields
+                else:
+                    result['fields'] = view_obj.model.sfields
+                result['labels'] = dict([(field, view_obj.model.skeleton[field].label)
+                                         for field in result['fields']])
                 result = route_template.render(this=result)
             except Exception as e:
                 result = exception_report(e)
@@ -159,8 +163,8 @@ class MapRouter:
 class PageRouter(MapRouter):
 
     def __init__(self, name):
-    """"PageRouter is a specialized MapRouter. The 'name' parameter is the name of the template
-    used to render the content to HTML. This should be a template for a complete HTML page.""""
+        """"PageRouter is a specialized MapRouter. The 'name' parameter is the name of the template
+        used to render the content to HTML. This should be a template for a complete HTML page."""
         super().__init__()
         self.content_type = 'text/html'
         self.template = setting.templates[name]
