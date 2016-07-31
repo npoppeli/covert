@@ -228,11 +228,12 @@ def parse_model_def(model_def, model_defs):
         field_def = line.split()
         if len(field_def) not in (3, 4):
             raise Error("field definition '{0}' should have 3 or 4 components".format(line))
-        optional_field, multiple_field = False, False
+        optional_field, multiple_field, auto_field = False, False, False
         if len(field_def) == 3:
             field_name, field_type, field_label = field_def
         else: # n == 4
             field_name, field_type, field_card, field_label = field_def
+            auto_field     = field_card == '%'
             multiple_field = field_card in '+*'
             optional_field = field_card in '?*'
             # indexed field: < >
@@ -255,8 +256,8 @@ def parse_model_def(model_def, model_defs):
             pm.qschema[field_name] = embedded.qschema
             pm.schema[schema_key] = [ embedded.schema ] if multiple_field else embedded.schema
             pm.skeleton[field_name] = Field(label=field_label, schema='dict',
-                                         hidden=field_hidden, auto=False,
-                                         optional=optional_field, multiple=multiple_field)
+                                            hidden=field_hidden, auto=False,
+                                            optional=optional_field, multiple=multiple_field)
             pm.names.extend(embedded.names)
             pm.cmap[field_name] = dict
             pm.dmap[field_name] = dict
@@ -292,7 +293,7 @@ def parse_model_def(model_def, model_defs):
             pm.qschema[field_name] = atom.schema
             pm.schema[schema_key]  = [ atom.schema ] if multiple_field else atom.schema
             pm.skeleton[field_name] = Field(label=field_label, schema=field_type,
-                                            hidden=field_hidden, auto=False,
+                                            hidden=field_hidden, auto=auto_field,
                                             optional=optional_field, multiple=multiple_field)
     return pm
 
@@ -328,7 +329,7 @@ def read_models(model_defs):
         mutable_fields = [f for f in pm.names
                           if not (pm.skeleton[f].hidden or pm.skeleton[f].auto)]
         mutable_fields.extend(Item.mfields)
-        short_fields = [f for f in pm.names
+        short_fields = [f for f in mutable_fields
                         if not (pm.skeleton[f].multiple or pm.skeleton[f].schema in ('text', 'memo'))]
         short_fields.extend(Item.sfields)
         pm.names.extend(Item.fields)

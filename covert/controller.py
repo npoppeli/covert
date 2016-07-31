@@ -134,17 +134,17 @@ class MapRouter:
         # run route or send error report
         if view_cls:
             try:
-                print('{0}: {1} {2}'.format(self.__class__.__name__, req_method, request.path_qs))
-                # logger.debug('{0} {1}'.format(req_method, request.path_qs))
+                # print('{0}: {1} {2}'.format(self.__class__.__name__, req_method, request.path_qs))
                 view_obj = view_cls(request, match.groupdict())
                 view_obj.model = setting.models[view_obj.model]
                 route = getattr(view_obj, route_name)
                 result = route()
                 # add fields and labels TODO: add icons and any other UI information
-                if 'items' in result: # list of items
-                    result['fields'] = view_obj.model.fields
-                else:
+                if 'itemlist' in result: # list of items
                     result['fields'] = view_obj.model.sfields
+                else:
+                    result['fields'] = view_obj.model.mfields
+                print('{0}: {1} fields={2}'.format(self.__class__.__name__, req_method, result['fields']))
                 result['labels'] = dict([(field, view_obj.model.skeleton[field].label)
                                          for field in result['fields']])
                 result = route_template.render(this=result)

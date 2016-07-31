@@ -69,7 +69,7 @@ class Item(BareItem):
         """
         find(cls, qdoc): list
         Find zero or more documents in collection, and return these in the
-        form of a list of instances of 'cls'. Assumption: stored documents are valid.
+        form of a list of 'cls' instances. Assumption: stored documents are valid.
         qdoc: dictionary specifying the query, e.g. {'id': '1234'}
 
         Regular expressions:
@@ -78,7 +78,7 @@ class Item(BareItem):
             db.collection.find({'family':rx})
         """
         cursor = setting.store_db[cls.name].find(filter=cls.query(qdoc), skip=skip, limit=limit,
-                                         fields=fields, sort=(sort if sort else cls.index))
+            sort=(sort if sort else cls.index))
         result = [ cls(doc) for doc in cursor ]
         return result
 

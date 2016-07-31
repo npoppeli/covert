@@ -20,6 +20,7 @@ store_dbname     = ''   # name of database
 content          = None # (static) content directory
 layout           = None # layout (template) directory
 site             = None # site directory
+patterns         = {}
 routes           = []
 models           = {}
 views            = {}

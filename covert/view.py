@@ -55,16 +55,12 @@ def label_for(name):
     return setting.labels.get(name, 'unknown')
 
 def url_for(view, name, item):
-    url = setting.routes(view+'_'+name, '').format(**item)
+    url = setting.patterns[view+'_'+name].format(**item)
     return url
 
 # functions for buttons
-def panel_button(name, action, enabled=True):
-    # TODO: add data-confirm and data-prompt (Bootstrap JS)
-    return {'label': label_for(name), 'icon': icon_for(name), 'action': action}
-
-def grid_button(name, action, enabled=True):
-    # TODO: add data-confirm and data-prompt (Bootstrap JS)
+def normal_button(name, action):
+    # TODO: add enabled; add data-confirm and data-prompt (Bootstrap JS)
     return {'label': label_for(name), 'icon': icon_for(name), 'action': action}
 
 def form_button(name, action):
@@ -76,6 +72,8 @@ class Cursor(dict):
                  'query', 'equery', 'submit')
     _numbers  = ('skip', 'limit', 'count', 'incl', 'incl0', 'dir')
     def __init__(self, model, request=None):
+        super().__init__()
+        self.model = model
         self.skip, self.limit, self.count = 0, 10, 0
         self.incl, self.incl0, self.dir = 0, 0, 0
         if request:
@@ -135,7 +133,7 @@ def split_route(pattern):
 
 def route2pattern(pattern):
     parts = split_route(pattern)
-    parts[1::2] = list(map(lambda s: '{{{0}}}'.format(s.split(':')[0]), parts[1::2]))
+    parts[1::2] = list(map(lambda p: '{{{0}}}'.format(p.split(':')[0]), parts[1::2]))
     return ''.join(parts)
 
 def route2regex(pattern):
@@ -143,7 +141,7 @@ def route2regex(pattern):
         before, after = s.split(':')
         return before, patterns[after]
     parts = split_route(pattern)
-    parts[1::2] = list(map(lambda s: '(?P<{0}>{1})'.format(*split_lookup(s)), parts[1::2]))
+    parts[1::2] = list(map(lambda p: '(?P<{0}>{1})'.format(*split_lookup(p)), parts[1::2]))
     parts.insert(0, '^')
     parts.append('$')
     return ''.join(parts)
@@ -168,8 +166,9 @@ def read_views(module):
                     template_name = 'default'
                 template = setting.templates[template_name]
                 for method in member.method.split(','):
-                    route = Route(regex, pattern, method, view_class, name, template)
-                    setting.routes.append(route)
+                    new_route = Route(regex, pattern, method, view_class, name, template)
+                    setting.patterns[prefix+'_'+name] = pattern
+                    setting.routes.append(new_route)
     # sorting in reverse alphabetical order ensures words like 'match' and 'index'
     # are not absorbed by {id} or other components of the regex patterns
     setting.routes.sort(key=lambda r: r.pattern, reverse=True)
@@ -229,27 +228,29 @@ class ItemView(BareItemView):
         """display one item"""
         r1 = self.model.lookup(self.matchdict['id'])
         r2 = r1.display()
-        buttons = {'index':  panel_button('index',  url_for(self.prefix, 'index',  self)),
-                   'update': panel_button('update', url_for(self.prefix, 'update', self)),
-                   'delete': panel_button('delete', url_for(self.prefix, 'delete', self))}
+        buttons = [normal_button('index',  url_for(self.prefix, 'index',  r1)),
+                   normal_button('update', url_for(self.prefix, 'update', r1))]
+        # TODO: add delete button, but this requires JS
         return {'item':r2, 'buttons': buttons}
 
     @route('/index', template='index')
     def index(self):
         """display multiple items (collection)"""
-        r1 = self.model.find({}, limit=10, skip=0)
-        r2 = r1.display()
-        for row in r2:
-            # add grid_buttons per item: show, modify, update, delete
-            row['_buttons'] = {}
-        buttons = {'new':  panel_button('new',  url_for(self.prefix, 'new',  self))}
-        return {'items': r2, 'buttons': buttons}
+        r1 = [item.display() for item in self.model.find({}, limit=10, skip=0)]
+        for item in r1:
+            buttons = [normal_button('show',   url_for(self.prefix, 'show',   item)),
+                       normal_button('modify', url_for(self.prefix, 'modify', item))]
+            # TODO: add delete button, but this requires JS
+            item['_buttons'] = buttons
+        buttons = [normal_button('new',  url_for(self.prefix, 'new',  r1[0]))]
+        result = {'itemlist': r1, 'buttons': buttons}
+        return result
 
     @route('/search', template='search')
     def search(self):
         """create search form"""
         r1 = self.model.empty()
-        buttons = {'search':  panel_button('search',  url_for(self.prefix, 'search',  self))}
+        buttons = {'search':  normal_button('search',  url_for(self.prefix, 'search',  r1))}
         return {'item':r1, 'buttons': buttons}
 
     @route('/search', method='POST', template='match')
