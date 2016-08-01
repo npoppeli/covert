@@ -216,9 +216,12 @@ def get_objectid(ref):
     return ref.id
 
 def ref_tuple(ref):
-    model = setting.models[ref.collection]
-    item = model.lookup(ref.id)
-    return str(item), '/{}/{}'.format(ref.collection.lower(), ref.id) # label, url
+    if ref.id is None:
+        return '', ''
+    else:
+        model = setting.models[ref.collection]
+        item = model.lookup(ref.id)
+        return str(item), '/{}/{}'.format(ref.collection.lower(), ref.id) # label, url
     
 def parse_model_def(model_def, model_defs):
     """parse definition of one model"""

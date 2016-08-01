@@ -37,18 +37,18 @@ def icon_for(name):
 setting.labels = {
      'show'   : 'Show|Toon|Show',
      'index'  : 'Index|Index|..',
-     'search' : 'Search|Zoek|..',
-     'match'  : 'Match|Resultaat|..',
-     'modify' : 'Modify|Wijzig|..',
-     'update' : 'Update|Wijzig|..',
-     'new'    : 'New|..|Nieuw',
-     'create' : 'Create|Creeer|..',
-     'delete' : 'Delete|Verwijder|..',
+     'search' : 'Search|Zoek|Sök',
+     'match'  : 'Match|Resultaat|Resultat',
+     'modify' : 'Modify|Wijzig|Ändra',
+     'update' : 'Update|Wijzig|Ändra',
+     'new'    : 'New|Nieuw|Ny',
+     'create' : 'Create|Creeer|Skapa',
+     'delete' : 'Delete|Verwijder|Radera',
      'home'   : 'Home|Begin|Hem',
      'info'   : 'Info|Info|Info',
-     'ok'     : 'OK|OK|..',
-     'refresh': 'Refresh|Ververs|..',
-     'cancel' : 'Cancel|Annuleer|..'
+     'ok'     : 'OK|OK|OK',
+     'refresh': 'Refresh|Ververs|Fylla på',
+     'cancel' : 'Cancel|Annuleer|Upphäva'
 }
 
 def label_for(name):
@@ -229,8 +229,9 @@ class ItemView(BareItemView):
         r1 = self.model.lookup(self.matchdict['id'])
         r2 = r1.display()
         buttons = [normal_button('index',  url_for(self.prefix, 'index',  r1)),
-                   normal_button('update', url_for(self.prefix, 'update', r1))]
-        # TODO: add delete button, but this requires JS
+                   normal_button('update', url_for(self.prefix, 'update', r1)),
+                   normal_button('delete', url_for(self.prefix, 'delete', r1))]
+        # TODO: delete button requires prompt and JS
         return {'item':r2, 'buttons': buttons}
 
     @route('/index', template='index')
@@ -238,10 +239,11 @@ class ItemView(BareItemView):
         """display multiple items (collection)"""
         r1 = [item.display() for item in self.model.find({}, limit=10, skip=0)]
         for item in r1:
-            buttons = [normal_button('show',   url_for(self.prefix, 'show',   item)),
-                       normal_button('modify', url_for(self.prefix, 'modify', item))]
-            # TODO: add delete button, but this requires JS
+            buttons = [normal_button('modify', url_for(self.prefix, 'modify', item)),
+                       normal_button('delete', url_for(self.prefix, 'delete', item))]
+            # TODO: delete button requires prompt and JS
             item['_buttons'] = buttons
+            item['_action'] = url_for(self.prefix, 'show',   item)
         buttons = [normal_button('new',  url_for(self.prefix, 'new',  r1[0]))]
         result = {'itemlist': r1, 'buttons': buttons}
         return result
@@ -304,7 +306,7 @@ class ItemView(BareItemView):
     def delete(self):
         """delete one item"""
         r1 = self.set_field(self.matchdict['id'], 'active', False) # item.remove() only during clean-up
-        # TODO: button index collection
+        # TODO: result page is feedback plus button to /item/index
         return r1
 
     #TODO import: import one or more items

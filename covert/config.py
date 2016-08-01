@@ -40,8 +40,10 @@ def read_config():
     setting.store_dbname  = config['dbname']
     setting.dbtype  = config['dbtype']
     # I18N: partly here, partly in 'model' module
-    setting.language = config['language'] if config['language'] in setting.languages else config_default['language']
+    setting.language = config['language'] if config['language'] in setting.languages\
+                       else config_default['language']
     label_index = setting.languages.index(setting.language)
+    print("Config: language is '{}' ({})".format(setting.language, label_index))
     for name in setting.labels.keys():
         parts = setting.labels[name].split('|')
         setting.labels[name] = parts[label_index]

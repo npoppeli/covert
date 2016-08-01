@@ -144,7 +144,7 @@ class MapRouter:
                     result['fields'] = view_obj.model.sfields
                 else:
                     result['fields'] = view_obj.model.mfields
-                print('{0}: {1} fields={2}'.format(self.__class__.__name__, req_method, result['fields']))
+                # print('{0}: {1} fields={2}'.format(self.__class__.__name__, req_method, result['fields']))
                 result['labels'] = dict([(field, view_obj.model.skeleton[field].label)
                                          for field in result['fields']])
                 result = route_template.render(this=result)
