@@ -1,0 +1,3 @@
+COVERT: COntent as VERsatile uniTs
+
+COVERT is a publishing framework based on Webob and Chameleon, and a variety of storage engines, e.g. RethinkDB and MongoDB.
