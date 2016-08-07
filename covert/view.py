@@ -58,14 +58,6 @@ def url_for(view, name, item):
     url = setting.patterns[view+'_'+name].format(**item)
     return url
 
-# functions for buttons
-def normal_button(name, action):
-    # TODO: add enabled; add data-confirm and data-prompt (Bootstrap JS)
-    return {'label': label_for(name), 'icon': icon_for(name), 'action': action}
-
-def form_button(name, action):
-    return {'label': label_for(name), 'icon': icon_for(name), 'action': action}
-
 # Cursor: class to represent state of browsing through item collection
 class Cursor(dict):
     __slots__ = ('skip', 'limit', 'count', 'incl', 'incl0', 'dir',
@@ -121,6 +113,26 @@ class Route:
         return("{0} {1} -> {2}:{3}".
                format(self.pattern, self.method, self.cls.__name__, self.name))
 
+# decorator used for the routes (view methods)
+class route:
+    """
+    route: decorator for methods in a View class. This adds attributes to methods.
+    Once set, these attributes cannot be changed anymore.
+    @route(pattern, method, template)
+    - pattern: URL pattern, given as a format string
+    - method: string identifying HTTP method (e.g. 'GET' or 'GET, POST')
+    - template: name of template that renders the result of the view
+    """
+    def __init__(self, pattern, method='GET', template=''):
+        self.pattern  = pattern
+        self.method   = method
+        self.template = template
+    def __call__(self, wrapped):
+        wrapped.pattern  = self.pattern
+        wrapped.method   = self.method
+        wrapped.template = self.template
+        return wrapped
+
 # regular expressions used in routes
 patterns = {
     'alpha'   : r'[a-zA-Z]+',
@@ -173,26 +185,6 @@ def read_views(module):
     # are not absorbed by {id} or other components of the regex patterns
     setting.routes.sort(key=lambda r: r.pattern, reverse=True)
 
-# ItemView class, and decorator used for the routes (view methods)
-class route:
-    """
-    route: decorator for methods in a View class. This adds attributes to methods.
-    Once set, these attributes cannot be changed anymore.
-    @route(pattern, method, template)
-    - pattern: URL pattern, given as a format string
-    - method: string identifying HTTP method (e.g. 'GET' or 'GET, POST')
-    - template: name of template that renders the result of the view
-    """
-    def __init__(self, pattern, method='GET', template=''):
-        self.pattern  = pattern
-        self.method   = method
-        self.template = template
-    def __call__(self, wrapped):
-        wrapped.pattern  = self.pattern
-        wrapped.method   = self.method
-        wrapped.template = self.template
-        return wrapped
-
 def store_result(item):
     return item.write()
 
@@ -205,10 +197,42 @@ def form2update(req):
 def form2query(req):
     return req.params
 
+# example: normal_button('person', 'modify', item)
+def normal_button(view_name, route_name, item):
+    # TODO: add enabled; add data-confirm and data-prompt (Bootstrap JS)
+    return {'label': label_for(route_name), 'icon': icon_for(route_name),
+            'action': url_for(view_name, route_name, item), 'method':'GET'}
+
+def form_button(view_name, route_name, item):
+    return {'label': label_for(route_name), 'icon': icon_for(route_name),
+            'action': url_for(view_name, route_name, item), 'method':'POST'}
+
+def delete_button(view_name, route_name, item):
+    # TODO: add enabled; add data-confirm and data-prompt (Bootstrap JS)
+    return {'label': label_for(route_name), 'icon': icon_for(route_name),
+            'action': url_for(view_name, route_name, item), 'method':'DELETE'}
+
+def display_item(item):
+    fields = item.mfields
+    labels = dict([(field, item.skeleton[field].label) for field in fields])
+    # add fields and labels TODO: add icons and any other UI information
+    return {'item':item.display(), 'fields':fields, 'labels':labels}
+
+def display_itemlist(itemlist):
+    if itemlist:
+        item0 = itemlist[0]
+        fields = item0.sfields
+        labels = dict([(field, item0.skeleton[field].label) for field in fields])
+        # add fields and labels TODO: add icons and any other UI information
+        return {'item': item.display(), 'fields':fields, 'labels':labels}
+    else:
+        return {'itemlist':[], 'fields':[], 'labels':{}}
+
+
 class BareItemView:
     """
-    BareItemView: bare view that does not define routes. It serves as superclass for ItemView and
-    for view classes that define their own specific routes.
+    BareItemView: bare view that does not define routes. It serves as superclass for
+    ItemView and for view classes that define their own specific routes.
     """
     model = 'BareItem'
     prefix = ''
@@ -227,23 +251,29 @@ class ItemView(BareItemView):
     def show(self):
         """display one item"""
         r1 = self.model.lookup(self.matchdict['id'])
-        r2 = r1.display()
-        buttons = [normal_button('index',  url_for(self.prefix, 'index',  r1)),
-                   normal_button('update', url_for(self.prefix, 'update', r1)),
-                   normal_button('delete', url_for(self.prefix, 'delete', r1))]
+        r2 = display_item(r1)
+        buttons = [normal_button(self.prefix, 'index',  r1),
+                   normal_button(self.prefix, 'update', r1),
+                   normal_button(self.prefix, 'delete', r1)]
         # TODO: delete button requires prompt and JS
         return {'item':r2, 'buttons': buttons}
 
     @route('/index', template='index')
     def index(self):
         """display multiple items (collection)"""
-        r1 = [item.display() for item in self.model.find({}, limit=10, skip=0)]
+        r1 = self.model.find({}, limit=10, skip=0)
+        if not r1:
+            return {'feedback':'Nothing found', 'itemlist':[]}
+        item0 = r1[0]
+        itemlist = []
+        fields = item0.sfields
         for item in r1:
-            buttons = [normal_button('modify', url_for(self.prefix, 'modify', item)),
-                       normal_button('delete', url_for(self.prefix, 'delete', item))]
+            buttons = [normal_button(self.prefix, 'modify', item),
+                       normal_button(self.prefix, 'delete', item)]
             # TODO: delete button requires prompt and JS
-            item['_buttons'] = buttons
-            item['_action'] = url_for(self.prefix, 'show',   item)
+            itemlist.append({'item':item.display(), 'buttons':buttons})
+            # TODO: change field 0 into tuple (label, url)
+            # where url=url_for(self.prefix, 'show',   item)
         buttons = [normal_button('new',  url_for(self.prefix, 'new',  r1[0]))]
         result = {'itemlist': r1, 'buttons': buttons}
         return result
