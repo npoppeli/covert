@@ -137,19 +137,20 @@ class Item(BareItem):
 
     # methods to set references (update database directly)
     @classmethod
-    def set_field(cls, itemid, key, value):
-        result = setting.store_db[cls.collection].update_one({'id':itemid}, {'$set':{key:value}})
-        return result
+    def set_field(cls, oid, key, value):
+        result = setting.store_db[cls.collection].update_one({'id':oid}, {'$set':{key:value}})
+        return {'ok': result.modified_count == 1, 'id': oid}
 
     @classmethod
-    def append_field(cls, itemid, key, value):
-        result = setting.store_db[cls.collection].update_one({'id':itemid}, {'$addToSet':{key:value}})
-        return result
+    def append_field(cls, oid, key, value):
+        result = setting.store_db[cls.collection].update_one({'id':oid}, {'$addToSet':{key:value}})
+        return {'ok': result.modified_count == 1, 'id': oid}
 
     def remove(self):
         """
         remove(self): doc
         Remove document from collection.
-        Return value should be {'ok':1.0, 'err':None}.
         """
-        return setting.store_db[self.name].remove(self['_id'])
+        oid = self['_id']
+        return setting.store_db[self.name].delete_one({'_id':oid})
+        return {'ok': result.deleted_count == 1, 'id': str(oid)}

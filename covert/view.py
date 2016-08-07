@@ -58,48 +58,6 @@ def url_for(view, name, item):
     url = setting.patterns[view+'_'+name].format(**item)
     return url
 
-# Cursor: class to represent state of browsing through item collection
-class Cursor(dict):
-    __slots__ = ('skip', 'limit', 'count', 'incl', 'incl0', 'dir',
-                 'query', 'equery', 'submit')
-    _numbers  = ('skip', 'limit', 'count', 'incl', 'incl0', 'dir')
-    def __init__(self, model, request=None):
-        super().__init__()
-        self.model = model
-        self.skip, self.limit, self.count = 0, 10, 0
-        self.incl, self.incl0, self.dir = 0, 0, 0
-        if request:
-            query = {}
-            for key, value in request.params.items():
-                if key.startswith('_'):
-                    newkey = key[1:]
-                    setattr(self, newkey, str2int(value) if newkey in self._numbers else value)
-                elif value:
-                    query[key] = value
-            if self.query == '': # initial post
-                valid = self.model.validate(query, 'query')
-                if valid['ok']:
-                    self.query = query
-                    self.error = {}
-                else:
-                    self.query = {}
-                    self.error = valid['error']
-            else: # follow-up post
-                self.query = decode_dict(self.query)
-        else:
-            self.query = {}
-        # equery = query (user query) + extra criterium depending on 'incl'
-        self.equery = {'active':''} if self.incl == 1 else {}
-        self.equery.update(self.query)
-        if (self.count == 0) or (self.incl != self.incl0): # no count or 'incl' has changed
-            self.count = self.model.count(self.equery)
-        if request:
-            self.skip = max(0, min(self.count, self.skip+self.dir*self.limit))
-    # in form template:
-    # action, incl (toggle), incl0 (hidden), skip (hidden), count (hidden), limit (menu),
-    # query (hidden), prev_on (boolean), next_on (boolean)
-    # prev_on = self.skip>0, next_on = self.skip+self.limit<self.count
-
 class Route:
     def __init__(self,regex, pattern, method, cls, name, template):
         self.regex = regex
@@ -197,9 +155,8 @@ def form2update(req):
 def form2query(req):
     return req.params
 
-# example: normal_button('person', 'modify', item)
 def normal_button(view_name, route_name, item):
-    # TODO: add enabled; add data-confirm and data-prompt (Bootstrap JS)
+    # TODO: add enabled
     return {'label': label_for(route_name), 'icon': icon_for(route_name),
             'action': url_for(view_name, route_name, item), 'method':'GET'}
 
@@ -208,26 +165,9 @@ def form_button(view_name, route_name, item):
             'action': url_for(view_name, route_name, item), 'method':'POST'}
 
 def delete_button(view_name, route_name, item):
-    # TODO: add enabled; add data-confirm and data-prompt (Bootstrap JS)
+    # TODO: add enabled; add data-prompt (Bootstrap JS)
     return {'label': label_for(route_name), 'icon': icon_for(route_name),
             'action': url_for(view_name, route_name, item), 'method':'DELETE'}
-
-def display_item(item):
-    fields = item.mfields
-    labels = dict([(field, item.skeleton[field].label) for field in fields])
-    # add fields and labels TODO: add icons and any other UI information
-    return {'item':item.display(), 'fields':fields, 'labels':labels}
-
-def display_itemlist(itemlist):
-    if itemlist:
-        item0 = itemlist[0]
-        fields = item0.sfields
-        labels = dict([(field, item0.skeleton[field].label) for field in fields])
-        # add fields and labels TODO: add icons and any other UI information
-        return {'item': item.display(), 'fields':fields, 'labels':labels}
-    else:
-        return {'itemlist':[], 'fields':[], 'labels':{}}
-
 
 class BareItemView:
     """
@@ -236,9 +176,9 @@ class BareItemView:
     """
     model = 'BareItem'
     prefix = ''
-    def __init__(self, request, matchdict):
+    def __init__(self, request, matches):
         self.request = request
-        self.matchdict = matchdict
+        self.params = matches
 
 class ItemView(BareItemView):
     """
@@ -247,36 +187,75 @@ class ItemView(BareItemView):
     """
     model = 'Item'
 
+    def tree_with_item(self, oid, buttons):
+        item = self.model.lookup(oid)
+        fields = item.mfields
+        button_list = [normal_button(self.prefix, button, item) for button in buttons]
+        labels = dict([(field, item.skeleton[field].label) for field in fields])
+        # add fields and labels TODO: add icons and any other UI information
+        return {'content': {'item':item.display(), 'buttons':button_list},
+                'fields': fields, 'labels': labels}
+
+    def tree_with_cursor(self):
+        numbers = ('skip', 'limit', 'count', 'incl', 'incl0', 'dir')
+        cursor = {'skip':0, 'limit':10, 'count':0, 'incl':0, 'incl0':0, 'dir':0}
+        query = {}
+        for key, value in self.request.params.items():
+            if key.startswith('_'):
+                newkey = key[1:]
+                cursor[newkey] = str2int(value) if newkey in numbers else value
+            elif value:
+                query[key] = value
+        if query: # follow-up post
+            cursor['query'] = decode_dict(query)
+        else: # initial post
+            valid = self.model.validate(query, 'query')
+            if valid['ok']:
+                cursor['query'] = query
+                feedback = ''
+            else:
+                cursor['query'] = {}
+                feedback = valid['error']
+        # full query = user query + condition depending on 'incl'
+        full_query = {'active': ''} if cursor['incl'] == 1 else {}
+        full_query.update(query)
+        if cursor['count'] == 0 or cursor['incl'] != cursor['incl0']:
+            # not counted before or the 'inclusive' has changed
+            cursor['count'] = self.model.count(full_query)
+        cursor['skip'] = max(0, min(cursor['count'],
+                                    cursor['skip'] + cursor['dir'] * cursor['limit']))
+        cursor['incl0'] = cursor['incl']
+        cursor['prev'] = cursor['skip']>0
+        cursor['next'] = cursor['skip']+cursor['limit'] < cursor['count']
+        return {'cursor':cursor, 'feedback':feedback, 'content':[]}
+
     @route('/{id:objectid}', template='show')
     def show(self):
         """display one item"""
-        r1 = self.model.lookup(self.matchdict['id'])
-        r2 = display_item(r1)
-        buttons = [normal_button(self.prefix, 'index',  r1),
-                   normal_button(self.prefix, 'update', r1),
-                   normal_button(self.prefix, 'delete', r1)]
+        t1 = self.tree_with_item(self.params['id'], ['index', 'update', 'delete'])
         # TODO: delete button requires prompt and JS
-        return {'item':r2, 'buttons': buttons}
+        return t1
 
     @route('/index', template='index')
     def index(self):
         """display multiple items (collection)"""
-        r1 = self.model.find({}, limit=10, skip=0)
-        if not r1:
-            return {'feedback':'Nothing found', 'itemlist':[]}
-        item0 = r1[0]
-        itemlist = []
-        fields = item0.sfields
+        t1 = self.tree_with_cursor() # TODO: add 'new' button at collection level
+        if t1['feedback']:
+            return t1
+        items = self.model.find({}, limit=r1['cursor']['limit'], skip=r1['cursor']['skip'])
+        if not items:
+            t1['feedback'] = 'Nothing found'
+            return t1
+        item0 = items[0]
+        t1['buttons'] = [normal_button('new',  url_for(self.prefix, 'new',  item0))]
+        t2 = self.add_content(items) # also add 'fields': item0.sfields
         for item in r1:
             buttons = [normal_button(self.prefix, 'modify', item),
                        normal_button(self.prefix, 'delete', item)]
-            # TODO: delete button requires prompt and JS
             itemlist.append({'item':item.display(), 'buttons':buttons})
             # TODO: change field 0 into tuple (label, url)
             # where url=url_for(self.prefix, 'show',   item)
-        buttons = [normal_button('new',  url_for(self.prefix, 'new',  r1[0]))]
-        result = {'itemlist': r1, 'buttons': buttons}
-        return result
+        return t2
 
     @route('/search', template='search')
     def search(self):
@@ -302,17 +281,14 @@ class ItemView(BareItemView):
     @route('/{id:objectid}/modify', template='modify')
     def modify(self):
         """get form for modify/update action"""
-        item_id = self.matchdict['id']
-        r1 = self.model.lookup(item_id)
-        r2 = r1.display()
-        buttons = {'ok':     form_button('ok',     url_for(self.prefix, 'update',  self)),
-                   'cancel': form_button('cancel', url_for(self.prefix, 'update', self))}
-        return {'item':r2, 'buttons': buttons}
+        r1 = self.tree_with_item(self.params['id'], [])
+        r2 = self.add_form_buttons(r1, ['ok', 'cancel'])
+        return r2
 
     @route('/{id:objectid}', method='PUT', template='update')
     def update(self): # update person
         # TODO: update if 'OK' was clicked, else use unmodified item
-        r1 = self.model.update({'id':self.matchdict['id']}, form2update(self.request))
+        r1 = self.model.update({'id':self.params['id']}, form2update(self.request))
         r2 = store_result(r1)
         return r2
 
@@ -334,10 +310,16 @@ class ItemView(BareItemView):
 
     @route('/{id:objectid}', method='DELETE', template='delete')
     def delete(self):
-        """delete one item"""
-        r1 = self.set_field(self.matchdict['id'], 'active', False) # item.remove() only during clean-up
-        # TODO: result page is feedback plus button to /item/index
-        return r1
+        """delete one item functionally, i.e. mark as inactive
+        item.remove() is only used for permanent removal, i.e. clean-up"""
+        oid = self.params['id']
+        r1 = self.set_field(oid, 'active', False)
+        if r1['ok']:
+            return {'feedback': 'item {} set to inactive'.format(oid),
+                    'buttons':[normal_button(self.prefix, 'index', {})]}
+        else:
+            return {'feedback': 'item {} not modified'.format(oid),
+                    'buttons': [normal_button(self.prefix, 'index', {})]}
 
     #TODO import: import one or more items
     # @route('GET,POST', '/import')
