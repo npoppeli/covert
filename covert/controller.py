@@ -135,8 +135,7 @@ class MapRouter:
         if view_cls:
             try:
                 # print('{0}: {1} {2}'.format(self.__class__.__name__, req_method, request.path_qs))
-                view_obj = view_cls(request, match.groupdict())
-                view_obj.model = setting.models[view_obj.model]
+                view_obj = view_cls(request, match.groupdict(), setting.models[view_cls.model], route_name)
                 route = getattr(view_obj, route_name)
                 result = route()
                 result = route_template.render(this=result)

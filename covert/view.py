@@ -17,7 +17,7 @@ setting.icons = {
    'show'   : 'fa fa-photo',
    'index'  : 'fa fa-list-alt',
    'search' : 'fa fa-search',
-   'match'  : 'fa fa-eye',
+   'match'  : 'fa fa-search',
    'modify' : 'fa fa-pencil',
    'update' : 'fa fa-pencil',
    'new'    : 'fa fa-new',
@@ -117,51 +117,79 @@ def route2regex(pattern):
     return ''.join(parts)
 
 def read_views(module):
-    for view_name, view_class in getmembers(module, isclass):
-        if view_name in ['BareItemView', 'ItemView'] or not issubclass(view_class, BareItemView):
+    for class_name, view_class in getmembers(module, isclass):
+        if class_name in ['BareItemView', 'ItemView'] or not issubclass(view_class, BareItemView):
             continue
         # view classes must have a name that ends in 'View'
-        assert len(view_name) > 4 and view_name.endswith('View')
-        prefix = view_name.replace('View', '', 1).lower()
-        view_class.prefix = prefix
+        assert len(class_name) > 4 and class_name.endswith('View')
+        view_name = class_name.replace('View', '', 1).lower()
+        view_class.view_name = view_name
         for name in dir(view_class):
             member = getattr(view_class, name)
             if hasattr(member, 'pattern'): # decorated method, i.e. a route
-                full_pattern = '/' + prefix + member.pattern
+                full_pattern = '/' + view_name + member.pattern
                 rx = route2regex(full_pattern)
                 regex = re.compile(rx)
                 pattern = route2pattern(full_pattern)
-                template_name = prefix+'_'+member.template
+                template_name = view_name+'_'+member.template
                 if template_name not in setting.templates:
                     template_name = 'default'
                 template = setting.templates[template_name]
                 for method in member.method.split(','):
                     new_route = Route(regex, pattern, method, view_class, name, template)
-                    setting.patterns[prefix+'_'+name] = pattern
+                    setting.patterns[view_name+'_'+name] = pattern
                     setting.routes.append(new_route)
     # sorting in reverse alphabetical order ensures words like 'match' and 'index'
     # are not absorbed by {id} or other components of the regex patterns
     setting.routes.sort(key=lambda r: r.pattern, reverse=True)
 
+class Cursor:
+    default = {'skip':0, 'limit':10, 'count':0, 'incl':0, 'incl0':0, 'dir':0}
+    __slots__ = ['skip', 'limit', 'count', 'incl', 'incl0', 'dir', 'feedback', 'query', 'filter']
+    def __init__(self, request, model):
+        query = {}
+        for key, value in self.default.items():
+            setattr(self, key, value)
+        for key, value in request.params.items():
+            if key.startswith('_'):
+                setattr(self, key[1:], str2int(value) if key[1:] in self.default else value)
+                print('cursor parameter {}={}'.format(key[1:], value))
+            elif value:
+                query[key] = value
+                print('query parameter {}={}'.format(key, value))
+        if query: # follow-up post
+            self.query = decode_dict(query)
+        else: # initial post
+            validation = model.validate(query, 'query')
+            if validation['ok']:
+                self.query = query
+                self.feedback = ''
+            else:
+                self.query = {}
+                self.feedback = validation['error']
+        # filter = user query + condition depending on 'incl'
+        self.filter = {'active': ''} if self.incl == 1 else {}
+        self.filter.update(self.query)
+        if self.count == 0 or self.incl != self.incl0:
+            # first time to count, or the 'inclusive' option has changed
+            self.count = model.count(self.filter)
+        self.skip = max(0, min(self.count,
+                               self.skip + self.dir * self.limit))
+        self.incl0 = self.incl
+
+    def asdict(self):
+        return dict([(key, getattr(self, key)) for key in self.__slots__])
+
 def store_result(item):
     return item.write()
 
-def form2doc(req):
-    return req.params
-
-def form2update(req):
-    return req.params
-
-def form2query(req):
-    return req.params
-
 def normal_button(view_name, route_name, item):
-    # TODO: add enabled
+    # TODO: add 'enabled' attribute
     return {'label': label_for(route_name), 'icon': icon_for(route_name),
             'action': url_for(view_name, route_name, item), 'method':'GET'}
 
-def form_button(view_name, route_name, item):
-    return {'label': label_for(route_name), 'icon': icon_for(route_name),
+def form_button(view_name, route_name, item, button_name):
+    return {'label': label_for(button_name), 'icon': icon_for(button_name),
             'action': url_for(view_name, route_name, item), 'method':'POST'}
 
 def delete_button(view_name, route_name, item):
@@ -169,16 +197,137 @@ def delete_button(view_name, route_name, item):
     return {'label': label_for(route_name), 'icon': icon_for(route_name),
             'action': url_for(view_name, route_name, item), 'method':'DELETE'}
 
+
+class RenderTree:
+    nodes = ['content', 'fields', 'labels', 'buttons', 'feedback', 'cursor']
+    def __init__(self, request, model, view_name, route_name):
+        self.request = request
+        self.model = model
+        self.view_name = view_name
+        self.route_name = route_name
+        self.content = []
+        self.labels = {}
+        self.fields = []
+        self.buttons = []
+        self.cursor = None
+        self.form = {}
+        self.feedback = ''
+
+    def add_cursor(self):
+        self.cursor = Cursor(self.request, self.model)
+        return self
+
+    def add_item(self, oid):
+        item = self.model.lookup(oid)
+        self.content = [{'item':item.display(), 'buttons':[]}]
+        self.fields = item.mfields
+        self.labels = dict([(field, item.skeleton[field].label) for field in self.fields])
+        # TODO: add icons and any other UI information
+        return self
+
+    def add_empty_item(self):
+        self.content = [{'item':self.model.empty(), 'buttons':[]}]
+        self.fields = self.model.mfields
+        self.labels = dict([(field, self.model.skeleton[field].label) for field in self.fields])
+        return self
+
+    def add_items(self, buttons):
+        if self.cursor.feedback:
+            self.feedback = self.cursor.feedback
+            return self
+        items = self.model.find(self.filter, limit=self.cursor.limit, skip=self.cursor.skip)
+        if not items:
+            self.feedback = 'Nothing found'
+            return self
+        item0 = items[0]
+        self.fields = item0.sfields
+        self.cursor.prev = self.skip>0
+        self.cursor.next = self.skip+self.limit < self.count
+        for item in items:
+            self.content.append({'item':item.display(),
+                                 'buttons':[normal_button(self.view_name, button, item)
+                                            for button in buttons]})
+        return self
+
+    def add_show_link(self, field):
+        for el in self.content:
+            el['item'][field] = (el['item'][field], url_for(self.prefix, 'show', el['item']))
+        return self
+
+    def add_buttons(self, buttons):
+        if self.content:
+            item = self.content[0]['item']
+            self.buttons = [normal_button(self.view_name, button, item) for button in buttons]
+        return self
+
+    def add_form_buttons(self, route_name):
+        if self.content:
+            item = self.content[0]['item']
+            self.buttons = [form_button(self.view_name, route_name, item, 'ok'),
+                            form_button(self.view_name, route_name, item, 'cancel')]
+        return self
+
+    def add_search_button(self, route_name):
+        if self.content:
+            item = self.content[0]['item']
+            self.buttons = [form_button(self.view_name, route_name, item, 'search')]
+        return self
+
+    def add_form(self):
+        self.form = self.model.convert(self.request.params)
+        return self
+
+    def update_if_ok(self, oid):
+        item = self.model.lookup(oid)
+        self.content = [{'item':item.display(), 'buttons':[]}]
+        if self.request.params['_submit'] == 'ok':
+            # update item with converted form contents
+            item.update(self.form)
+            validation = item.validate(item)
+            if validation['ok']:
+                result = item.write(validate=False)
+                if result['ok']:
+                    self.content = [{'item': item.display(), 'buttons': []}]
+                else:
+                    self.feedback = 'Modified document {} could not be stored'.format(item)
+            else:
+                self.feedback = 'Modified document {} not valid: {}'.format(item, validation['error'])
+        return self
+
+    def insert_if_ok(self):
+        if self.request.params['_submit'] == 'ok':
+            # create item from converted form contents
+            item = self.model(self.form)
+            validation = item.validate(item)
+            if validation['ok']:
+                result = item.write(validate=False)
+                if result['ok']:
+                    self.content = [{'item': item.display(), 'buttons': []}]
+                else:
+                    self.feedback = 'New document {} could not be stored'.format(item)
+            else:
+                self.feedback = 'New document {} not valid: {}'.format(item, validation['error'])
+        return self
+
+    def asdict(self):
+        if self.cursor:
+            self.cursor = self.cursor.asdict()
+        return dict([(key, getattr(self, key)) for key in self.nodes])
+
+
 class BareItemView:
     """
     BareItemView: bare view that does not define routes. It serves as superclass for
     ItemView and for view classes that define their own specific routes.
     """
     model = 'BareItem'
-    prefix = ''
-    def __init__(self, request, matches):
+    view_name = ''
+    def __init__(self, request, matches, model, route_name):
         self.request = request
         self.params = matches
+        self.model = model
+        self.tree = RenderTree(request, model, self.view_name, route_name)
+
 
 class ItemView(BareItemView):
     """
@@ -187,126 +336,66 @@ class ItemView(BareItemView):
     """
     model = 'Item'
 
-    def tree_with_item(self, oid, buttons):
-        item = self.model.lookup(oid)
-        fields = item.mfields
-        button_list = [normal_button(self.prefix, button, item) for button in buttons]
-        labels = dict([(field, item.skeleton[field].label) for field in fields])
-        # add fields and labels TODO: add icons and any other UI information
-        return {'content': {'item':item.display(), 'buttons':button_list},
-                'fields': fields, 'labels': labels}
-
-    def tree_with_cursor(self):
-        numbers = ('skip', 'limit', 'count', 'incl', 'incl0', 'dir')
-        cursor = {'skip':0, 'limit':10, 'count':0, 'incl':0, 'incl0':0, 'dir':0}
-        query = {}
-        for key, value in self.request.params.items():
-            if key.startswith('_'):
-                newkey = key[1:]
-                cursor[newkey] = str2int(value) if newkey in numbers else value
-            elif value:
-                query[key] = value
-        if query: # follow-up post
-            cursor['query'] = decode_dict(query)
-        else: # initial post
-            valid = self.model.validate(query, 'query')
-            if valid['ok']:
-                cursor['query'] = query
-                feedback = ''
-            else:
-                cursor['query'] = {}
-                feedback = valid['error']
-        # full query = user query + condition depending on 'incl'
-        full_query = {'active': ''} if cursor['incl'] == 1 else {}
-        full_query.update(query)
-        if cursor['count'] == 0 or cursor['incl'] != cursor['incl0']:
-            # not counted before or the 'inclusive' has changed
-            cursor['count'] = self.model.count(full_query)
-        cursor['skip'] = max(0, min(cursor['count'],
-                                    cursor['skip'] + cursor['dir'] * cursor['limit']))
-        cursor['incl0'] = cursor['incl']
-        cursor['prev'] = cursor['skip']>0
-        cursor['next'] = cursor['skip']+cursor['limit'] < cursor['count']
-        return {'cursor':cursor, 'feedback':feedback, 'content':[]}
-
     @route('/{id:objectid}', template='show')
     def show(self):
         """display one item"""
-        t1 = self.tree_with_item(self.params['id'], ['index', 'update', 'delete'])
         # TODO: delete button requires prompt and JS
-        return t1
+        return self.tree.add_item(self.params['id'])\
+                        .add_buttons(['index', 'update', 'delete'])\
+                        .asdict()
 
     @route('/index', template='index')
     def index(self):
         """display multiple items (collection)"""
-        t1 = self.tree_with_cursor() # TODO: add 'new' button at collection level
-        if t1['feedback']:
-            return t1
-        items = self.model.find({}, limit=r1['cursor']['limit'], skip=r1['cursor']['skip'])
-        if not items:
-            t1['feedback'] = 'Nothing found'
-            return t1
-        item0 = items[0]
-        t1['buttons'] = [normal_button('new',  url_for(self.prefix, 'new',  item0))]
-        t2 = self.add_content(items) # also add 'fields': item0.sfields
-        for item in r1:
-            buttons = [normal_button(self.prefix, 'modify', item),
-                       normal_button(self.prefix, 'delete', item)]
-            itemlist.append({'item':item.display(), 'buttons':buttons})
-            # TODO: change field 0 into tuple (label, url)
-            # where url=url_for(self.prefix, 'show',   item)
-        return t2
+        return self.tree.add_cursor()\
+                        .add_items(['modify', 'delete'])\
+                        .add_show_link(self.model.fields[0])\
+                        .add_buttons(['new'])\
+                        .asdict()
 
     @route('/search', template='search')
     def search(self):
         """create search form"""
-        r1 = self.model.empty()
-        buttons = {'search':  normal_button('search',  url_for(self.prefix, 'search',  r1))}
-        return {'item':r1, 'buttons': buttons}
+        return self.tree.add_empty_item()\
+                        .add_search_button('match')\
+                        .asdict()
 
     @route('/search', method='POST', template='match')
     def match(self):
         """show result list of search"""
-        query = form2query(self.request)
-        r1 = self.model.find(query, limit=10, skip=0)
-        r2 = r1.display()
-        # cursor = Cursor(self.model, req)
-        # if not cursor.query:
-        #     logger.debug('match: invalid query '+str(cursor.error))
-        #     return self.search(self.request, cursor.error) # show search form and errors
-        # #TODO: $key $op $value, where $op is 'in' for 'text' and 'memo', otherwise 'eq'
-        # buttons per item: show item, modify, update item, delete item
-        return r2
+        # TODO: handle search operators:
+        # TODO: $key $op $value, where $op is 'in' for 'text' and 'memo', otherwise 'eq'
+        return self.tree.add_cursor()\
+                        .add_show_link(self.model.fields[0])\
+                        .add_buttons(['new'])\
+                        .asdict()
 
     @route('/{id:objectid}/modify', template='modify')
     def modify(self):
         """get form for modify/update action"""
-        r1 = self.tree_with_item(self.params['id'], [])
-        r2 = self.add_form_buttons(r1, ['ok', 'cancel'])
-        return r2
+        return self.tree.add_item(self.params['id'])\
+                        .add_form_buttons('update')\
+                        .asdict()
 
     @route('/{id:objectid}', method='PUT', template='update')
     def update(self): # update person
-        # TODO: update if 'OK' was clicked, else use unmodified item
-        r1 = self.model.update({'id':self.params['id']}, form2update(self.request))
-        r2 = store_result(r1)
-        return r2
+        return self.tree.add_form()\
+                        .update_if_ok(self.params['id'])\
+                        .asdict()
 
     @route('/new', template='new')
     def new(self):
         """get form for new/create action"""
-        r1 = self.model.empty()
-        buttons = {'ok':     form_button('ok',     url_for(self.prefix, 'create',  self)),
-                   'cancel': form_button('cancel', url_for(self.prefix, 'create', self))}
-        return {'item':r1, 'buttons': buttons}
+        return self.tree.add_empty_item()\
+                        .add_form_buttons('create')\
+                        .asdict()
 
     @route('', method='POST', template='create')
     def create(self):
         """create new item"""
-        # TODO: create if 'OK' was clicked, else do nothing
-        r1 = self.model.insert(form2doc(self.request))
-        r2 = store_result(r1)
-        return r2
+        return self.tree.add_form()\
+                        .insert_if_ok()\
+                        .asdict()
 
     @route('/{id:objectid}', method='DELETE', template='delete')
     def delete(self):
