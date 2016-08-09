@@ -170,4 +170,5 @@ class JSONRouter(MapRouter):
         self.content_type = 'application/json'
 
     def renderer(self, result):
+        # TODO: should this be encode_dict()?
         return json.dumps(result)
