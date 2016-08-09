@@ -125,7 +125,7 @@ class MapRouter:
         req_path = request.path_info
         # find first route that matches request
         view_cls = None
-        for route in setting.routes: # route: regex, pattern, method, cls, name, template
+        for route in setting.routes: # route=(pattern, method, template, regex, cls, name)
             match = route.regex.match(req_path)
             if route.method == req_method and match: # exit loop if matching route found
                 view_cls, route_name, route_template = route.cls, route.name, route.template

@@ -8,9 +8,9 @@ it could be delegated to the client, using Parsley.js (jQuery) for example.
 """
 
 import re
-from inspect import getmembers, isclass
+from inspect import getmembers, isclass, isfunction
 from itertools import chain
-from .common import str2int, decode_dict
+from .common import str2int, decode_dict, encode_dict
 from . import setting
 
 setting.icons = {
@@ -59,13 +59,13 @@ def url_for(view, name, item):
     return url
 
 class Route:
-    def __init__(self,regex, pattern, method, cls, name, template):
-        self.regex = regex
+    def __init__(self, pattern, method, template, regex, cls, name):
         self.pattern = pattern
         self.method = method
+        self.template = template
         self.cls = cls
         self.name = name
-        self.template = template
+        self.regex = regex
 
     def __str__(self):
         return("{0} {1} -> {2}:{3}".
@@ -118,27 +118,25 @@ def route2regex(pattern):
 
 def read_views(module):
     for class_name, view_class in getmembers(module, isclass):
-        if class_name in ['BareItemView', 'ItemView'] or not issubclass(view_class, BareItemView):
+        if (class_name in ['BareItemView', 'ItemView'] or
+            not issubclass(view_class, BareItemView) or
+            not (len(class_name) > 4 and class_name.endswith('View'))):
             continue
-        # view classes must have a name that ends in 'View'
-        assert len(class_name) > 4 and class_name.endswith('View')
         view_name = class_name.replace('View', '', 1).lower()
         view_class.view_name = view_name
-        for name in dir(view_class):
-            member = getattr(view_class, name)
-            if hasattr(member, 'pattern'): # decorated method, i.e. a route
-                full_pattern = '/' + view_name + member.pattern
-                rx = route2regex(full_pattern)
-                regex = re.compile(rx)
-                pattern = route2pattern(full_pattern)
+        for member_name, member in getmembers(view_class, isfunction):
+            if hasattr(member, 'pattern'): # method is a route
+                full_pattern  = '/' + view_name + member.pattern
+                pattern       = route2pattern(full_pattern)
+                regex         = route2regex(full_pattern)
                 template_name = view_name+'_'+member.template
                 if template_name not in setting.templates:
                     template_name = 'default'
                 template = setting.templates[template_name]
                 for method in member.method.split(','):
-                    new_route = Route(regex, pattern, method, view_class, name, template)
-                    setting.patterns[view_name+'_'+name] = pattern
-                    setting.routes.append(new_route)
+                    setting.patterns[view_name+'_'+member_name] = pattern
+                    setting.routes.append(Route(pattern, method, template,
+                                                re.compile(regex), view_class, member_name))
     # sorting in reverse alphabetical order ensures words like 'match' and 'index'
     # are not absorbed by {id} or other components of the regex patterns
     setting.routes.sort(key=lambda r: r.pattern, reverse=True)
@@ -157,9 +155,7 @@ class Cursor:
             elif value:
                 query[key] = value
                 print('query parameter {}={}'.format(key, value))
-        if query: # follow-up post
-            self.query = decode_dict(query)
-        else: # initial post
+        if query: # initial post
             validation = model.validate(query, 'query')
             if validation['ok']:
                 self.query = query
@@ -167,6 +163,8 @@ class Cursor:
             else:
                 self.query = {}
                 self.feedback = validation['error']
+        else: # follow-up post
+            self.query = decode_dict(query)
         # filter = user query + condition depending on 'incl'
         self.filter = {'active': ''} if self.incl == 1 else {}
         self.filter.update(self.query)
@@ -178,6 +176,7 @@ class Cursor:
         self.incl0 = self.incl
 
     def asdict(self):
+        self.query = encode_dict(self.query)
         return dict([(key, getattr(self, key)) for key in self.__slots__])
 
 def store_result(item):
@@ -344,7 +343,7 @@ class ItemView(BareItemView):
                         .add_buttons(['index', 'update', 'delete'])\
                         .asdict()
 
-    @route('/index', template='index')
+    @route('/index', method='GET,POST', template='index')
     def index(self):
         """display multiple items (collection)"""
         return self.tree.add_cursor()\
