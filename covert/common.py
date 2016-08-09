@@ -75,7 +75,7 @@ def encode_dict(s):
     return html.escape(json.dumps(s, separators=(',',':'), cls=ComplexEncoder))
 
 def show_dict(s):
-    return json.dumps(s, separators=(',',':'), cls=ComplexEncoder)
+    return json.dumps(s, separators=(',',':'), sort_keys=True, indent=2, cls=ComplexEncoder)
 
 # lightweight Trie data structure, based on an example by James Tauber
 # A Trie is a radix or prefix tree, and can be used to represent a dictionary, for example.
