@@ -19,6 +19,3 @@ logger.setLevel(logging.DEBUG)
 # formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(message)s')
 # console.setFormatter(formatter)
 # logger.addHandler(console)
-
-def print_doc(doc):
-    return json.dumps(doc, sort_keys=True, indent=2, separators=(',', ': '), cls=ComplexEncoder)
