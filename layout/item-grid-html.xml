@@ -1,1 +1,0 @@
-<tr class="${['text-muted', ''][active]}" tal:content="structure content">ITEM</tr>

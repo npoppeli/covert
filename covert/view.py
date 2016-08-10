@@ -155,25 +155,12 @@ class Cursor:
             elif value:
                 query[key] = value
                 print('query parameter {}={}'.format(key, value))
-        if query: # initial post
-            validation = model.validate(query, 'query')
-            if validation['ok']:
-                self.query = query
-                self.feedback = ''
-            else:
-                self.query = {}
-                self.feedback = validation['error']
-        else: # follow-up post
-            self.query = decode_dict(query)
-        # filter = user query + condition depending on 'incl'
-        self.filter = {'active': ''} if self.incl == 1 else {}
-        self.filter.update(self.query)
-        if self.count == 0 or self.incl != self.incl0:
-            # first time to count, or the 'inclusive' option has changed
-            self.count = model.count(self.filter)
-        self.skip = max(0, min(self.count,
-                               self.skip + self.dir * self.limit))
         self.incl0 = self.incl
+        if query: # initial post
+            self.query = query
+        else: # follow-up post
+            print('follow-up post: decode saved query')
+            self.query = decode_dict(self.query)
 
     def asdict(self):
         self.query = encode_dict(self.query)
@@ -231,6 +218,25 @@ class RenderTree:
         return self
 
     def add_items(self, buttons):
+        cursor = self.tree.cursor
+        validation = self.model.validate(cursor.query, 'query')
+        if validation['ok']:
+            print('initial post: valid query')
+            cursor.query = query
+            cursor.feedback = ''
+        else:
+            print('initial post: invalid query')
+            cursor.query = {}
+            cursor.feedback = validation['error']
+        # filter = user query + condition depending on 'incl'
+        self.filter = {'active': ''} if self.incl == 1 else {}
+        self.filter.update(self.query)
+        if self.count == 0 or self.incl != self.incl0:
+            # first time to count, or the 'inclusive' option has changed
+            self.count = model.count(self.filter)
+        self.skip = max(0, min(self.count,
+                               self.skip + self.dir * self.limit))
+
         if self.cursor.feedback:
             self.feedback = self.cursor.feedback
             return self
@@ -240,8 +246,8 @@ class RenderTree:
             return self
         item0 = items[0]
         self.fields = item0.sfields
-        self.cursor.prev = self.skip>0
-        self.cursor.next = self.skip+self.limit < self.count
+        self.cursor.prev = self.cursor.skip>0
+        self.cursor.next = self.cursor.skip+self.cursor.limit < self.cursor.count
         for item in items:
             self.content.append({'item':item.display(),
                                  'buttons':[normal_button(self.view_name, button, item)

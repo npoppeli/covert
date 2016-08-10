@@ -1,7 +1,0 @@
-<div class="form-group ${['','has-error'][error]">
-<label for="${name}" class="${name}-info col-sm-3 col-xs-4 control-label">${label}</label>
-<div class="col-sm-7 col-xs-8">
-<textarea class="form-control" rows="4" cols="50" name="${name}" placeholder="${name}" id="${name}"
-          tal:attributes="auto ['disabled', None][auto]">${content}</textarea>
-</div>
-</div>

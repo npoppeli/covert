@@ -1,4 +1,0 @@
-<div class="container" tal:content="structure content">
-  regions: header, main, sidebar, footer
-</div>
-

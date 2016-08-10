@@ -103,8 +103,8 @@ def kernel_init():
                 print('fields', model.fields)
                 print('mfields', model.mfields)
                 print('sfields', model.sfields)
-                print(str(model._schema))
-                for field_name, field in model.skeleton.items():
-                    print('{0}: "{1}" optional={2} multiple={3} auto={4}'.\
-                        format(field_name, field.label, field.optional, field.multiple, field.auto))
+                #print(str(model._schema))
+                #for field_name, field in model.skeleton.items():
+                #    print('{0}: "{1}" optional={2} multiple={3} auto={4}'.\
+                #        format(field_name, field.label, field.optional, field.multiple, field.auto))
                 print('')

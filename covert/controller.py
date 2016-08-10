@@ -138,7 +138,7 @@ class MapRouter:
                 view_obj = view_cls(request, match.groupdict(), setting.models[view_cls.model], route_name)
                 route = getattr(view_obj, route_name)
                 result = route()
-                result = route_template.render(this=result)
+                result = route_template.render(**result)
             except Exception as e:
                 result = exception_report(e)
                 response.status = 500
@@ -161,7 +161,7 @@ class PageRouter(MapRouter):
         self.template = setting.templates[name]
 
     def renderer(self, result):
-        return self.template.render(this={'content':result})
+        return self.template.render(content=result)
 
 class JSONRouter(MapRouter):
 

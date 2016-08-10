@@ -1,2 +1,0 @@
-<table class='item table table-condensed table-bordered' tal:content="structure content">
-</table>

@@ -1,6 +1,0 @@
-<table class="table table-striped">
-  <tr>
-     <th tal:repeat="field children[0].children">${field['label']}</th>
-  </tr>
-  <span tal:replace="structure content"></span>
-</table>

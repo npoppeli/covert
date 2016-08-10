@@ -1,2 +1,0 @@
-<td><a class="btn btn-default btn-xs ${['disabled',''][enabled]}" href="${action}"
-   tal:attributes="data-confirm confirm; data-prompt prompt"><span class="fa fa-${icon}"></span></a></td>

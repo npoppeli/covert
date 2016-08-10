@@ -1,7 +1,0 @@
-<form class="form-horizontal" action="${action}" method="POST">
-  <fieldset>
-    <legend class="text-info text-capitalize">${legend}</legend>
-    <input tal:condition="method == 'PUT'" name="_method" type="hidden" value="PUT" />
-    <span tal:replace="structure content">FIELDS, BUTTONS</span>
-  </fieldset>
-</form>

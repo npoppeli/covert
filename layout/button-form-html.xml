@@ -1,4 +1,0 @@
-<button class="btn btn-default" type="submit" name="${name}" value="${value}">
-<span tal:condition="icon and len(icon)>0" class="fa fa-${icon}"></span>
-<span tal:condition="label and len(label)>0">${label}</span>
-</button>

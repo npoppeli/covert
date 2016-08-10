@@ -1,7 +1,0 @@
-<div class="form-group ${['','has-error'][error]">
-<label for="${name}" class="text-info col-sm-3 col-xs-4 control-label">${label}</label>
-<div class="col-sm-7 col-xs-8">
-<input class="form-control" type="url" name="${name}" id="${name}" value="${content}"
-       tal:attributes="auto ['disabled', None][auto]" />
-</div>
-</div>
