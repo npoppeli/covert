@@ -142,8 +142,8 @@ def read_views(module):
     setting.routes.sort(key=lambda r: r.pattern, reverse=True)
 
 class Cursor:
-    default = {'skip':0, 'limit':10, 'count':0, 'incl':0, 'incl0':0, 'dir':0}
-    __slots__ = ['skip', 'limit', 'count', 'incl', 'incl0', 'dir', 'feedback', 'query', 'filter']
+    default = {'skip':0, 'limit':10, 'incl':0, 'incl0':0, 'dir':0}
+    __slots__ = ['skip', 'limit', 'incl', 'incl0', 'dir', 'feedback', 'query', 'filter']
     def __init__(self, request, model):
         query = {}
         for key, value in self.default.items():
