@@ -142,12 +142,19 @@ def read_views(module):
     setting.routes.sort(key=lambda r: r.pattern, reverse=True)
 
 class Cursor:
+<<<<<<< local
+    default = {'skip':0, 'limit':10, 'count':0, 'incl':0, 'incl0':0, 'dir':0}
+=======
     default = {'skip':0, 'limit':10, 'incl':0, 'incl0':0, 'dir':0}
     __slots__ = ['skip', 'limit', 'incl', 'incl0', 'dir', 'feedback', 'query', 'filter']
+>>>>>>> other
     def __init__(self, request, model):
-        query = {}
+        initial = '_incl' in request.params.keys()
         for key, value in self.default.items():
             setattr(self, key, value)
+        self.feedback = ''
+        self.query = {}
+        query = {}
         for key, value in request.params.items():
             if key.startswith('_'):
                 setattr(self, key[1:], str2int(value) if key[1:] in self.default else value)
@@ -156,7 +163,7 @@ class Cursor:
                 query[key] = value
                 print('query parameter {}={}'.format(key, value))
         self.incl0 = self.incl
-        if query: # initial post
+        if initial: # initial post
             self.query = query
         else: # follow-up post
             print('follow-up post: decode saved query')
@@ -198,10 +205,29 @@ class RenderTree:
         self.cursor = None
         self.form = {}
         self.feedback = ''
+        self.filter = {}
 
     def add_cursor(self):
         self.cursor = Cursor(self.request, self.model)
         return self
+
+    def move_cursor(self):
+        cursor = self.tree.cursor
+        # TODO: query validation, including transformed queries
+        # validation = self.model.validate(cursor.query, 'query')
+        # if validation['ok']:
+        #     print('initial post: valid query')
+        #     cursor.feedback = ''
+        # else:
+        #     print('initial post: invalid query')
+        #     cursor.query = {}
+        #     cursor.feedback = validation['error']
+        # filter = user query + condition depending on 'incl'
+        cursor.filter = {'active': ''} if cursor.incl == 1 else {}
+        cursor.filter.update(cursor.query)
+        count = model.count(cursor.filter)
+        cursor.skip = max(0, min(cursor.count,
+                               cursor.skip + cursor.dir * cursor.limit))
 
     def add_item(self, oid):
         item = self.model.lookup(oid)
@@ -218,24 +244,6 @@ class RenderTree:
         return self
 
     def add_items(self, buttons):
-        cursor = self.tree.cursor
-        validation = self.model.validate(cursor.query, 'query')
-        if validation['ok']:
-            print('initial post: valid query')
-            cursor.query = query
-            cursor.feedback = ''
-        else:
-            print('initial post: invalid query')
-            cursor.query = {}
-            cursor.feedback = validation['error']
-        # filter = user query + condition depending on 'incl'
-        self.filter = {'active': ''} if self.incl == 1 else {}
-        self.filter.update(self.query)
-        if self.count == 0 or self.incl != self.incl0:
-            # first time to count, or the 'inclusive' option has changed
-            self.count = model.count(self.filter)
-        self.skip = max(0, min(self.count,
-                               self.skip + self.dir * self.limit))
 
         if self.cursor.feedback:
             self.feedback = self.cursor.feedback

@@ -5,7 +5,7 @@ covert.common
 Objects and functions common to two or more modules in the package.
 """
 
-import json, os, os.path, datetime
+import json, datetime
 import html
 from bson.objectid import ObjectId
 from yaml import load, load_all
@@ -69,7 +69,7 @@ class ComplexEncoder(json.JSONEncoder):
             return json.JSONEncoder.default(self, obj)
 
 def decode_dict(s):
-    return json.loads(html.unescape(s))
+    return json.loads(html.unescape(s)) if s else {}
 
 def encode_dict(s):
     return html.escape(json.dumps(s, separators=(',',':'), cls=ComplexEncoder))
