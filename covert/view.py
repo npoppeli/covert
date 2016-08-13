@@ -10,7 +10,7 @@ it could be delegated to the client, using Parsley.js (jQuery) for example.
 import re
 from inspect import getmembers, isclass, isfunction
 from itertools import chain
-from .common import str2int, decode_dict, encode_dict
+from .common import str2int, decode_dict, encode_dict, show_dict
 from . import setting
 
 setting.icons = {
@@ -129,10 +129,14 @@ def read_views(module):
                 full_pattern  = '/' + view_name + member.pattern
                 pattern       = route2pattern(full_pattern)
                 regex         = route2regex(full_pattern)
-                template_name = view_name+'_'+member.template
-                if template_name not in setting.templates:
-                    template_name = 'default'
-                template = setting.templates[template_name]
+                template_name = view_name+'_' + member.template
+                parent_name   = 'item_'       + member.template
+                if template_name in setting.templates:
+                    template = setting.templates[template_name]
+                elif parent_name in setting.templates:
+                    template = setting.templates[parent_name]
+                else:
+                    template = setting.templates['default']
                 for method in member.method.split(','):
                     setting.patterns[view_name+'_'+member_name] = pattern
                     setting.routes.append(Route(pattern, method, template,
@@ -142,26 +146,23 @@ def read_views(module):
     setting.routes.sort(key=lambda r: r.pattern, reverse=True)
 
 class Cursor:
-<<<<<<< local
-    default = {'skip':0, 'limit':10, 'count':0, 'incl':0, 'incl0':0, 'dir':0}
-=======
+    __slots__ = ['skip', 'limit', 'incl', 'incl0', 'dir', 'filter', 'query', 'prev', 'next']
     default = {'skip':0, 'limit':10, 'incl':0, 'incl0':0, 'dir':0}
-    __slots__ = ['skip', 'limit', 'incl', 'incl0', 'dir', 'feedback', 'query', 'filter']
->>>>>>> other
-    def __init__(self, request, model):
-        initial = '_incl' in request.params.keys()
+
+    def __init__(self, request):
+        initial = '_incl' not in request.params.keys()
         for key, value in self.default.items():
             setattr(self, key, value)
-        self.feedback = ''
         self.query = {}
+        self.filter = {}
         query = {}
         for key, value in request.params.items():
             if key.startswith('_'):
                 setattr(self, key[1:], str2int(value) if key[1:] in self.default else value)
-                print('cursor parameter {}={}'.format(key[1:], value))
+                print('cursor_init: cursor parameter {}={}'.format(key[1:], value))
             elif value:
                 query[key] = value
-                print('query parameter {}={}'.format(key, value))
+                print('cursor_init: query parameter {}={}'.format(key, value))
         self.incl0 = self.incl
         if initial: # initial post
             self.query = query
@@ -198,7 +199,7 @@ class RenderTree:
         self.model = model
         self.view_name = view_name
         self.route_name = route_name
-        self.content = []
+        self.content = None
         self.labels = {}
         self.fields = []
         self.buttons = []
@@ -208,30 +209,24 @@ class RenderTree:
         self.filter = {}
 
     def add_cursor(self):
-        self.cursor = Cursor(self.request, self.model)
+        self.cursor = Cursor(self.request)
         return self
 
     def move_cursor(self):
-        cursor = self.tree.cursor
-        # TODO: query validation, including transformed queries
-        # validation = self.model.validate(cursor.query, 'query')
-        # if validation['ok']:
-        #     print('initial post: valid query')
-        #     cursor.feedback = ''
-        # else:
-        #     print('initial post: invalid query')
-        #     cursor.query = {}
-        #     cursor.feedback = validation['error']
+        cursor = self.cursor
         # filter = user query + condition depending on 'incl'
         cursor.filter = {'active': ''} if cursor.incl == 1 else {}
         cursor.filter.update(cursor.query)
-        count = model.count(cursor.filter)
-        cursor.skip = max(0, min(cursor.count,
-                               cursor.skip + cursor.dir * cursor.limit))
+        count = self.model.count(cursor.filter)
+        print("move_cursor: filter {} -> count={}".format(cursor.filter, count))
+        cursor.skip = max(0, min(count, cursor.skip+cursor.dir*cursor.limit))
+        cursor.prev = cursor.skip>0
+        cursor.next = cursor.skip+cursor.limit < count
+        return self
 
     def add_item(self, oid):
         item = self.model.lookup(oid)
-        self.content = [{'item':item.display(), 'buttons':[]}]
+        self.content = item.display()
         self.fields = item.mfields
         self.labels = dict([(field, item.skeleton[field].label) for field in self.fields])
         # TODO: add icons and any other UI information
@@ -244,18 +239,15 @@ class RenderTree:
         return self
 
     def add_items(self, buttons):
-
-        if self.cursor.feedback:
-            self.feedback = self.cursor.feedback
-            return self
-        items = self.model.find(self.filter, limit=self.cursor.limit, skip=self.cursor.skip)
+        items = self.model.find(self.cursor.filter, limit=self.cursor.limit, skip=self.cursor.skip)
         if not items:
-            self.feedback = 'Nothing found'
+            self.feedback += 'Nothing found'
             return self
         item0 = items[0]
+        print('add_items: adding {} items'.format(len(items)))
+        self.content = []
         self.fields = item0.sfields
-        self.cursor.prev = self.cursor.skip>0
-        self.cursor.next = self.cursor.skip+self.cursor.limit < self.cursor.count
+        self.labels = dict([(field, item0.skeleton[field].label) for field in self.fields])
         for item in items:
             self.content.append({'item':item.display(),
                                  'buttons':[normal_button(self.view_name, button, item)
@@ -264,12 +256,12 @@ class RenderTree:
 
     def add_show_link(self, field):
         for el in self.content:
-            el['item'][field] = (el['item'][field], url_for(self.prefix, 'show', el['item']))
+            el['item'][field] = (el['item'][field], url_for(self.view_name, 'show', el['item']))
         return self
 
     def add_buttons(self, buttons):
         if self.content:
-            item = self.content[0]['item']
+            item = self.content[0]['item'] if isinstance(self.content, list) else self.content
             self.buttons = [normal_button(self.view_name, button, item) for button in buttons]
         return self
 
@@ -288,6 +280,15 @@ class RenderTree:
 
     def add_form(self):
         self.form = self.model.convert(self.request.params)
+        # TODO: form validation, for insert and update
+        # validation = self.model.validate(cursor.query, 'query')
+        # if validation['ok']:
+        #     print('initial post: valid query')
+        #     cursor.feedback = ''
+        # else:
+        #     print('initial post: invalid query')
+        #     cursor.query = {}
+        #     cursor.feedback = validation['error']
         return self
 
     def update_if_ok(self, oid):
@@ -361,6 +362,7 @@ class ItemView(BareItemView):
     def index(self):
         """display multiple items (collection)"""
         return self.tree.add_cursor()\
+                        .move_cursor()\
                         .add_items(['modify', 'delete'])\
                         .add_show_link(self.model.fields[0])\
                         .add_buttons(['new'])\
@@ -379,6 +381,8 @@ class ItemView(BareItemView):
         # TODO: handle search operators:
         # TODO: $key $op $value, where $op is 'in' for 'text' and 'memo', otherwise 'eq'
         return self.tree.add_cursor()\
+                        .move_cursor()\
+                        .add_items(['modify', 'delete'])\
                         .add_show_link(self.model.fields[0])\
                         .add_buttons(['new'])\
                         .asdict()

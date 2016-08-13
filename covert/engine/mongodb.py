@@ -51,7 +51,7 @@ class Item(BareItem):
         non-null values.
         """
         qdoc = dict((name, value) for name, value in doc.items()
-                     if name in cls.fields() and value)
+                     if name in cls.fields and value)
         return qdoc
 
     @classmethod
@@ -65,7 +65,7 @@ class Item(BareItem):
         return cursor.count()
 
     @classmethod
-    def find(cls, qdoc={}, skip=0, limit=0, fields=None, sort=None):
+    def find(cls, qdoc={}, skip=0, limit=0, sort=None):
         """
         find(cls, qdoc): list
         Find zero or more documents in collection, and return these in the

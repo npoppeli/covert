@@ -14,7 +14,7 @@ from . import setting
 def read_templates():
     """read templates from layout directory"""
     template_types = ['.xml', '.pt']
-    logger.debug('Scanning for templates in {0}'.format(setting.layout))
+    print('Scanning for templates in {0}'.format(setting.layout))
     for (dirpath, _, filenames) in walk(setting.layout):
         prefix = relpath(dirpath, setting.layout)
         for filename in filenames:
@@ -26,6 +26,7 @@ def read_templates():
                     template_name = prefix.replace('/', '_')+'_'+name
                 filepath = join(dirpath, filename)
                 try:
+                    # print("Template '{0}' in file {1}".format(template_name, filepath))
                     setting.templates[template_name] = PageTemplateFile(filepath)
                 except Exception as e:
                     print("Error in template '{0}' in file {1}".format(template_name, filepath))

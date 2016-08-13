@@ -249,10 +249,10 @@ def parse_model_def(model_def, model_defs):
         schema_key = Optional(field_name) if optional_field else field_name
         pm.names.append(field_name)
         field_hidden = field_label.startswith('_')
-        if not field_hidden:
+        if field_hidden:
             field_label = field_label.replace('_', ' ')
-            parts = field_label.split('|')
-            field_label = parts[label_index]
+        parts = field_label.split('|')
+        field_label = parts[label_index]
         if field_type[0] == '_': # embedded model (comparable to inner class)
             embedded = parse_model_def(model_defs[field_type], model_defs)
             pm.empty[field_name] = [ embedded.empty ] if multiple_field else embedded.empty

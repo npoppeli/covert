@@ -7,7 +7,7 @@ The switching router creates a response object with full HTML, partial HTML or J
 depending on the request parameters.
 """
 
-import waitress, sys, traceback, json
+import html, json, sys, traceback, waitress
 from webob import BaseRequest as Request, Response # performance of BaseRequest is better
 from . import setting
 from .report import logger
@@ -27,18 +27,18 @@ def bad_request(environ, start_response):
     start_response('400 Not Found', [('Content-Type', 'text/plain')])
     return ['Bad request']
 
-def exception_report(exc, html=True):
+def exception_report(exc, ashtml=True):
     """generate exception traceback"""
     exc_type, exc_value, exc_trace = sys.exc_info()
-    if html:
+    if ashtml:
         head = ["<h2>Internal error</h2>", "<p>Traceback (most recent call last:</p>"]
         body = ["<p>{0}</p>".format(l.replace("\n", "<br/>"))
                 for l in traceback.format_tb(exc_trace)]
-        tail = ["<p><em>{0}: {1}</em></p>".format(exc_type.__name__, exc_value)]
+        tail = ["<div><pre>{0}: {1}</pre></div>".format(exc_type.__name__, html.escape(str(exc_value)))]
     else:
         head = ["Internal error. ", "Traceback (most recent call last:"]
         body = []
-        tail = ["{0}: {1}".format(exc_type.__name__, exc_value)]
+        tail = ["{0}: {1}".format(exc_type.__name__, str(exc_value))]
     return ''.join(head+body+tail)
 
 class SwitchRouter:
