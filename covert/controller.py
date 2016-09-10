@@ -109,13 +109,16 @@ class MapRouter:
        This application uses a global route map to map a regular expression to a view and a route.
        The route is a method of a view class. The view class is instantiated with two parameters:
        the request object, and the match dict. Then the route method is called, which is expected to
-       return a render tree, a dictionary containing the content to be rendered and delivered.
+       return a render tree, a dictionary containing the content to be serialized and delivered.
     """
 
     def __init__(self):
         self.content_type = 'text/html'
 
-    def renderer(self, result):
+    def serializer(self, result, template):
+        return setting.templates[template].render(result)
+
+    def finalizer(self, result):
         return result
 
     def __call__(self, environ, start_response):
@@ -128,7 +131,7 @@ class MapRouter:
         for route in setting.routes: # route=(pattern, method, template, regex, cls, name)
             match = route.regex.match(req_path)
             if route.method == req_method and match: # exit loop if matching route found
-                view_cls, route_name, route_template = route.cls, route.name, route.template
+                view_cls, route_name, route_templates = route.cls, route.name, route.templates
                 break
         response = Response(content_type=self.content_type, status=200)
         # run route or send error report
@@ -138,7 +141,8 @@ class MapRouter:
                 view_obj = view_cls(request, match.groupdict(), setting.models[view_cls.model], route_name)
                 route = getattr(view_obj, route_name)
                 result = route()
-                result = route_template.render(**result)
+                template = route.templates[result.get('style', 0)]
+                result = self.serialize(result, template)
             except Exception as e:
                 result = exception_report(e)
                 response.status = 500
@@ -148,7 +152,7 @@ class MapRouter:
             response.status = 404
         # encode to UTF8 and return according to WSGI protocol
         response.charset = 'utf-8'
-        response.text = self.renderer(result)
+        response.text = self.finalizer(result)
         return response(environ, start_response)
 
 class PageRouter(MapRouter):
@@ -158,10 +162,10 @@ class PageRouter(MapRouter):
         used to render the content to HTML. This should be a template for a complete HTML page."""
         super().__init__()
         self.content_type = 'text/html'
-        self.template = setting.templates[name]
+        self.template = name
 
-    def renderer(self, result):
-        return self.template.render(content=result)
+    def finalizer(self, result):
+        return setting.templates[self.template].render(content=result)
 
 class JSONRouter(MapRouter):
 
@@ -169,6 +173,6 @@ class JSONRouter(MapRouter):
         super().__init__()
         self.content_type = 'application/json'
 
-    def renderer(self, result):
+    def serializer(self, result, template):
         # TODO: should this be encode_dict()?
         return json.dumps(result)

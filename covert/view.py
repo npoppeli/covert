@@ -10,7 +10,7 @@ it could be delegated to the client, using Parsley.js (jQuery) for example.
 import re
 from inspect import getmembers, isclass, isfunction
 from itertools import chain
-from .common import str2int, decode_dict, encode_dict, show_dict
+from .common import str2int, decode_dict, encode_dict
 from . import setting
 
 setting.icons = {
@@ -59,10 +59,10 @@ def url_for(view, name, item):
     return url
 
 class Route:
-    def __init__(self, pattern, method, template, regex, cls, name):
+    def __init__(self, pattern, method, templates, regex, cls, name):
         self.pattern = pattern
         self.method = method
-        self.template = template
+        self.templates = templates
         self.cls = cls
         self.name = name
         self.regex = regex
@@ -125,21 +125,23 @@ def read_views(module):
         view_name = class_name.replace('View', '', 1).lower()
         view_class.view_name = view_name
         for member_name, member in getmembers(view_class, isfunction):
-            if hasattr(member, 'pattern'): # method is a route
+            if hasattr(member, 'pattern'): # current member (method) is a route
                 full_pattern  = '/' + view_name + member.pattern
                 pattern       = route2pattern(full_pattern)
                 regex         = route2regex(full_pattern)
-                template_name = view_name+'_' + member.template
-                parent_name   = 'item_'       + member.template
-                if template_name in setting.templates:
-                    template = setting.templates[template_name]
-                elif parent_name in setting.templates:
-                    template = setting.templates[parent_name]
-                else:
-                    template = setting.templates['default']
+                templates     = [] # each route can have 1 or more templates
+                for name in member.template.split(';'):
+                    template_name = view_name+'_' + name
+                    parent_name   = 'item_'       + name
+                    if template_name in setting.templates:
+                        templates.append(template_name)
+                    elif parent_name in setting.templates:
+                        templates.append(parent_name)
+                    else:
+                        templates.append('default')
                 for method in member.method.split(','):
                     setting.patterns[view_name+'_'+member_name] = pattern
-                    setting.routes.append(Route(pattern, method, template,
+                    setting.routes.append(Route(pattern, method, templates,
                                                 re.compile(regex), view_class, member_name))
     # sorting in reverse alphabetical order ensures words like 'match' and 'index'
     # are not absorbed by {id} or other components of the regex patterns
@@ -394,7 +396,7 @@ class ItemView(BareItemView):
                         .add_form_buttons('update')\
                         .asdict()
 
-    @route('/{id:objectid}', method='PUT', template='update')
+    @route('/{id:objectid}', method='PUT', template='show;update')
     def update(self): # update person
         return self.tree.add_form()\
                         .update_if_ok(self.params['id'])\
@@ -407,7 +409,7 @@ class ItemView(BareItemView):
                         .add_form_buttons('create')\
                         .asdict()
 
-    @route('', method='POST', template='create')
+    @route('', method='POST', template='show;create')
     def create(self):
         """create new item"""
         return self.tree.add_form()\
