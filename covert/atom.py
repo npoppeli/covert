@@ -14,24 +14,23 @@ from .common import Error
 # Atom = namedtuple('Atom', ['sname', 'schema', 'convert', 'display', 'read', 'write', 'form'])
 class Atom(tuple):
     __slots__ = ()
-    def __new__(cls, sname, schema, convert, display, read=None, write=None, form=None):
+    def __new__(cls, schema, convert, display, read=None, write=None, form=None):
         return tuple.__new__(cls, (schema, convert, display, read, write, form))
     def __repr__(self):
-        return 'Atom(sname=%r, schema=%r, convert=%r, display=%r, read=%r, write=%r, form=%r)' % self
-    sname   = property(itemgetter(0))
-    schema  = property(itemgetter(1))
-    convert = property(itemgetter(2))
-    display = property(itemgetter(3))
-    read    = property(itemgetter(4))
-    write   = property(itemgetter(5))
-    form    = property(itemgetter(6))
+        return 'Atom(schema=%r, convert=%r, display=%r, read=%r, write=%r, form=%r)' % self
+    schema  = property(itemgetter(0))
+    convert = property(itemgetter(1))
+    display = property(itemgetter(2))
+    read    = property(itemgetter(3))
+    write   = property(itemgetter(4))
+    form    = property(itemgetter(5))
 
 atom_map = {}
 def register_atom(name, **kwarg):
     if name in atom_map:
         raise Error('Atom {0} is already registered'.format(name))
     else:
-        atom_map[name] = Atom(sname=name, **kwarg)
+        atom_map[name] = Atom(**kwarg)
 
 true_strings = ('j', 'y', 'ja', 'yes')
 bool_repr = {True:'ja', False:'nee'}

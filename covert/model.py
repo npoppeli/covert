@@ -90,6 +90,9 @@ def mapdoc(fnmap, doc):
        Map doc using functions in fnmap
     """
     newdoc = {}
+    debug = isinstance(doc, BareItem)
+    if debug:
+        print('>> mapdoc: {}'.format(doc.__str__()))
     for key, value in doc.items():
         if key in fnmap: # apply mapping function
             if isinstance(value, dict): # embedded document
@@ -102,6 +105,8 @@ def mapdoc(fnmap, doc):
                 else: # list of scalars
                     newdoc[key] = [fnmap[key](element) for element in value]
             else: # scalar
+                if debug:
+                    print('>>> {}: {}'.format(key, value))
                 newdoc[key] = fnmap[key](value)
         else: # no mapping for this element
             newdoc[key] = value
@@ -240,8 +245,9 @@ class BareItem(dict):
     def display(self):
         """
         display(cls): newdoc
-        Convert item with typed fields to item with stringified fields.
+        Convert item with typed values to item with only string values.
         """
+        print('>> {}.display'.format(self.name))
         return mapdoc(self.dmap, self)
 
     def copy(self):
@@ -264,7 +270,7 @@ class ItemRef:
     def __str__(self):
         return self.__repr__()
     def __repr__(self):
-        return "{}({} {})".format(self.__class__.__name__, self.collection, self.id)
+        return "{}({}, {})".format(self.__class__.__name__, self.collection, self.id)
 
 def get_objectid(ref):
     return ref.id
@@ -303,7 +309,7 @@ def parse_model_def(model_def, model_defs):
         schema_key = Optional(field_name) if optional_field else field_name
         pm.names.append(field_name)
         field_hidden = field_label.startswith('_')
-        if field_hidden:
+        if not field_hidden:
             field_label = field_label.replace('_', ' ')
         parts = field_label.split('|')
         field_label = parts[label_index]

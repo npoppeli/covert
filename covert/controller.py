@@ -115,10 +115,10 @@ class MapRouter:
     def __init__(self):
         self.content_type = 'text/html'
 
-    def serializer(self, result, template):
-        return setting.templates[template].render(result)
+    def serialize(self, result, template):
+        return setting.templates[template].render(this=result)
 
-    def finalizer(self, result):
+    def finalize(self, result):
         return result
 
     def __call__(self, environ, start_response):
@@ -139,9 +139,9 @@ class MapRouter:
             try:
                 # print('{0}: {1} {2}'.format(self.__class__.__name__, req_method, request.path_qs))
                 view_obj = view_cls(request, match.groupdict(), setting.models[view_cls.model], route_name)
-                route = getattr(view_obj, route_name)
-                result = route()
-                template = route.templates[result.get('style', 0)]
+                route_method = getattr(view_obj, route_name)
+                result = route_method()
+                template = route_templates[result.get('style', 0)]
                 result = self.serialize(result, template)
             except Exception as e:
                 result = exception_report(e)
@@ -152,7 +152,7 @@ class MapRouter:
             response.status = 404
         # encode to UTF8 and return according to WSGI protocol
         response.charset = 'utf-8'
-        response.text = self.finalizer(result)
+        response.text = self.finalize(result)
         return response(environ, start_response)
 
 class PageRouter(MapRouter):
@@ -164,8 +164,9 @@ class PageRouter(MapRouter):
         self.content_type = 'text/html'
         self.template = name
 
-    def finalizer(self, result):
-        return setting.templates[self.template].render(content=result)
+    def finalize(self, result):
+        trimmed = '\n'.join([line.lstrip() for line in result.splitlines() if not line.isspace()])
+        return setting.templates[self.template].render(content=trimmed)
 
 class JSONRouter(MapRouter):
 
@@ -173,6 +174,6 @@ class JSONRouter(MapRouter):
         super().__init__()
         self.content_type = 'application/json'
 
-    def serializer(self, result, template):
+    def serialize(self, result, template):
         # TODO: should this be encode_dict()?
         return json.dumps(result)

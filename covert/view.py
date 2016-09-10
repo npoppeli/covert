@@ -254,6 +254,8 @@ class RenderTree:
             self.content.append({'item':item.display(),
                                  'buttons':[normal_button(self.view_name, button, item)
                                             for button in buttons]})
+        print('add_items: buttons=', buttons)
+        print('add_items: item buttons=', str(self.content[0]['buttons']))
         return self
 
     def add_show_link(self, field):
@@ -365,8 +367,7 @@ class ItemView(BareItemView):
         """display multiple items (collection)"""
         return self.tree.add_cursor()\
                         .move_cursor()\
-                        .add_items(['modify', 'delete'])\
-                        .add_show_link(self.model.fields[0])\
+                        .add_items(['show', 'modify', 'delete'])\
                         .add_buttons(['new'])\
                         .asdict()
 
@@ -384,12 +385,11 @@ class ItemView(BareItemView):
         # TODO: $key $op $value, where $op is 'in' for 'text' and 'memo', otherwise 'eq'
         return self.tree.add_cursor()\
                         .move_cursor()\
-                        .add_items(['modify', 'delete'])\
-                        .add_show_link(self.model.fields[0])\
+                        .add_items(['show', 'modify', 'delete'])\
                         .add_buttons(['new'])\
                         .asdict()
 
-    @route('/{id:objectid}/modify', template='modify')
+    @route('/{id:objectid}/modify', template='update')
     def modify(self):
         """get form for modify/update action"""
         return self.tree.add_item(self.params['id'])\
@@ -398,11 +398,20 @@ class ItemView(BareItemView):
 
     @route('/{id:objectid}', method='PUT', template='show;update')
     def update(self): # update person
+        # if Cancel clicked: redirect back to referer
+        # if OK clicked:
+        #   form -> document
+        #   if valid:
+        #     display document, add feedback 'OK'
+        #     style = 0
+        #   else:
+        #     add form contents back to render tree, add feedback with errors
+        #     style = 1
         return self.tree.add_form()\
                         .update_if_ok(self.params['id'])\
                         .asdict()
 
-    @route('/new', template='new')
+    @route('/new', template='create')
     def new(self):
         """get form for new/create action"""
         return self.tree.add_empty_item()\

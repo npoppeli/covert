@@ -61,6 +61,7 @@ class Item(BareItem):
         Find zero or more documents in collection, and count them.
         qdoc: dictionary specifying the query, e.g. {'id': '1234'}
         """
+        print('>> {}.count'.format(cls.name))
         cursor = setting.store_db[cls.name].find(filter=cls.query(qdoc))
         return cursor.count()
 
