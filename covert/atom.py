@@ -43,25 +43,34 @@ register_atom('boolean',
     display = lambda value: bool_repr[value]
 )
 
+# date and datetime have new display maps, to avoid Python issue 13305
 midnight = time(0, 0, 0, 0)
 register_atom('date',
     schema  = date,
     convert = lambda value: datetime.strptime(value, "%Y-%m-%d"),
-    display = lambda value: datetime.strftime(value, "%Y-%m-%d"),
+    display = lambda value: '{0:04d}-{1:02d}-{2:02d}'.format(value.year, value.month, value.day),
     read    = lambda value: value.date(),
     write   = lambda value: datetime.combine(value, midnight)
 )
 
 register_atom('datetime',
     schema  = datetime,
-    convert = lambda value: datetime.strptime(value, "%Y-%m-%d_%H:%M:%S"),
-    display = lambda value: datetime.strftime(value, "%Y-%m-%d_%H:%M:%S")
+    convert = lambda value: datetime.strptime(value, "%Y-%m-%dT%H:%M:%S"),
+    display = lambda value: '{0:04d}-{1:02d}-{2:02d}T{3:02d}:{4:02d}:{5:02d}'.\
+              format(value.year, value.month, value.day, value.hour, value.minute, value.second)
 )
 
 register_atom('float',
     schema  = float,
     convert = float,
     display = lambda value: '{0:.2}'.format(value)
+)
+
+genders = ['?', 'v', 'm'] # TODO: I18N
+register_atom('gender', # TODO: add possibility to define this in application
+    schema  = int,
+    convert = lambda value: genders.index(value),
+    display = lambda value: genders[value]
 )
 
 register_atom('integer',
@@ -91,7 +100,7 @@ register_atom('text',
 register_atom('time',
     schema  = time,
     convert = lambda value: datetime.strptime(value, "%H:%M:%S"),
-    display = lambda value: datetime.strftime(value, "%H:%M:%S")
+    display = lambda value: '{0:02d}:{1:02d}:{2:02d}'.format(value.hour, value.minute, value.second)
 )
 
 register_atom('url',

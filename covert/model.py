@@ -34,7 +34,8 @@ from . import setting
 
 def flatten(doc):
     """flatten(doc) -> newdoc
-       Flatten document with hierarchical structure
+       Flatten document with hierarchical structure.
+       Measure of depth: max[(1+key.count('.') for key in newdoc.keys])
     """
     newdoc = {}
     for key, value in _flatten(doc, ''):
@@ -90,9 +91,6 @@ def mapdoc(fnmap, doc):
        Map doc using functions in fnmap
     """
     newdoc = {}
-    debug = isinstance(doc, BareItem)
-    if debug:
-        print('>> mapdoc: {}'.format(doc.__str__()))
     for key, value in doc.items():
         if key in fnmap: # apply mapping function
             if isinstance(value, dict): # embedded document
@@ -105,8 +103,6 @@ def mapdoc(fnmap, doc):
                 else: # list of scalars
                     newdoc[key] = [fnmap[key](element) for element in value]
             else: # scalar
-                if debug:
-                    print('>>> {}: {}'.format(key, value))
                 newdoc[key] = fnmap[key](value)
         else: # no mapping for this element
             newdoc[key] = value
@@ -247,7 +243,6 @@ class BareItem(dict):
         display(cls): newdoc
         Convert item with typed values to item with only string values.
         """
-        print('>> {}.display'.format(self.name))
         return mapdoc(self.dmap, self)
 
     def copy(self):
@@ -392,8 +387,8 @@ def read_models(model_defs):
         mutable_fields = [f for f in pm.names
                           if not (pm.skeleton[f].hidden or pm.skeleton[f].auto)]
         mutable_fields.extend(Item.mfields)
-        short_fields = [f for f in mutable_fields
-                        if not (pm.skeleton[f].multiple or pm.skeleton[f].schema in ('text', 'memo'))]
+        short_fields = [f for f in mutable_fields if not (pm.skeleton[f].multiple or
+                                                          pm.skeleton[f].schema in ('text', 'memo'))]
         short_fields.extend(Item.sfields)
         pm.names.extend(Item.fields)
         class_dict['index'].extend(pm.index)

@@ -137,11 +137,12 @@ class MapRouter:
         # run route or send error report
         if view_cls:
             try:
-                # print('{0}: {1} {2}'.format(self.__class__.__name__, req_method, request.path_qs))
                 view_obj = view_cls(request, match.groupdict(), setting.models[view_cls.model], route_name)
                 route_method = getattr(view_obj, route_name)
                 result = route_method()
                 template = route_templates[result.get('style', 0)]
+                print('{0}: {1} {2} -> template {3}'.\
+                      format(self.__class__.__name__, req_method, request.path_qs, template))
                 result = self.serialize(result, template)
             except Exception as e:
                 result = exception_report(e)

@@ -68,8 +68,9 @@ class Route:
         self.regex = regex
 
     def __str__(self):
-        return("{0} {1} -> {2}:{3}".
-               format(self.pattern, self.method, self.cls.__name__, self.name))
+        return("{0} {1} -> {2}:{3}, templates={4}".
+               format(self.pattern, self.method, self.cls.__name__, self.name,
+                      ', '.join(self.templates)))
 
 # decorator used for the routes (view methods)
 class route:
@@ -148,7 +149,7 @@ def read_views(module):
     setting.routes.sort(key=lambda r: r.pattern, reverse=True)
 
 class Cursor:
-    __slots__ = ['skip', 'limit', 'incl', 'incl0', 'dir', 'filter', 'query', 'prev', 'next']
+    __slots__ = ['skip', 'limit', 'incl', 'incl0', 'dir', 'filter', 'query', 'prev', 'next', 'action']
     default = {'skip':0, 'limit':10, 'incl':0, 'incl0':0, 'dir':0}
 
     def __init__(self, request):
@@ -161,10 +162,8 @@ class Cursor:
         for key, value in request.params.items():
             if key.startswith('_'):
                 setattr(self, key[1:], str2int(value) if key[1:] in self.default else value)
-                print('cursor_init: cursor parameter {}={}'.format(key[1:], value))
             elif value:
                 query[key] = value
-                print('cursor_init: query parameter {}={}'.format(key, value))
         self.incl0 = self.incl
         if initial: # initial post
             self.query = query
@@ -210,8 +209,9 @@ class RenderTree:
         self.feedback = ''
         self.filter = {}
 
-    def add_cursor(self):
+    def add_cursor(self, route_name):
         self.cursor = Cursor(self.request)
+        self.cursor.action = url_for(self.view_name, route_name, {})
         return self
 
     def move_cursor(self):
@@ -222,6 +222,7 @@ class RenderTree:
         count = self.model.count(cursor.filter)
         print("move_cursor: filter {} -> count={}".format(cursor.filter, count))
         cursor.skip = max(0, min(count, cursor.skip+cursor.dir*cursor.limit))
+        print("move_cursor: skip={} limit={}".format(cursor.skip, cursor.limit))
         cursor.prev = cursor.skip>0
         cursor.next = cursor.skip+cursor.limit < count
         return self
@@ -240,8 +241,9 @@ class RenderTree:
         self.labels = dict([(field, self.model.skeleton[field].label) for field in self.fields])
         return self
 
-    def add_items(self, buttons):
-        items = self.model.find(self.cursor.filter, limit=self.cursor.limit, skip=self.cursor.skip)
+    def add_items(self, buttons, sort):
+        items = self.model.find(self.cursor.filter,
+                                limit=self.cursor.limit, skip=self.cursor.skip, sort=sort)
         if not items:
             self.feedback += 'Nothing found'
             return self
@@ -254,8 +256,6 @@ class RenderTree:
             self.content.append({'item':item.display(),
                                  'buttons':[normal_button(self.view_name, button, item)
                                             for button in buttons]})
-        print('add_items: buttons=', buttons)
-        print('add_items: item buttons=', str(self.content[0]['buttons']))
         return self
 
     def add_show_link(self, field):
@@ -353,6 +353,7 @@ class ItemView(BareItemView):
     (create, index, new, update, delete, edit, show) plus extensions.
     """
     model = 'Item'
+    sort = [] # TODO: (1) should not depend on db engine; (2) passing to render tree methods is awkward
 
     @route('/{id:objectid}', template='show')
     def show(self):
@@ -365,9 +366,9 @@ class ItemView(BareItemView):
     @route('/index', method='GET,POST', template='index')
     def index(self):
         """display multiple items (collection)"""
-        return self.tree.add_cursor()\
+        return self.tree.add_cursor('index')\
                         .move_cursor()\
-                        .add_items(['show', 'modify', 'delete'])\
+                        .add_items(['show', 'modify', 'delete'], self.sort)\
                         .add_buttons(['new'])\
                         .asdict()
 
@@ -378,14 +379,14 @@ class ItemView(BareItemView):
                         .add_search_button('match')\
                         .asdict()
 
-    @route('/search', method='POST', template='match')
+    @route('/search', method='POST', template='index')
     def match(self):
         """show result list of search"""
         # TODO: handle search operators:
         # TODO: $key $op $value, where $op is 'in' for 'text' and 'memo', otherwise 'eq'
-        return self.tree.add_cursor()\
+        return self.tree.add_cursor('search')\
                         .move_cursor()\
-                        .add_items(['show', 'modify', 'delete'])\
+                        .add_items(['show', 'modify', 'delete'], self.sort)\
                         .add_buttons(['new'])\
                         .asdict()
 
