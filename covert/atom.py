@@ -32,15 +32,16 @@ def register_atom(name, **kwarg):
     else:
         atom_map[name] = Atom(**kwarg)
 
-true_strings = ('j', 'y', 'ja', 'yes')
-bool_repr = {True:'ja', False:'nee'}
+true_strings = ('j', 'y', 'ja', 'yes') # TODO: I18N
+bool_repr = {True:'ja', False:'nee'}   # TODO: I18N
 # identity = lambda x: x # when we use dense/full transformation maps
 identity = None # when we use sparse transformation maps (faster)
 
 register_atom('boolean',
-    schema  = type(True),
+    schema  = bool,
     convert = lambda value: value.lower() in true_strings,
-    display = lambda value: bool_repr[value]
+    display = lambda value: bool_repr[value],
+    form    = {'type': 'boolean', 'range': ['nee', 'ja'], 'control':'radio'}
 )
 
 # date and datetime have new display maps, to avoid Python issue 13305
@@ -50,61 +51,71 @@ register_atom('date',
     convert = lambda value: datetime.strptime(value, "%Y-%m-%d"),
     display = lambda value: '{0:04d}-{1:02d}-{2:02d}'.format(value.year, value.month, value.day),
     read    = lambda value: value.date(),
-    write   = lambda value: datetime.combine(value, midnight)
+    write   = lambda value: datetime.combine(value, midnight),
+    form    = {'type': 'date', 'control': 'input'}
 )
 
 register_atom('datetime',
     schema  = datetime,
     convert = lambda value: datetime.strptime(value, "%Y-%m-%dT%H:%M:%S"),
     display = lambda value: '{0:04d}-{1:02d}-{2:02d}T{3:02d}:{4:02d}:{5:02d}'.\
-              format(value.year, value.month, value.day, value.hour, value.minute, value.second)
+              format(value.year, value.month, value.day, value.hour, value.minute, value.second),
+    form    = {'type': 'datetime', 'control': 'input'}
 )
 
 register_atom('float',
     schema  = float,
     convert = float,
-    display = lambda value: '{0:.2}'.format(value)
+    display = lambda value: '{0:.2}'.format(value),
+    form    = {'type': 'number', 'control': 'input'}
 )
 
 genders = ['?', 'v', 'm'] # TODO: I18N
 register_atom('gender', # TODO: add possibility to define this in application
     schema  = int,
     convert = lambda value: genders.index(value),
-    display = lambda value: genders[value]
+    display = lambda value: genders[value],
+    form    = {'type': 'gender', 'control': 'radio', 'range':genders}
 )
 
 register_atom('integer',
     schema  = int,
     convert = int,
     display = str,
+    form    = {'type': 'number', 'control': 'input'}
 )
 
 register_atom('memo',
     schema  = str,
     convert = identity,
-    display = identity
+    display = identity,
+    form    = {'type': 'memo', 'control': 'textarea'}
 )
 
 register_atom('string',
     schema  = str,
     convert = identity,
-    display = identity
+    display = identity,
+    form    = {'type': 'text', 'control': 'input'}
 )
 
 register_atom('text',
     schema  = str,
     convert = identity,
-    display = identity
+    display = identity,
+    form    = {'type': 'text', 'control': 'textarea'}
 )
 
 register_atom('time',
     schema  = time,
     convert = lambda value: datetime.strptime(value, "%H:%M:%S"),
-    display = lambda value: '{0:02d}:{1:02d}:{2:02d}'.format(value.hour, value.minute, value.second)
+    display = lambda value: '{0:02d}:{1:02d}:{2:02d}'.format(value.hour, value.minute, value.second),
+    form    = {'type': 'datetime', 'control': 'input'}
 )
 
 register_atom('url',
     schema  = str,
     convert = identity,
-    display = identity
+    display = identity,
+    form    = {'type': 'url', 'control': 'input'}
 )

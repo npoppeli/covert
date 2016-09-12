@@ -32,33 +32,31 @@ from .atom import atom_map
 from .common import Error
 from . import setting
 
-def flatten(doc):
-    """flatten(doc) -> newdoc
-       Flatten document with hierarchical structure.
-       Measure of depth: max[(1+key.count('.') for key in newdoc.keys])
-    """
-    newdoc = {}
-    for key, value in _flatten(doc, ''):
-        newdoc[key] = value
-    return newdoc
-
-def _flatten(doc, prefix):
-    for key, value in doc.items(): #TODO: use the model's declaration order
+def _flatten(doc, prefix, keys):
+    for key in [key for key in keys if key in doc.keys()]:  # keys in model order
+        value = doc[key]
         sub_prefix = '{}{}.'.format(prefix, key)
         if isinstance(value, dict):  # embedded document
-            yield from _flatten(value, sub_prefix)
+            yield from _flatten(value, sub_prefix, keys)
         elif isinstance(value, list):  # list of scalars or documents
             if len(value) == 0:  # empty list
                 yield prefix + key, value
             elif isinstance(value[0], dict):  # list of documents
                 for sub_key, element in enumerate(value):
-                    yield from _flatten(element, sub_prefix + str(sub_key) + '.')
+                    yield from _flatten(element, sub_prefix+str(sub_key)+'.', keys)
             else:  # list of scalars
                 for sub_key, element in enumerate(value):
                     yield sub_prefix + str(sub_key), element
         else:  # scalar
             yield prefix + key, value
 
+def prune(doc, depth):
+    """prune(doc) -> newdoc
+       Prune a flattened document to given depth, where depth = key.count('.')
+    """
+    return OrderedDict((key, value) for (key, value) in doc.items() if key.count('.') <= depth)
+
+# TODO: turn into classmethod of BareItem
 def unflatten(doc):
     """unflatten(doc) -> newdoc
        Unflatten document to (re)create hierarchical structure.
@@ -130,7 +128,7 @@ class ParsedModel:
         self.skeleton = OrderedDict()
         self.empty = {}
         self.schema, self.qschema = {}, {}
-        self.rmap, self.wmap, self.dmap, self.cmap = {}, {}, {}, {}
+        self.rmap, self.wmap, self.dmap, self.cmap, self.fmap = {}, {}, {}, {}, {}
 
 # Document revisions
 # 1. If the number of revisions is low, keep all of them in the storage,
@@ -240,10 +238,22 @@ class BareItem(dict):
 
     def display(self):
         """
-        display(cls): newdoc
+        display(self): newdoc
         Convert item with typed values to item with only string values.
         """
-        return mapdoc(self.dmap, self)
+        cls = self.__class__
+        item = cls()
+        item.update(mapdoc(self.dmap, self))
+        return item
+
+    def flatten(self):
+        """flatten(doc) -> newdoc
+           Flatten document with hierarchical structure.
+        """
+        newdoc = OrderedDict()
+        for key, value in _flatten(self, '', self.fields):
+            newdoc[key] = value
+        return newdoc
 
     def copy(self):
         """
@@ -321,6 +331,7 @@ def parse_model_def(model_def, model_defs):
             pm.dmap[field_name] = dict
             pm.rmap[field_name] = dict
             pm.wmap[field_name] = dict
+            pm.fmap[field_name] = None
             pm.cmap.update(embedded.cmap)
             pm.dmap.update(embedded.dmap)
             pm.rmap.update(embedded.rmap)
@@ -335,6 +346,7 @@ def parse_model_def(model_def, model_defs):
             pm.dmap[field_name] = ref_tuple # create tuple (label, url)
             pm.rmap[field_name] = setting.models[ref_name] # create ItemRef instance with argument 'objectid'
             pm.wmap[field_name] = get_objectid # write only objectid to database
+            pm.fmap[field_name] = None
             pm.empty[field_name] = [ '' ] if multiple_field else ''
             pm.qschema[field_name] = None
             pm.schema[schema_key] = [ setting.models[ref_name] ] if multiple_field else setting.models[ref_name]
@@ -347,6 +359,7 @@ def parse_model_def(model_def, model_defs):
             if atom.display: pm.dmap[field_name] = atom.display
             if atom.read:    pm.rmap[field_name] = atom.read
             if atom.write:   pm.wmap[field_name] = atom.write
+            pm.fmap[field_name] = atom.form
             pm.empty[field_name] = [ '' ] if multiple_field else ''
             pm.qschema[field_name] = atom.schema
             pm.schema[schema_key]  = [ atom.schema ] if multiple_field else atom.schema

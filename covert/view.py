@@ -8,9 +8,11 @@ it could be delegated to the client, using Parsley.js (jQuery) for example.
 """
 
 import re
+from collections import OrderedDict
 from inspect import getmembers, isclass, isfunction
 from itertools import chain
 from .common import str2int, decode_dict, encode_dict
+from .model import prune
 from . import setting
 
 setting.icons = {
@@ -168,7 +170,8 @@ class Cursor:
         if initial: # initial post
             self.query = query
         else: # follow-up post
-            print('follow-up post: decode saved query')
+            if setting.debug:
+                print('follow-up post: decode saved query')
             self.query = decode_dict(self.query)
 
     def asdict(self):
@@ -220,25 +223,34 @@ class RenderTree:
         cursor.filter = {'active': ''} if cursor.incl == 1 else {}
         cursor.filter.update(cursor.query)
         count = self.model.count(cursor.filter)
-        print("move_cursor: filter {} -> count={}".format(cursor.filter, count))
+        if setting.debug:
+            print("move_cursor: filter {} -> count={}".format(cursor.filter, count))
         cursor.skip = max(0, min(count, cursor.skip+cursor.dir*cursor.limit))
-        print("move_cursor: skip={} limit={}".format(cursor.skip, cursor.limit))
+        if setting.debug:
+            print("move_cursor: skip={} limit={}".format(cursor.skip, cursor.limit))
         cursor.prev = cursor.skip>0
         cursor.next = cursor.skip+cursor.limit < count
         return self
 
     def add_item(self, oid):
         item = self.model.lookup(oid)
-        self.content = item.display()
-        self.fields = item.mfields
-        self.labels = dict([(field, item.skeleton[field].label) for field in self.fields])
-        # TODO: add icons and any other UI information
+        flat_item = prune(item.display().flatten(), 1)
+        show_item = OrderedDict()
+        for key, value in flat_item.items():
+            prefix = key if key.count('.') == 0 else key[:key.find('.')]
+            label = item.skeleton[prefix].label if prefix in item.mfields else ''
+            show_item[key] = {'value':value, 'label':label}
+        self.content = show_item
         return self
 
     def add_empty_item(self):
-        self.content = [{'item':self.model.empty(), 'buttons':[]}]
-        self.fields = self.model.mfields
-        self.labels = dict([(field, self.model.skeleton[field].label) for field in self.fields])
+        flat_item = prune(self.model.empty().flatten(), 1)
+        show_item = OrderedDict()
+        for key, value in flat_item.items():
+            prefix = key if key.count('.') == 0 else key[:key.find('.')]
+            label = self.model.skeleton[prefix].label if prefix in self.model.mfields else ''
+            show_item[key] = {'value':value, 'label':label}
+        self.content = show_item
         return self
 
     def add_items(self, buttons, sort):
@@ -248,7 +260,8 @@ class RenderTree:
             self.feedback += 'Nothing found'
             return self
         item0 = items[0]
-        print('add_items: adding {} items'.format(len(items)))
+        if setting.debug:
+            print('add_items: adding {} items'.format(len(items)))
         self.content = []
         self.fields = item0.sfields
         self.labels = dict([(field, item0.skeleton[field].label) for field in self.fields])
@@ -278,8 +291,8 @@ class RenderTree:
 
     def add_search_button(self, route_name):
         if self.content:
-            item = self.content[0]['item']
-            self.buttons = [form_button(self.view_name, route_name, item, 'search')]
+            # item = self.content[0]['item']
+            self.buttons = [form_button(self.view_name, route_name, {}, 'search')]
         return self
 
     def add_form(self):
