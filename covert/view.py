@@ -187,6 +187,7 @@ def normal_button(view_name, route_name, item):
             'action': url_for(view_name, route_name, item), 'method':'GET'}
 
 def form_button(view_name, route_name, item, button_name):
+    print('form_button: view={} route={} item={}'.format(view_name, route_name, str(item)))
     return {'label': label_for(button_name), 'icon': icon_for(button_name),
             'action': url_for(view_name, route_name, item), 'method':'POST'}
 
@@ -253,6 +254,16 @@ class RenderTree:
         self.content = show_item
         return self
 
+    def add_form_controls(self):
+        for key, value in self.content.items():
+            prefix = key if key.count('.') == 0 else key[:key.find('.')]
+            fmap = self.model.fmap[prefix]
+            if value['label'] and fmap is not None:
+                value.update(fmap)
+            else:
+                value.update({'type':'hidden', 'control':'input'})
+        return self
+
     def add_items(self, buttons, sort):
         items = self.model.find(self.cursor.filter,
                                 limit=self.cursor.limit, skip=self.cursor.skip, sort=sort)
@@ -284,9 +295,10 @@ class RenderTree:
 
     def add_form_buttons(self, route_name):
         if self.content:
-            item = self.content[0]['item']
+            item = self.content
             self.buttons = [form_button(self.view_name, route_name, item, 'ok'),
                             form_button(self.view_name, route_name, item, 'cancel')]
+            print('add_form_buttons:', self.buttons)
         return self
 
     def add_search_button(self, route_name):
@@ -389,6 +401,7 @@ class ItemView(BareItemView):
     def search(self):
         """create search form"""
         return self.tree.add_empty_item()\
+                        .add_form_controls()\
                         .add_search_button('match')\
                         .asdict()
 
@@ -403,14 +416,15 @@ class ItemView(BareItemView):
                         .add_buttons(['new'])\
                         .asdict()
 
-    @route('/{id:objectid}/modify', template='update')
+    @route('/{id:objectid}/modify', template='form')
     def modify(self):
         """get form for modify/update action"""
         return self.tree.add_item(self.params['id'])\
+                        .add_form_controls()\
                         .add_form_buttons('update')\
                         .asdict()
 
-    @route('/{id:objectid}', method='PUT', template='show;update')
+    @route('/{id:objectid}', method='PUT', template='show;form')
     def update(self): # update person
         # if Cancel clicked: redirect back to referer
         # if OK clicked:
@@ -429,10 +443,11 @@ class ItemView(BareItemView):
     def new(self):
         """get form for new/create action"""
         return self.tree.add_empty_item()\
+                        .add_form_controls()\
                         .add_form_buttons('create')\
                         .asdict()
 
-    @route('', method='POST', template='show;create')
+    @route('', method='POST', template='show;form')
     def create(self):
         """create new item"""
         return self.tree.add_form()\

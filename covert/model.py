@@ -163,6 +163,7 @@ class BareItem(dict):
     dmap  = {'ctime':da.display, 'mtime':da.display, 'active': ba.display}
     rmap = {}
     wmap = {}
+    fmap  = {'ctime':None, 'mtime':None, 'active':None, 'id':None}
     # skeleton
     skeleton = OrderedDict()
     # TODO: labels should become language-dependent
@@ -336,6 +337,7 @@ def parse_model_def(model_def, model_defs):
             pm.dmap.update(embedded.dmap)
             pm.rmap.update(embedded.rmap)
             pm.wmap.update(embedded.wmap)
+            pm.fmap.update(embedded.fmap)
             for name in embedded.names: # necessary for preserving order
                 pm.skeleton[name] = embedded.skeleton[name]
         elif field_type[0] == '^': # reference to model
@@ -415,11 +417,13 @@ def read_models(model_defs):
         pm.dmap.update(Item.dmap)
         pm.rmap.update(Item.rmap)
         pm.wmap.update(Item.wmap)
+        pm.fmap.update(Item.fmap)
         class_dict['name']       = model_name
         class_dict['cmap']       = pm.cmap
         class_dict['dmap']       = pm.dmap
         class_dict['rmap']       = pm.rmap
         class_dict['wmap']       = pm.wmap
+        class_dict['fmap']       = pm.fmap
         class_dict['fields']     = pm.names
         class_dict['mfields']    = mutable_fields
         class_dict['sfields']    = short_fields
