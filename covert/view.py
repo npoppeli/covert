@@ -233,13 +233,15 @@ class RenderTree:
         cursor.next = cursor.skip+cursor.limit < count
         return self
 
-    def add_item(self, oid):
+    def add_item(self, oid, form=False):
         item = self.model.lookup(oid)
         flat_item = prune(item.display().flatten(), 1)
         show_item = OrderedDict()
+        # if form: auto->input.type=hidden, hidden->omit
+        # else   : auto->omit, hidden->omit
         for key, value in flat_item.items():
             prefix = key if key.count('.') == 0 else key[:key.find('.')]
-            label = item.skeleton[prefix].label if prefix in item.mfields else ''
+            label = item.skeleton[prefix].label if prefix in fields else ''
             show_item[key] = {'value':value, 'label':label}
         self.content = show_item
         return self

@@ -347,7 +347,7 @@ def parse_model_def(model_def, model_defs):
             # don't add entry to pm.cmap, since conversion is unnecessary
             pm.dmap[field_name] = ref_tuple # create tuple (label, url)
             pm.rmap[field_name] = setting.models[ref_name] # create ItemRef instance with argument 'objectid'
-            pm.wmap[field_name] = get_objectid # write only objectid to database
+            pm.wmap[field_name] = get_objectid # write only object id to database
             pm.fmap[field_name] = None
             pm.empty[field_name] = [ '' ] if multiple_field else ''
             pm.qschema[field_name] = None
@@ -399,12 +399,6 @@ def read_models(model_defs):
         model_def, class_dict = model_defs[model_name], {}
         class_dict['index'] = [ ('id', 1) ]
         pm = parse_model_def(model_def, model_defs) # pm: instance of class ParsedModel
-        mutable_fields = [f for f in pm.names
-                          if not (pm.skeleton[f].hidden or pm.skeleton[f].auto)]
-        mutable_fields.extend(Item.mfields)
-        short_fields = [f for f in mutable_fields if not (pm.skeleton[f].multiple or
-                                                          pm.skeleton[f].schema in ('text', 'memo'))]
-        short_fields.extend(Item.sfields)
         pm.names.extend(Item.fields)
         class_dict['index'].extend(pm.index)
         schema = Item._schema.copy()
@@ -425,8 +419,6 @@ def read_models(model_defs):
         class_dict['wmap']       = pm.wmap
         class_dict['fmap']       = pm.fmap
         class_dict['fields']     = pm.names
-        class_dict['mfields']    = mutable_fields
-        class_dict['sfields']    = short_fields
         class_dict['_empty']     = pm.empty
         class_dict['_schema']    = schema
         class_dict['_qschema']   = qschema
