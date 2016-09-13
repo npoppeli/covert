@@ -198,7 +198,7 @@ def delete_button(view_name, route_name, item):
 
 
 class RenderTree:
-    nodes = ['content', 'fields', 'labels', 'buttons', 'feedback', 'cursor']
+    nodes = ['content', 'fields', 'labels', 'buttons', 'feedback', 'cursor', 'controls']
     def __init__(self, request, model, view_name, route_name):
         self.request = request
         self.model = model
@@ -207,6 +207,7 @@ class RenderTree:
         self.content = None
         self.labels = {}
         self.fields = []
+        self.controls = {}
         self.buttons = []
         self.cursor = None
         self.form = {}
@@ -235,35 +236,43 @@ class RenderTree:
 
     def add_item(self, oid, form=False):
         item = self.model.lookup(oid)
-        flat_item = prune(item.display().flatten(), 1)
-        show_item = OrderedDict()
-        # if form: auto->input.type=hidden, hidden->omit
-        # else   : auto->omit, hidden->omit
-        for key, value in flat_item.items():
+        self.content = prune(item.display().flatten(), 1)
+        skeleton = item.skeleton
+        short_fields = [f for f in item.fields if skeleton[f].atomic and not
+                        (skeleton[f].hidden or (not form and skeleton[f].auto) or
+                         skeleton[f].schema in ('text', 'memo'))]
+        labels = {}
+        for key in short_fields:
+            # TODO: ADD code for multiple short field
             prefix = key if key.count('.') == 0 else key[:key.find('.')]
-            label = item.skeleton[prefix].label if prefix in fields else ''
-            show_item[key] = {'value':value, 'label':label}
-        self.content = show_item
+            labels[key] = '' if skeleton[key].auto else skeleton[prefix].label
+        self.labels = labels
         return self
 
     def add_empty_item(self):
-        flat_item = prune(self.model.empty().flatten(), 1)
-        show_item = OrderedDict()
-        for key, value in flat_item.items():
+        item = self.model.empty() # difference with add_item
+        self.content = prune(item.flatten(), 1)
+        skeleton = item.skeleton
+        short_fields = [f for f in item.fields if skeleton[f].atomic and not
+                        (skeleton[f].hidden or # difference with add_item
+                         skeleton[f].schema in ('text', 'memo'))]
+        labels = {}
+        for key in short_fields:
+            # TODO: ADD code for multiple short field
             prefix = key if key.count('.') == 0 else key[:key.find('.')]
-            label = self.model.skeleton[prefix].label if prefix in self.model.mfields else ''
-            show_item[key] = {'value':value, 'label':label}
-        self.content = show_item
+            labels[key] = '' if skeleton[key].auto else skeleton[prefix].label
+        self.labels = labels
         return self
 
     def add_form_controls(self):
-        for key, value in self.content.items():
+        controls = {}
+        for key in self.labels.keys():
             prefix = key if key.count('.') == 0 else key[:key.find('.')]
-            fmap = self.model.fmap[prefix]
-            if value['label'] and fmap is not None:
-                value.update(fmap)
+            if self.labels[prefix] == '': # hidden fields have empty label
+                controls[prefix] = {'type':'hidden', 'control':'input'}
             else:
-                value.update({'type':'hidden', 'control':'input'})
+                controls[prefix] = self.model.fmap[prefix]
+        self.controls = controls
         return self
 
     def add_items(self, buttons, sort):

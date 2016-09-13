@@ -106,19 +106,20 @@ def mapdoc(fnmap, doc):
             newdoc[key] = value
     return newdoc
 
-# Field = namedtuple('Field', ['label', 'schema', 'optional', 'multiple', 'hidden', 'auto'])
+# Field = namedtuple('Field', ['label', 'schema', 'optional', 'multiple', 'hidden', 'auto', 'atomic'])
 class Field(tuple):
     __slots__ = ()
-    def __new__(cls, label, schema, optional=False, multiple=False, hidden=False, auto=False):
-        return tuple.__new__(cls, (label, schema, optional, multiple, hidden, auto))
+    def __new__(cls, label, schema, optional=False, multiple=False, hidden=False, auto=False, atomic=True):
+        return tuple.__new__(cls, (label, schema, optional, multiple, hidden, auto, atomic))
     def __repr__(self):
-        return 'Field(label=%r, schema=%r, optional=%r, multiple=%r, hidden=%r, auto=%r)' % self
+        return 'Field(label=%r, schema=%r, optional=%r, multiple=%r, hidden=%r, auto=%r, atomic=%r)' % self
     label    = property(itemgetter(0))
     schema   = property(itemgetter(1))
     optional = property(itemgetter(2))
     multiple = property(itemgetter(3))
     hidden   = property(itemgetter(4))
     auto     = property(itemgetter(5))
+    atomic   = property(itemgetter(6))
 
 class ParsedModel:
     """ParsedModel: result of parsing model definition."""
@@ -325,7 +326,7 @@ def parse_model_def(model_def, model_defs):
             pm.qschema[field_name] = embedded.qschema
             pm.schema[schema_key] = [ embedded.schema ] if multiple_field else embedded.schema
             pm.skeleton[field_name] = Field(label=field_label, schema='dict',
-                                            hidden=field_hidden, auto=False,
+                                            hidden=field_hidden, auto=False, atomic=False,
                                             optional=optional_field, multiple=multiple_field)
             pm.names.extend(embedded.names)
             pm.cmap[field_name] = dict
@@ -353,7 +354,7 @@ def parse_model_def(model_def, model_defs):
             pm.qschema[field_name] = None
             pm.schema[schema_key] = [ setting.models[ref_name] ] if multiple_field else setting.models[ref_name]
             pm.skeleton[field_name] = Field(label=field_label, schema=ref_name,
-                                            hidden=field_hidden, auto=False,
+                                            hidden=field_hidden, auto=False, atomic=False,
                                             optional=optional_field, multiple=multiple_field)
         else: # atom class
             atom = atom_map[field_type]
