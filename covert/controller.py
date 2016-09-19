@@ -11,6 +11,7 @@ import html, json, sys, traceback, waitress
 from webob import BaseRequest as Request, Response # performance of BaseRequest is better
 from . import setting
 from .report import logger
+from .common import show_dict
 
 def http_server(app, **kwarg):
     logger.debug('starting HTTP server')
@@ -141,8 +142,10 @@ class MapRouter:
                 route_method = getattr(view_obj, route_name)
                 result = route_method()
                 template = route_templates[result.get('style', 0)]
-                print('{0}: {1} {2} -> template {3}'.\
-                      format(self.__class__.__name__, req_method, request.path_qs, template))
+                if setting.debug:
+                    print('{0}: {1} {2} -> template {3}'.\
+                          format(self.__class__.__name__, req_method, request.path_qs, template))
+                    print(show_dict(result))
                 result = self.serialize(result, template)
             except Exception as e:
                 result = exception_report(e)

@@ -101,10 +101,7 @@ def kernel_init():
             else:
                 print('{0}\n{1}'.format(name, '-'*len(name)))
                 print('fields', model.fields)
-                print('mfields', model.mfields)
-                print('sfields', model.sfields)
-                #print(str(model._schema))
-                #for field_name, field in model.skeleton.items():
-                #    print('{0}: "{1}" optional={2} multiple={3} auto={4}'.\
-                #        format(field_name, field.label, field.optional, field.multiple, field.auto))
+                for field_name, field in model.skeleton.items():
+                    print("{0}: '{1}' schema={2} optional={3} multiple={4} auto={5}".\
+                        format(field_name, field.label, field.schema, field.optional, field.multiple, field.auto))
                 print('')

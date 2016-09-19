@@ -56,7 +56,6 @@ def prune(doc, depth):
     """
     return OrderedDict((key, value) for (key, value) in doc.items() if key.count('.') <= depth)
 
-# TODO: turn into classmethod of BareItem
 def unflatten(doc):
     """unflatten(doc) -> newdoc
        Unflatten document to (re)create hierarchical structure.
@@ -76,7 +75,7 @@ def _unflatten(lrep):
         end = bisect_right(car_list, key)
         children = lrep[begin:end]
         if len(children) == 1:
-            newdoc[key] = children[0][1]  # scalar
+            newdoc[key] = [] if children[0][1] == '[]' else children[0][1]  # scalar
         else:
             newdoc[key] = _unflatten(children)
     if all([key.isnumeric() for key in car_set]):  # turn dict with numeric keys into list
@@ -106,20 +105,25 @@ def mapdoc(fnmap, doc):
             newdoc[key] = value
     return newdoc
 
-# Field = namedtuple('Field', ['label', 'schema', 'optional', 'multiple', 'hidden', 'auto', 'atomic'])
-class Field(tuple):
-    __slots__ = ()
-    def __new__(cls, label, schema, optional=False, multiple=False, hidden=False, auto=False, atomic=True):
-        return tuple.__new__(cls, (label, schema, optional, multiple, hidden, auto, atomic))
-    def __repr__(self):
-        return 'Field(label=%r, schema=%r, optional=%r, multiple=%r, hidden=%r, auto=%r, atomic=%r)' % self
-    label    = property(itemgetter(0))
-    schema   = property(itemgetter(1))
-    optional = property(itemgetter(2))
-    multiple = property(itemgetter(3))
-    hidden   = property(itemgetter(4))
-    auto     = property(itemgetter(5))
-    atomic   = property(itemgetter(6))
+# Atom defines: 'schema', 'convert', 'display', 'formtype', 'control', 'read', 'write', 'enum'
+# schema: used for Item._schema, for validation purposes
+# formtype, control, enum: used for UI metadata, supplemented by label
+
+class Field:
+    __slots__ = ('label', 'schema', 'formtype', 'control', 'optional', 'multiple',
+                 'hidden', 'auto', 'atomic',  'control', 'enum')
+    def __init__(self, label, schema, formtype, control, optional=False, multiple=False,
+                 hidden=False, auto=False, atomic=True, enum=None):
+        self.label    = label
+        self.schema   = schema
+        self.formtype = formtype
+        self.control  = control
+        self.optional = optional
+        self.multiple = multiple
+        self.hidden   = hidden
+        self.auto     = auto
+        self.atomic   = atomic
+        self.enum     = enum
 
 class ParsedModel:
     """ParsedModel: result of parsing model definition."""
@@ -152,10 +156,7 @@ class BareItem(dict):
     sa = atom_map['string']
     da = atom_map['datetime']
     name = 'BareItem'
-    # all, all mutable, and all short fields
     fields  = ['id', 'ctime', 'mtime', 'active']
-    mfields = []
-    sfields = []
     # schemata for normal and query validation
     _schema  = {'id':sa.schema, 'ctime':da.schema, 'mtime':da.schema, 'active': ba.schema}
     _qschema = {}
@@ -164,14 +165,13 @@ class BareItem(dict):
     dmap  = {'ctime':da.display, 'mtime':da.display, 'active': ba.display}
     rmap = {}
     wmap = {}
-    fmap  = {'ctime':None, 'mtime':None, 'active':None, 'id':None}
     # skeleton
     skeleton = OrderedDict()
     # TODO: labels should become language-dependent
-    skeleton['id']     = Field(label='Id',       schema='string',   auto=True, hidden=True )
-    skeleton['ctime']  = Field(label='Created',  schema='datetime', auto=True, hidden=False)
-    skeleton['mtime']  = Field(label='Modified', schema='datetime', auto=True, hidden=False)
-    skeleton['active'] = Field(label='Active',   schema='boolean',  auto=True, hidden=True )
+    skeleton['id']     = Field(label='Id',       schema='string',   formtype='hidden', control='input', auto=True, hidden=True )
+    skeleton['ctime']  = Field(label='Created',  schema='datetime', formtype='hidden', control='input', auto=True, hidden=False)
+    skeleton['mtime']  = Field(label='Modified', schema='datetime', formtype='hidden', control='input', auto=True, hidden=False)
+    skeleton['active'] = Field(label='Active',   schema='boolean',  formtype='hidden', control='input', auto=True, hidden=True )
 
     def __init__(self, doc=None):
         """
@@ -216,8 +216,8 @@ class BareItem(dict):
             _ = validator(doc)
             return {'ok': True, 'error':{} }
         except MultipleInvalid as e:
-            # error = dict([('.'.join(el.path), el.msg) for el in e.errors ])
-            error = str(e.errors)
+            error = '; '.join([str(el) for el in e.errors ])
+            # error = str(e.errors)
             return {'ok': False, 'error':error }
 
     @classmethod
@@ -234,7 +234,7 @@ class BareItem(dict):
     def convert(cls, doc):
         """
         convert(cls, doc): newdoc
-        Convert stringified item to item with typed fields.
+        Convert item with only string values to item with typed values.
         """
         return mapdoc(cls.cmap, doc)
 
@@ -325,7 +325,10 @@ def parse_model_def(model_def, model_defs):
             pm.empty[field_name] = [ embedded.empty ] if multiple_field else embedded.empty
             pm.qschema[field_name] = embedded.qschema
             pm.schema[schema_key] = [ embedded.schema ] if multiple_field else embedded.schema
+            # Field(label, schema, formtype, control, optional=False, multiple=False,
+            #       hidden=False, auto=False, atomic=True, enum=None):
             pm.skeleton[field_name] = Field(label=field_label, schema='dict',
+                                            formtype='hidden', control='input',
                                             hidden=field_hidden, auto=False, atomic=False,
                                             optional=optional_field, multiple=multiple_field)
             pm.names.extend(embedded.names)
@@ -354,6 +357,7 @@ def parse_model_def(model_def, model_defs):
             pm.qschema[field_name] = None
             pm.schema[schema_key] = [ setting.models[ref_name] ] if multiple_field else setting.models[ref_name]
             pm.skeleton[field_name] = Field(label=field_label, schema=ref_name,
+                                            formtype='hidden', control='input',
                                             hidden=field_hidden, auto=False, atomic=False,
                                             optional=optional_field, multiple=multiple_field)
         else: # atom class
@@ -362,12 +366,12 @@ def parse_model_def(model_def, model_defs):
             if atom.display: pm.dmap[field_name] = atom.display
             if atom.read:    pm.rmap[field_name] = atom.read
             if atom.write:   pm.wmap[field_name] = atom.write
-            pm.fmap[field_name] = atom.form
             pm.empty[field_name] = [ '' ] if multiple_field else ''
             pm.qschema[field_name] = atom.schema
             pm.schema[schema_key]  = [ atom.schema ] if multiple_field else atom.schema
             pm.skeleton[field_name] = Field(label=field_label, schema=field_type,
-                                            hidden=field_hidden, auto=auto_field,
+                                            formtype=atom.formtype, control=atom.control,
+                                            enum=atom.enum, hidden=field_hidden, auto=auto_field,
                                             optional=optional_field, multiple=multiple_field)
     return pm
 
@@ -412,7 +416,6 @@ def read_models(model_defs):
         pm.dmap.update(Item.dmap)
         pm.rmap.update(Item.rmap)
         pm.wmap.update(Item.wmap)
-        pm.fmap.update(Item.fmap)
         class_dict['name']       = model_name
         class_dict['cmap']       = pm.cmap
         class_dict['dmap']       = pm.dmap

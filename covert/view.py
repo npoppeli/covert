@@ -8,11 +8,11 @@ it could be delegated to the client, using Parsley.js (jQuery) for example.
 """
 
 import re
-from collections import OrderedDict
 from inspect import getmembers, isclass, isfunction
 from itertools import chain
-from .common import str2int, decode_dict, encode_dict
-from .model import prune
+from .common import str2int, Error
+from .common import decode_dict, encode_dict, show_dict
+from .model import prune, unflatten
 from . import setting
 
 setting.icons = {
@@ -187,32 +187,36 @@ def normal_button(view_name, route_name, item):
             'action': url_for(view_name, route_name, item), 'method':'GET'}
 
 def form_button(view_name, route_name, item, button_name):
-    print('form_button: view={} route={} item={}'.format(view_name, route_name, str(item)))
     return {'label': label_for(button_name), 'icon': icon_for(button_name),
-            'action': url_for(view_name, route_name, item), 'method':'POST'}
+            'name': button_name, 'method':'POST',
+            'action': url_for(view_name, route_name, item)}
 
+# TODO: delete button requires prompt and JS
 def delete_button(view_name, route_name, item):
     # TODO: add enabled; add data-prompt (Bootstrap JS)
     return {'label': label_for(route_name), 'icon': icon_for(route_name),
             'action': url_for(view_name, route_name, item), 'method':'DELETE'}
 
-
 class RenderTree:
-    nodes = ['content', 'fields', 'labels', 'buttons', 'feedback', 'cursor', 'controls']
+    # elements listed here are included by RenderTree.asdict()
+    nodes = ['buttons', 'content', 'controls', 'cursor', 'feedback',
+             'fields', 'labels', 'method', 'style']
     def __init__(self, request, model, view_name, route_name):
         self.request = request
         self.model = model
         self.view_name = view_name
         self.route_name = route_name
-        self.content = None
-        self.labels = {}
-        self.fields = []
-        self.controls = {}
+        self.form = None
+        # content of render tree
         self.buttons = []
+        self.content = None
+        self.controls = {}
         self.cursor = None
-        self.form = {}
         self.feedback = ''
-        self.filter = {}
+        self.fields = []
+        self.labels = {}
+        self.method = ''
+        self.style = 0
 
     def add_cursor(self, route_name):
         self.cursor = Cursor(self.request)
@@ -234,34 +238,44 @@ class RenderTree:
         cursor.next = cursor.skip+cursor.limit < count
         return self
 
-    def add_item(self, oid, form=False):
-        item = self.model.lookup(oid)
-        self.content = prune(item.display().flatten(), 1)
+    def add_item(self, oid_or_item, form=False):
+        if isinstance(oid_or_item, str):
+            item = self.model.lookup(oid_or_item)
+        else:
+            item = oid_or_item
+        for key in item.fields:
+            print('{}: {}'.format(key, item[key]))
+        flattened = prune(item.display().flatten(), 1)
+        for key in flattened.keys():
+            print('{}: {}'.format(key, flattened[key]))
+        self.content = prune(item.display().flatten(), 0)
         skeleton = item.skeleton
-        short_fields = [f for f in item.fields if skeleton[f].atomic and not
-                        (skeleton[f].hidden or (not form and skeleton[f].auto) or
-                         skeleton[f].schema in ('text', 'memo'))]
+        fields = [f for f in item.fields if skeleton[f].atomic and not
+                  (skeleton[f].hidden or (not form and skeleton[f].auto) or
+                   skeleton[f].schema in ('text', 'memo'))]
         labels = {}
-        for key in short_fields:
-            # TODO: ADD code for multiple short field
+        for key in fields:
+            # TODO: ADD code for multiple field
             prefix = key if key.count('.') == 0 else key[:key.find('.')]
             labels[key] = '' if skeleton[key].auto else skeleton[prefix].label
         self.labels = labels
+        self.fields = fields
         return self
 
     def add_empty_item(self):
         item = self.model.empty() # difference with add_item
-        self.content = prune(item.flatten(), 1)
+        self.content = prune(item.flatten(), 0)
         skeleton = item.skeleton
-        short_fields = [f for f in item.fields if skeleton[f].atomic and not
-                        (skeleton[f].hidden or # difference with add_item
-                         skeleton[f].schema in ('text', 'memo'))]
+        fields = [f for f in item.fields if skeleton[f].atomic and not
+                  (skeleton[f].hidden or # difference with add_item
+                   skeleton[f].schema in ('text', 'memo'))]
         labels = {}
-        for key in short_fields:
-            # TODO: ADD code for multiple short field
+        for key in fields:
+            # TODO: ADD code for multiple field
             prefix = key if key.count('.') == 0 else key[:key.find('.')]
             labels[key] = '' if skeleton[key].auto else skeleton[prefix].label
         self.labels = labels
+        self.fields = fields
         return self
 
     def add_form_controls(self):
@@ -282,13 +296,19 @@ class RenderTree:
             self.feedback += 'Nothing found'
             return self
         item0 = items[0]
-        if setting.debug:
-            print('add_items: adding {} items'.format(len(items)))
+        skeleton = item0.skeleton
+        fields = [f for f in item0.fields if skeleton[f].atomic and not
+                  (skeleton[f].hidden or skeleton[f].multiple or
+                   skeleton[f].schema in ('text', 'memo'))]
+        labels = {}
+        for key in fields:
+            prefix = key if key.count('.') == 0 else key[:key.find('.')]
+            labels[key] = '' if skeleton[key].auto else skeleton[prefix].label
+        self.labels = labels
+        self.fields = fields
         self.content = []
-        self.fields = item0.sfields
-        self.labels = dict([(field, item0.skeleton[field].label) for field in self.fields])
         for item in items:
-            self.content.append({'item':item.display(),
+            self.content.append({'item':prune(item.display().flatten(), 0),
                                  'buttons':[normal_button(self.view_name, button, item)
                                             for button in buttons]})
         return self
@@ -304,11 +324,12 @@ class RenderTree:
             self.buttons = [normal_button(self.view_name, button, item) for button in buttons]
         return self
 
-    def add_form_buttons(self, route_name):
+    def add_form_buttons(self, route_name, method=None):
         if self.content:
             item = self.content
-            self.buttons = [form_button(self.view_name, route_name, item, 'ok'),
-                            form_button(self.view_name, route_name, item, 'cancel')]
+            self.buttons = [form_button(self.view_name, route_name, item, 'ok')]
+            if method: # hide method, e.g. PUT inside the form
+                self.method = method
             print('add_form_buttons:', self.buttons)
         return self
 
@@ -316,51 +337,6 @@ class RenderTree:
         if self.content:
             # item = self.content[0]['item']
             self.buttons = [form_button(self.view_name, route_name, {}, 'search')]
-        return self
-
-    def add_form(self):
-        self.form = self.model.convert(self.request.params)
-        # TODO: form validation, for insert and update
-        # validation = self.model.validate(cursor.query, 'query')
-        # if validation['ok']:
-        #     print('initial post: valid query')
-        #     cursor.feedback = ''
-        # else:
-        #     print('initial post: invalid query')
-        #     cursor.query = {}
-        #     cursor.feedback = validation['error']
-        return self
-
-    def update_if_ok(self, oid):
-        item = self.model.lookup(oid)
-        self.content = [{'item':item.display(), 'buttons':[]}]
-        if self.request.params['_submit'] == 'ok':
-            # update item with converted form contents
-            item.update(self.form)
-            validation = item.validate(item)
-            if validation['ok']:
-                result = item.write(validate=False)
-                if result['ok']:
-                    self.content = [{'item': item.display(), 'buttons': []}]
-                else:
-                    self.feedback = 'Modified document {} could not be stored'.format(item)
-            else:
-                self.feedback = 'Modified document {} not valid: {}'.format(item, validation['error'])
-        return self
-
-    def insert_if_ok(self):
-        if self.request.params['_submit'] == 'ok':
-            # create item from converted form contents
-            item = self.model(self.form)
-            validation = item.validate(item)
-            if validation['ok']:
-                result = item.write(validate=False)
-                if result['ok']:
-                    self.content = [{'item': item.display(), 'buttons': []}]
-                else:
-                    self.feedback = 'New document {} could not be stored'.format(item)
-            else:
-                self.feedback = 'New document {} not valid: {}'.format(item, validation['error'])
         return self
 
     def asdict(self):
@@ -394,9 +370,8 @@ class ItemView(BareItemView):
     @route('/{id:objectid}', template='show')
     def show(self):
         """display one item"""
-        # TODO: delete button requires prompt and JS
         return self.tree.add_item(self.params['id'])\
-                        .add_buttons(['index', 'update', 'delete'])\
+                        .add_buttons(['index', 'modify', 'delete'])\
                         .asdict()
 
     @route('/index', method='GET,POST', template='index')
@@ -420,34 +395,12 @@ class ItemView(BareItemView):
     def match(self):
         """show result list of search"""
         # TODO: handle search operators:
-        # TODO: $key $op $value, where $op is 'in' for 'text' and 'memo', otherwise 'eq'
+        # TODO: {$field $op $value}, where $op is 'cont' for 'text' and 'memo', otherwise 'eq'
+        # TODO: engine should translate this to its own API for searches
         return self.tree.add_cursor('search')\
                         .move_cursor()\
                         .add_items(['show', 'modify', 'delete'], self.sort)\
                         .add_buttons(['new'])\
-                        .asdict()
-
-    @route('/{id:objectid}/modify', template='form')
-    def modify(self):
-        """get form for modify/update action"""
-        return self.tree.add_item(self.params['id'])\
-                        .add_form_controls()\
-                        .add_form_buttons('update')\
-                        .asdict()
-
-    @route('/{id:objectid}', method='PUT', template='show;form')
-    def update(self): # update person
-        # if Cancel clicked: redirect back to referer
-        # if OK clicked:
-        #   form -> document
-        #   if valid:
-        #     display document, add feedback 'OK'
-        #     style = 0
-        #   else:
-        #     add form contents back to render tree, add feedback with errors
-        #     style = 1
-        return self.tree.add_form()\
-                        .update_if_ok(self.params['id'])\
                         .asdict()
 
     @route('/new', template='create')
@@ -458,10 +411,75 @@ class ItemView(BareItemView):
                         .add_form_buttons('create')\
                         .asdict()
 
+    @route('/{id:objectid}/modify', template='form')
+    def modify(self):
+        """get form for modify/update action"""
+        return self.tree.add_item(self.params['id'])\
+                        .add_form_controls()\
+                        .add_form_buttons('update', 'PUT')\
+                        .asdict()
+
+    def _convert_form(self):
+        raw_form = {}
+        for key, value in self.request.params.items():
+            if not key.startswith('_'):
+                raw_form[key] = value
+        # print('>> read form: raw form\n{}'.format(raw_form))
+        unflattened = unflatten(raw_form)
+        # print('>> read_form: unflattened\n{}'.format(unflattened))
+        return self.model.convert(unflattened)
+
+    @route('/{id:objectid}', method='PUT', template='show;form')
+    def update(self):
+        """update existing item"""
+        item = self.model.lookup(self.params['id'])
+        # update item with converted form contents
+        form = self._convert_form()
+        item.update(form)
+        print('>> update: item updated with form contents\n{}'.format(show_dict(item)))
+        validation = item.validate(item)
+        if validation['ok']:
+            result = item.write(validate=False)
+            print('>> update: modified item written to db')
+            if result['ok']:
+                return self.tree.add_item(self.params['id']) \
+                    .add_buttons(['index', 'update', 'delete']) \
+                    .asdict()
+                tree.feedback = 'Modified item'
+                return tree.add_item(item).add_buttons(['index', 'update', 'delete']).asdict()
+            else: # exception, under normal circumstances this should never occur
+                raise Error('Modified item {} could not be stored ({})'.\
+                            format(item, result['error']))
+        else:
+            print('>> update: modified item not valid\n'+validation['error'])
+            self.tree.style = 1
+            self.tree.feedback = 'Modified item {} not valid: {}'.format(item, validation['error'])
+            return self.tree.add_item(self.tree.form)\
+                       .add_form_controls() \
+                       .add_form_buttons('update', 'PUT')\
+                       .asdict()
+
+
+    def insert_if_ok(self):
+        item = self.model.empty
+        # update empty item with converted form contents
+        item.update(self.form)
+        validation = item.validate(item)
+        if validation['ok']:
+            print('>> update_if_ok: new item written to db')
+            result = item.write(validate=False, debug=True)
+            if result['ok']:
+                self.content = [{'item': item.display(), 'buttons': []}]
+            else: # exception, under normal circumstances this should never occur
+                raise Error('New item {} could not be stored'.format(item))
+        else:
+            self.feedback = 'New item {} not valid: {}'.format(item, validation['error'])
+        return self
+
     @route('', method='POST', template='show;form')
     def create(self):
         """create new item"""
-        return self.tree.add_form()\
+        return self.tree.read_form()\
                         .insert_if_ok()\
                         .asdict()
 
@@ -483,7 +501,7 @@ class ItemView(BareItemView):
     # def import(cls, filename):
     #     """
     #     import(self, filename): n
-    #     Import documents from file.
-    #     Return value if number of validated documents imported.
+    #     Import items from file.
+    #     Return value if number of validated items imported.
     #     """
-    #     pass # import documents of this model from CSV file (form-based file upload)
+    #     pass # import items of this model from CSV file (form-based file upload)

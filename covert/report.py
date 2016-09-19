@@ -5,8 +5,7 @@ covert.report
 Objects and functions related to reporting, logging etcetera.
 """
 
-import datetime, json, logging
-from .common import ComplexEncoder
+import logging
 
 # logging levels: DEBUG, INFO, WARNING, ERROR, CRITICAL
 logger = logging.getLogger('waitress')

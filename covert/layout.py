@@ -26,8 +26,6 @@ def read_templates():
                     template_name = prefix.replace('/', '_')+'_'+name
                 filepath = join(dirpath, filename)
                 try:
-                    if setting.debug:
-                        print("Template '{0}' in file {1}".format(template_name, filepath))
                     setting.templates[template_name] = PageTemplateFile(filepath)
                 except Exception as e:
                     print("Error in template '{0}' in file {1}".format(template_name, filepath))

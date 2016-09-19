@@ -5,9 +5,7 @@ covert.common
 Objects and functions common to two or more modules in the package.
 """
 
-import json, datetime
-import html
-from bson.objectid import ObjectId
+import html, json
 from yaml import load, load_all
 try:
     from yaml import CLoader as Loader
@@ -21,7 +19,15 @@ class Error(Exception):
     def __str__(self):
         return repr(self.message)
 
-# auxiliary functions
+def str2int(s):
+    try:
+        number = int(s)
+    except:
+        number = 0
+    return number
+
+
+# HTTP-related functions
 # def is_safe_url(target, req):
 #     host_url = urlparse(req.host_url)
 #     test_url = urlparse(urljoin(req.host_url, target))
@@ -39,6 +45,7 @@ class Error(Exception):
 #         target = default
 #     raise HTTPSeeOther(location=target)
 
+# YAML-related functions
 def read_file(filename):
     """read entire file, return content as one string"""
     with open(filename, 'rU') as f:
@@ -54,28 +61,23 @@ def read_yaml_file(path, multi=False):
             result = load(f, Loader=Loader)
     return result
 
-def str2int(s):
-    try:
-        i = int(s)
-    except:
-        i = 0
-    return i
-
-class ComplexEncoder(json.JSONEncoder):
+# JSON-related functions
+class ExtendedEncoder(json.JSONEncoder):
     def default(self, obj):
-        if isinstance(obj, (ObjectId, datetime.datetime, datetime.time, datetime.date)):
-            return str(obj)
-        else:
+        if isinstance(obj, (dict, list, tuple, int, float, bool, str)):
             return json.JSONEncoder.default(self, obj)
+        else:
+            return str(obj)
 
 def decode_dict(s):
     return json.loads(html.unescape(s)) if s else {}
 
 def encode_dict(s):
-    return html.escape(json.dumps(s, separators=(',',':'), cls=ComplexEncoder))
+    return html.escape(json.dumps(s, separators=(',',':'), cls=ExtendedEncoder))
 
 def show_dict(s):
-    return json.dumps(s, separators=(',',':'), sort_keys=True, indent=2, cls=ComplexEncoder)
+    return json.dumps(s, separators=(',',':'), sort_keys=True, indent=2, cls=ExtendedEncoder)
+
 
 # lightweight Trie data structure, based on an example by James Tauber
 # A Trie is a radix or prefix tree, and can be used to represent a dictionary, for example.

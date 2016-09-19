@@ -35,16 +35,17 @@ The name, style, method, URL pattern and pattern identifier are attached to the 
 or function by means of a decorator: @route(pattern, method, template)
 
 There are three types of buttons:
-1. normal button    (name,   value, label, icon, enabled=True|False)
-2. form button      (action,        label, icon)
-3. delete button
+1. normal button    (label, icon, action, enabled=True|False)
+2. form button      (label, icon, action, name, value)
+3. delete button    (label, icon, action, enabled=True|False)
 
 The action is a URL or a JavaScript expression, e.g. confirmDelete(action).
 Defined in /_static/script/site.js (can be done fancier with Dojo's dijit/Dialog)
-Form buttons do not contain an action, since that is defined by the 'action'
-attribute of the parent element 'form'.
+Form buttons contain an action. The actions within one group of form buttons
+should be identical; the first action is picked up as the action of the form to
+which the button group belongs.
 
-The shape of a button (label, icon or both) is decided by the component that builds the
+The shape of a button (label, icon or both) is decided by the template that serializes the
 page in which the button is embedded.
 """
 

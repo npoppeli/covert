@@ -104,7 +104,7 @@ class Item(BareItem):
         doc = setting.store_db[cls.name].find_one(cls.query(qdoc))
         return cls(doc)
 
-    def write(self, validate=True, debug=False):
+    def write(self, validate=True):
         """
         write(self): id
         Save document contained in this instance.
@@ -120,20 +120,21 @@ class Item(BareItem):
         if validate:
             validate_result = self.validate(self)
             if not validate_result['ok']:
-                print("document {}\ndoes not validate because of error\n{}\n".format(self, validate_result['error']))
-                return {'ok': False}
-        doc = mapdoc(self._wmap, self, debug=debug)
+                message = "document {}\ndoes not validate because of error\n{}\n".\
+                    format(self, validate_result['error'])
+                return {'ok': False, 'error': message}
         try:
+            doc = mapdoc(self.wmap, self)
+            collection = setting.store_db[self.name]
             if new:
-                # print('inserting', self.collection, self.tag())
-                result = setting.store_db[self.collection].insert_one(doc)
+                result = collection.insert_one(doc)
                 return {'ok':True, 'id':str(result.inserted_id)}
             else:
-                result = setting.store_db[self.collection].replace_one({'_id':self['_id']}, doc)
+                result = collection.replace_one({'_id':self['_id']}, doc)
                 return {'ok':True, 'id':str(result.upserted_id)}
         except Exception as e:
-            print('document {}\nnot written because of error\n{}\n'.format(doc, str(e)))
-            return {'ok': False, 'id': None}
+            message = 'document {}\nnot written because of error\n{}\n'.format(doc, str(e))
+            return {'ok': False, 'id': None, 'error': message}
 
     # methods to set references (update database directly)
     @classmethod
