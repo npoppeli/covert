@@ -26,7 +26,6 @@ TODO:
 from bisect import bisect_left, bisect_right
 from copy import deepcopy
 from collections import OrderedDict
-from operator import itemgetter
 from voluptuous import Schema, Optional, MultipleInvalid
 from .atom import atom_map
 from .common import Error
@@ -406,16 +405,16 @@ def read_models(model_defs):
         pm = parse_model_def(model_def, model_defs) # pm: instance of class ParsedModel
         pm.names.extend(Item.fields)
         class_dict['index'].extend(pm.index)
-        schema = Item._schema.copy()
+        schema = BareItem._schema.copy()
         schema.update(pm.schema)
-        qschema = Item._qschema.copy()
+        qschema = BareItem._qschema.copy()
         qschema.update(pm.qschema)
-        skeleton = Item.skeleton.copy()
+        skeleton = BareItem.skeleton.copy()
         skeleton.update(pm.skeleton)
-        pm.cmap.update(Item.cmap)
-        pm.dmap.update(Item.dmap)
-        pm.rmap.update(Item.rmap)
-        pm.wmap.update(Item.wmap)
+        pm.cmap.update(BareItem.cmap)
+        pm.dmap.update(BareItem.dmap)
+        pm.rmap.update(BareItem.rmap)
+        pm.wmap.update(BareItem.wmap)
         class_dict['name']       = model_name
         class_dict['cmap']       = pm.cmap
         class_dict['dmap']       = pm.dmap

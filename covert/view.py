@@ -8,6 +8,7 @@ it could be delegated to the client, using Parsley.js (jQuery) for example.
 """
 
 import re
+from collections import OrderedDict
 from inspect import getmembers, isclass, isfunction
 from itertools import chain
 from .common import str2int, Error
@@ -199,8 +200,7 @@ def delete_button(view_name, route_name, item):
 
 class RenderTree:
     # elements listed here are included by RenderTree.asdict()
-    nodes = ['buttons', 'content', 'controls', 'cursor', 'feedback',
-             'fields', 'labels', 'method', 'style']
+    nodes = ['buttons', 'content', 'cursor', 'feedback', 'method', 'style', 'ui']
     def __init__(self, request, model, view_name, route_name):
         self.request = request
         self.model = model
@@ -210,13 +210,12 @@ class RenderTree:
         # content of render tree
         self.buttons = []
         self.content = None
-        self.controls = {}
+        self.controls = None
         self.cursor = None
         self.feedback = ''
-        self.fields = []
-        self.labels = {}
         self.method = ''
         self.style = 0
+        self.ui = None
 
     def add_cursor(self, route_name):
         self.cursor = Cursor(self.request)
@@ -229,53 +228,57 @@ class RenderTree:
         cursor.filter = {'active': ''} if cursor.incl == 1 else {}
         cursor.filter.update(cursor.query)
         count = self.model.count(cursor.filter)
-        if setting.debug:
-            print("move_cursor: filter {} -> count={}".format(cursor.filter, count))
         cursor.skip = max(0, min(count, cursor.skip+cursor.dir*cursor.limit))
-        if setting.debug:
-            print("move_cursor: skip={} limit={}".format(cursor.skip, cursor.limit))
         cursor.prev = cursor.skip>0
         cursor.next = cursor.skip+cursor.limit < count
         return self
 
-    def add_item(self, oid_or_item, form=False):
+    def add_item(self, oid_or_item):
         if isinstance(oid_or_item, str):
             item = self.model.lookup(oid_or_item)
         else:
             item = oid_or_item
-        for key in item.fields:
-            print('{}: {}'.format(key, item[key]))
-        flattened = prune(item.display().flatten(), 1)
-        for key in flattened.keys():
-            print('{}: {}'.format(key, flattened[key]))
-        self.content = prune(item.display().flatten(), 0)
-        skeleton = item.skeleton
-        fields = [f for f in item.fields if skeleton[f].atomic and not
-                  (skeleton[f].hidden or (not form and skeleton[f].auto) or
-                   skeleton[f].schema in ('text', 'memo'))]
-        labels = {}
-        for key in fields:
-            # TODO: ADD code for multiple field
-            prefix = key if key.count('.') == 0 else key[:key.find('.')]
-            labels[key] = '' if skeleton[key].auto else skeleton[prefix].label
-        self.labels = labels
-        self.fields = fields
+        self.content = item
         return self
 
     def add_empty_item(self):
-        item = self.model.empty() # difference with add_item
-        self.content = prune(item.flatten(), 0)
-        skeleton = item.skeleton
-        fields = [f for f in item.fields if skeleton[f].atomic and not
-                  (skeleton[f].hidden or # difference with add_item
-                   skeleton[f].schema in ('text', 'memo'))]
-        labels = {}
-        for key in fields:
-            # TODO: ADD code for multiple field
-            prefix = key if key.count('.') == 0 else key[:key.find('.')]
-            labels[key] = '' if skeleton[key].auto else skeleton[prefix].label
-        self.labels = labels
-        self.fields = fields
+        self.content = self.model.empty()
+        return self
+
+    def add_items(self, buttons, sort):
+        items = self.model.find(self.cursor.filter,
+                                limit=self.cursor.limit, skip=self.cursor.skip, sort=sort)
+        if not items:
+            self.feedback += 'Nothing found'
+            return self
+        self.content = []
+        for item in items:
+            self.content.append({'item':item,
+                                 'buttons':[normal_button(self.view_name, b, item) for b in buttons]})
+        return self
+
+    def flatten_item(self):
+        self.content = self.content.flatten()
+        return self
+
+    def flatten_collection(self):
+        for row in self.content:
+          row['item'] = row['item'].flatten()
+        return self
+
+    def prune_item(self, depth):
+        skeleton = self.model.skeleton
+        ui = OrderedDict()
+        content = OrderedDict()
+        for key, value in self.content.items():
+            path = key.split('.')
+            field = path[-2] if path[-1].isnumeric() else path[-1]
+            if key.count('.') < depth and skeleton[field].atomic and not skeleton[field].hidden:
+                content[key] = value
+                ui[key] = {'label':skeleton[field].label,
+                           'formtype':skeleton[field].formtype, 'control':skeleton[field].control}
+        self.content = content
+        self.ui = ui
         return self
 
     def add_form_controls(self):
@@ -287,35 +290,6 @@ class RenderTree:
             else:
                 controls[prefix] = self.model.fmap[prefix]
         self.controls = controls
-        return self
-
-    def add_items(self, buttons, sort):
-        items = self.model.find(self.cursor.filter,
-                                limit=self.cursor.limit, skip=self.cursor.skip, sort=sort)
-        if not items:
-            self.feedback += 'Nothing found'
-            return self
-        item0 = items[0]
-        skeleton = item0.skeleton
-        fields = [f for f in item0.fields if skeleton[f].atomic and not
-                  (skeleton[f].hidden or skeleton[f].multiple or
-                   skeleton[f].schema in ('text', 'memo'))]
-        labels = {}
-        for key in fields:
-            prefix = key if key.count('.') == 0 else key[:key.find('.')]
-            labels[key] = '' if skeleton[key].auto else skeleton[prefix].label
-        self.labels = labels
-        self.fields = fields
-        self.content = []
-        for item in items:
-            self.content.append({'item':prune(item.display().flatten(), 0),
-                                 'buttons':[normal_button(self.view_name, button, item)
-                                            for button in buttons]})
-        return self
-
-    def add_show_link(self, field):
-        for el in self.content:
-            el['item'][field] = (el['item'][field], url_for(self.view_name, 'show', el['item']))
         return self
 
     def add_buttons(self, buttons):
@@ -372,6 +346,8 @@ class ItemView(BareItemView):
         """display one item"""
         return self.tree.add_item(self.params['id'])\
                         .add_buttons(['index', 'modify', 'delete'])\
+                        .flatten_item()\
+                        .prune_item(2)\
                         .asdict()
 
     @route('/index', method='GET,POST', template='index')
@@ -381,14 +357,17 @@ class ItemView(BareItemView):
                         .move_cursor()\
                         .add_items(['show', 'modify', 'delete'], self.sort)\
                         .add_buttons(['new'])\
+                        .flatten_collection()\
+                        .prune_collection(1)\
                         .asdict()
 
     @route('/search', template='search')
     def search(self):
         """create search form"""
         return self.tree.add_empty_item()\
-                        .add_form_controls()\
                         .add_search_button('match')\
+                        .flatten_item()\
+                        .prune_item(1)\
                         .asdict()
 
     @route('/search', method='POST', template='index')
