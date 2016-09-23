@@ -1,0 +1,58 @@
+<!--! cursor -->
+<form tal:define="cursor this['cursor']" class="form-inline" action="${cursor.action}" method="POST">
+  <input type="hidden" name="_incl0" value="${cursor.incl0}"/>
+  <input type="hidden" name="_skip"  value="${cursor.skip}" />
+  <input type="hidden" name="_query" value="${cursor.query}"/>
+  <div class="form-group">
+    <label for="incl" class="text-info control-label">Toon vervallen: </label>
+    <input type="checkbox" name="_incl" id="incl" tal:attributes="checked 'checked' if cursor.incl else default"/>
+  </div>
+  <div class="form-group">
+    <label for="limit" class="text-info control-label">Aantal items: </label>
+    <select class="form-control" name="_limit" id="limit">
+      <option tal:attributes="selected 'selected' if cursor.limit==5  else default">5</option>
+      <option tal:attributes="selected 'selected' if cursor.limit==10 else default">10</option>
+      <option tal:attributes="selected 'selected' if cursor.limit==15 else default">15</option>
+      <option tal:attributes="selected 'selected' if cursor.limit==20 else default">20</option>
+    </select>
+  </div>
+  <div class="form-group">
+    <button class="btn btn-default btn-sm" type="submit" name="_dir" value="-1"
+        tal:attributes="disabled 'disabled' if not cursor.prev else default"><span class="fa fa-chevron-left"></span></button>
+    <button class="btn btn-default btn-sm" type="submit" name="_dir" value="0"><span class="fa fa-refresh"></span></button>
+    <button class="btn btn-default btn-sm" type="submit" name="_dir" value="1"
+        tal:attributes="disabled 'disabled' if not cursor.next else default"><span class="fa fa-chevron-right"></span></button>
+  </div>
+</form>
+<!--! content -->
+<table class='table table-bordered' tal:define="fields this['fields']; labels this['labels']; content this['content']">
+<thead>
+<tr>
+  <th tal:repeat="field fields">${labels[field]}</th>
+  <th>&nbsp;</th>
+</tr>
+</thead>
+<tbody>
+   <tr tal:repeat="el content">
+     <span tal:repeat="field fields" tal:omit-tag="">
+         <td tal:define="cell el['item'][field]" tal:switch="isinstance(cell,tuple)">
+             <span tal:case="True" tal:omit-tag=""><a href="${cell[1]}">${cell[0]}</a>&nbsp;</span>
+             <span tal:case="False" tal:replace="cell"></span>
+         </td>
+     </span>
+     <td class="text-nowrap">
+         <a tal:repeat="button el['buttons']" href="${button['action']}">
+           <button class="btn btn-default btn-xs"><span class="${button['icon']}"></span></button></a>
+     </td>
+   </tr>
+</tbody>
+</table>
+<!--! feedback -->
+<div class="row" tal:condition="this['feedback']">
+  <p><span tal:content="structure this['feedback']"></span></p>
+</div>
+<!--! buttons -->
+<div class="row">
+  <a tal:repeat="button this['buttons']" href="${button['action']}">
+    <button class="btn btn-primary btn-sm"><span class="${button['icon']}"></span>${button['label']}</button></a>&nbsp;
+</div>

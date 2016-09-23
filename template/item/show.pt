@@ -1,0 +1,32 @@
+<!--! content -->
+<table class='table table-bordered'
+       tal:define="item this['content']; ui this['ui']">
+  <tbody>
+    <span tal:repeat="key item.keys()" tal:omit-tag="">
+        <tr tal:condition="ui[key]['formtype'] != 'hidden'">
+            <td>${ui[key]['label']}</td>
+            <td tal:define="value item[key]">
+                <span tal:switch="isinstance(value,tuple)" tal:omit-tag="">
+                    <span tal:case="True" tal:omit-tag=""><a href="${value[1]}">${value[0]}</a></span>
+                    <span tal:case="False" tal:replace="value if value else ''"></span>
+                </span>
+            </td>
+        </tr>
+    </span>
+  </tbody>
+</table>
+<!--! metadata -->
+<div class="row" tal:define="item this['content']">
+  <p class="text-muted small">Gemaakt op: ${item['ctime']}. Gewijzigd op: ${item['mtime']}.</p>
+</div>
+<!--! feedback -->
+<div class="row" tal:condition="this['feedback']">
+  <p><span tal:content="structure this['feedback']"></p>
+</div>
+<!--! buttons -->
+<div class="row">
+<a tal:repeat="button this['buttons']" href="${button['action']}">
+  <button class="btn btn-primary btn-sm">
+    <span class="${button['icon']}"></span>${button['label']}
+  </button></a>&nbsp;
+</div>
