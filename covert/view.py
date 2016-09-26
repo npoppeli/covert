@@ -210,7 +210,6 @@ class RenderTree:
         # content of render tree
         self.buttons = []
         self.content = None
-        self.controls = None
         self.cursor = None
         self.feedback = ''
         self.method = ''
@@ -258,38 +257,77 @@ class RenderTree:
         return self
 
     def flatten_item(self):
-        self.content = self.content.flatten()
+        self.content = self.content.display().flatten()
+        print(">> flatten_item")
+        for key, value in self.content.items():
+            print("{:<10}: {}".format(key, value))
         return self
 
-    def flatten_collection(self):
+    # print(">> unflatten")
+    # for key, value in doc.items():
+    #     print("{:<10}: {}".format(key, value))
+    # print(">> flatten")
+    # for key, value in newdoc.items():
+    #     print("{:<10}: {}".format(key, value))
+
+    def flatten_items(self):
         for row in self.content:
-          row['item'] = row['item'].flatten()
+          row['item'] = row['item'].display().flatten()
         return self
 
     def prune_item(self, depth):
         skeleton = self.model.skeleton
-        ui = OrderedDict()
-        content = OrderedDict()
+        ui, item = OrderedDict(), OrderedDict()
         for key, value in self.content.items():
             path = key.split('.')
             field = path[-2] if path[-1].isnumeric() else path[-1]
-            if key.count('.') < depth and skeleton[field].atomic and not skeleton[field].hidden:
-                content[key] = value
-                ui[key] = {'label':skeleton[field].label,
-                           'formtype':skeleton[field].formtype, 'control':skeleton[field].control}
-        self.content = content
-        self.ui = ui
+            if key.count('.') < depth and skeleton[field].atomic and\
+                                          not skeleton[field].hidden:
+                item[key] = value
+                ui[key] = {'label'   : skeleton[field].label,
+                           'formtype': 'hidden' if skeleton[field].auto else skeleton[field].formtype,
+                           'control' : skeleton[field].control}
+        self.content, self.ui = item, ui
         return self
 
-    def add_form_controls(self):
-        controls = {}
-        for key in self.labels.keys():
-            prefix = key if key.count('.') == 0 else key[:key.find('.')]
-            if self.labels[prefix] == '': # hidden fields have empty label
-                controls[prefix] = {'type':'hidden', 'control':'input'}
-            else:
-                controls[prefix] = self.model.fmap[prefix]
-        self.controls = controls
+    def prune_form(self, depth):
+        skeleton = self.model.skeleton
+        ui, item = OrderedDict(), OrderedDict()
+        for key, value in self.content.items():
+            path = key.split('.')
+            field = path[-2] if path[-1].isnumeric() else path[-1]
+            if key.count('.') < depth and skeleton[field].atomic and\
+                    not skeleton[field].hidden and\
+                    not skeleton[field].schema.endswith('Ref'):
+                item[key] = value
+                ui[key] = {'label'   : skeleton[field].label,
+                           'enum'    : skeleton[field].enum,
+                           'formtype': 'hidden' if skeleton[field].auto else skeleton[field].formtype,
+                           'control' : skeleton[field].control}
+        self.content, self.ui = item, ui
+        return self
+
+    def prune_items(self, depth):
+        skeleton = self.model.skeleton
+        ui, ui_ready = OrderedDict(), False
+        for row in self.content:
+            item = OrderedDict()
+            for key, value in row['item'].items():
+                path = key.split('.')
+                field = path[-2] if path[-1].isnumeric() else path[-1]
+                if key.count('.') < depth and skeleton[field].atomic and\
+                        not skeleton[field].hidden and\
+                        not skeleton[field].multiple and\
+                        not skeleton[field].auto and\
+                        skeleton[field].schema not in ('text', 'memo') and\
+                        not skeleton[field].schema.endswith('Ref'):
+                    item[key] = value
+                    if not ui_ready:
+                        ui[key] = {'label'   : skeleton[field].label,
+                                   'formtype': skeleton[field].formtype,
+                                   'control' : skeleton[field].control}
+            row['item'] = item
+            self.ui, ui_ready = ui, True
         return self
 
     def add_buttons(self, buttons):
@@ -302,9 +340,8 @@ class RenderTree:
         if self.content:
             item = self.content
             self.buttons = [form_button(self.view_name, route_name, item, 'ok')]
-            if method: # hide method, e.g. PUT inside the form
+            if method: # hide method (e.g. PUT) inside the form
                 self.method = method
-            print('add_form_buttons:', self.buttons)
         return self
 
     def add_search_button(self, route_name):
@@ -357,8 +394,8 @@ class ItemView(BareItemView):
                         .move_cursor()\
                         .add_items(['show', 'modify', 'delete'], self.sort)\
                         .add_buttons(['new'])\
-                        .flatten_collection()\
-                        .prune_collection(1)\
+                        .flatten_items()\
+                        .prune_items(1)\
                         .asdict()
 
     @route('/search', template='search')
@@ -367,7 +404,7 @@ class ItemView(BareItemView):
         return self.tree.add_empty_item()\
                         .add_search_button('match')\
                         .flatten_item()\
-                        .prune_item(1)\
+                        .prune_form(1)\
                         .asdict()
 
     @route('/search', method='POST', template='index')
@@ -386,16 +423,18 @@ class ItemView(BareItemView):
     def new(self):
         """get form for new/create action"""
         return self.tree.add_empty_item()\
-                        .add_form_controls()\
                         .add_form_buttons('create')\
+                        .flatten_item()\
+                        .prune_form(1)\
                         .asdict()
 
     @route('/{id:objectid}/modify', template='form')
     def modify(self):
         """get form for modify/update action"""
         return self.tree.add_item(self.params['id'])\
-                        .add_form_controls()\
                         .add_form_buttons('update', 'PUT')\
+                        .flatten_item()\
+                        .prune_form(2)\
                         .asdict()
 
     def _convert_form(self):
@@ -403,16 +442,16 @@ class ItemView(BareItemView):
         for key, value in self.request.params.items():
             if not key.startswith('_'):
                 raw_form[key] = value
-        # print('>> read form: raw form\n{}'.format(raw_form))
+        print('>> read form: raw form\n{}'.format(raw_form))
         unflattened = unflatten(raw_form)
-        # print('>> read_form: unflattened\n{}'.format(unflattened))
+        print('>> read_form: unflattened\n{}'.format(unflattened))
         return self.model.convert(unflattened)
 
     @route('/{id:objectid}', method='PUT', template='show;form')
     def update(self):
         """update existing item"""
+        # fetch item from database and update with converted form contents
         item = self.model.lookup(self.params['id'])
-        # update item with converted form contents
         form = self._convert_form()
         item.update(form)
         print('>> update: item updated with form contents\n{}'.format(show_dict(item)))
@@ -421,45 +460,31 @@ class ItemView(BareItemView):
             result = item.write(validate=False)
             print('>> update: modified item written to db')
             if result['ok']:
-                return self.tree.add_item(self.params['id']) \
-                    .add_buttons(['index', 'update', 'delete']) \
-                    .asdict()
+                tree = self.tree
                 tree.feedback = 'Modified item'
-                return tree.add_item(item).add_buttons(['index', 'update', 'delete']).asdict()
+                return tree.add_item(item) \
+                           .add_buttons(['index', 'update', 'delete']) \
+                           .flatten_item() \
+                           .prune_item(2) \
+                           .asdict()
             else: # exception, under normal circumstances this should never occur
                 raise Error('Modified item {} could not be stored ({})'.\
                             format(item, result['error']))
         else:
             print('>> update: modified item not valid\n'+validation['error'])
-            self.tree.style = 1
-            self.tree.feedback = 'Modified item {} not valid: {}'.format(item, validation['error'])
-            return self.tree.add_item(self.tree.form)\
-                       .add_form_controls() \
+            tree = self.tree
+            tree.style = 1
+            tree.feedback = 'Modified item {} not valid: {}'.format(item, validation['error'])
+            return tree.add_item(item)\
                        .add_form_buttons('update', 'PUT')\
+                       .flatten_item()\
+                       .prune_form(1)\
                        .asdict()
-
-
-    def insert_if_ok(self):
-        item = self.model.empty
-        # update empty item with converted form contents
-        item.update(self.form)
-        validation = item.validate(item)
-        if validation['ok']:
-            print('>> update_if_ok: new item written to db')
-            result = item.write(validate=False, debug=True)
-            if result['ok']:
-                self.content = [{'item': item.display(), 'buttons': []}]
-            else: # exception, under normal circumstances this should never occur
-                raise Error('New item {} could not be stored'.format(item))
-        else:
-            self.feedback = 'New item {} not valid: {}'.format(item, validation['error'])
-        return self
 
     @route('', method='POST', template='show;form')
     def create(self):
         """create new item"""
         return self.tree.read_form()\
-                        .insert_if_ok()\
                         .asdict()
 
     @route('/{id:objectid}', method='DELETE', template='delete')

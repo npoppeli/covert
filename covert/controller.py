@@ -145,7 +145,7 @@ class MapRouter:
                 if setting.debug:
                     print('{0}: {1} {2} -> template {3}'.\
                           format(self.__class__.__name__, req_method, request.path_qs, template))
-                    print(show_dict(result))
+                    # print(show_dict(result))
                 result = self.serialize(result, template)
             except Exception as e:
                 result = exception_report(e)

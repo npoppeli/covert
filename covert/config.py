@@ -88,11 +88,11 @@ def kernel_init():
     module = import_module(name)
     read_views(module)
 
-#   print debugging information
-    if setting.debug:
-        print('Application has {0} routes'.format(len(setting.routes)))
-        for route in setting.routes:
-            print(str(route))
+    # print debugging information
+    # if setting.debug:
+    #     print('Application has {0} routes'.format(len(setting.routes)))
+    #     for route in setting.routes:
+    #         print(str(route))
     if setting.debug:
         print('Application has {0} models'.format(len(setting.models)))
         for name, model in setting.models.items():

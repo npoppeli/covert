@@ -39,7 +39,7 @@ def _flatten(doc, prefix, keys):
             yield from _flatten(value, sub_prefix, keys)
         elif isinstance(value, list):  # list of scalars or documents
             if len(value) == 0:  # empty list
-                yield prefix + key, value
+                yield sub_prefix + '0', ''
             elif isinstance(value[0], dict):  # list of documents
                 for sub_key, element in enumerate(value):
                     yield from _flatten(element, sub_prefix+str(sub_key)+'.', keys)
@@ -62,19 +62,20 @@ def unflatten(doc):
        transformed into lists (25% faster than keeping them as strings), and
        the document is transformed to a list of 2-tuples, sorted on key.
     """
-    lrep = [(key.split('.'), doc[key]) for key in sorted(doc.keys())]
-    return _unflatten(lrep)
+    list_rep = [(key.split('.'), doc[key]) for key in sorted(doc.keys())]
+    return _unflatten(list_rep)
 
-def _unflatten(lrep):
+def _unflatten(list_rep):
     newdoc = {}
-    car_list = [elt[0].pop(0) for elt in lrep]  # take first element (car) from each key
+    car_list = [elt[0].pop(0) for elt in list_rep]  # take first element (car) from each key
     car_set = set(car_list)  # set of (unique) car's is the set of keys of newdoc
     for key in car_set:
         begin = bisect_left(car_list, key)
         end = bisect_right(car_list, key)
-        children = lrep[begin:end]
+        children = list_rep[begin:end]
+        print("key={} begin={} end={}".format(key, begin, end))
         if len(children) == 1:
-            newdoc[key] = [] if children[0][1] == '[]' else children[0][1]  # scalar
+            newdoc[key] = [] if children[0][1] == '' else children[0][1]  # scalar
         else:
             newdoc[key] = _unflatten(children)
     if all([key.isnumeric() for key in car_set]):  # turn dict with numeric keys into list
@@ -311,7 +312,7 @@ def parse_model_def(model_def, model_defs):
                 pm.index.append( (field_name, direction) )
         if field_name == '_format':
             pm.fmt = field_label.replace('_', ' ')
-            continue
+            continue # TODO: should become class attribute, like in BareItem
         schema_key = Optional(field_name) if optional_field else field_name
         pm.names.append(field_name)
         field_hidden = field_label.startswith('_')
