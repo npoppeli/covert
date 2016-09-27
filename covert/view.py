@@ -281,8 +281,7 @@ class RenderTree:
         for key, value in self.content.items():
             path = key.split('.')
             field = path[-2] if path[-1].isnumeric() else path[-1]
-            if key.count('.') < depth and skeleton[field].atomic and\
-                                          not skeleton[field].hidden:
+            if key.count('.') < depth and skeleton[field].atomic and not skeleton[field].hidden:
                 item[key] = value
                 ui[key] = {'label'   : skeleton[field].label,
                            'formtype': 'hidden' if skeleton[field].auto else skeleton[field].formtype,
@@ -290,15 +289,13 @@ class RenderTree:
         self.content, self.ui = item, ui
         return self
 
-    def prune_form(self, depth):
+    def prune_form(self, depth): # TODO: the only difference between this and prune_item is the addition of 'enum'
         skeleton = self.model.skeleton
         ui, item = OrderedDict(), OrderedDict()
         for key, value in self.content.items():
             path = key.split('.')
             field = path[-2] if path[-1].isnumeric() else path[-1]
-            if key.count('.') < depth and skeleton[field].atomic and\
-                    not skeleton[field].hidden and\
-                    not skeleton[field].schema.endswith('Ref'):
+            if key.count('.') < depth and skeleton[field].atomic and not skeleton[field].hidden and:
                 item[key] = value
                 ui[key] = {'label'   : skeleton[field].label,
                            'enum'    : skeleton[field].enum,
@@ -315,12 +312,9 @@ class RenderTree:
             for key, value in row['item'].items():
                 path = key.split('.')
                 field = path[-2] if path[-1].isnumeric() else path[-1]
-                if key.count('.') < depth and skeleton[field].atomic and\
-                        not skeleton[field].hidden and\
-                        not skeleton[field].multiple and\
-                        not skeleton[field].auto and\
-                        skeleton[field].schema not in ('text', 'memo') and\
-                        not skeleton[field].schema.endswith('Ref'):
+                if key.count('.') < depth and skeleton[field].atomic and not skeleton[field].hidden and\
+                                          not skeleton[field].multiple and not skeleton[field].auto and\
+                                          skeleton[field].schema not in ('text', 'memo'):
                     item[key] = value
                     if not ui_ready:
                         ui[key] = {'label'   : skeleton[field].label,
