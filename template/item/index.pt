@@ -25,23 +25,23 @@
   </div>
 </form>
 <!--! content -->
-<table class='table table-bordered' tal:define="fields this['fields']; labels this['labels']; content this['content']">
+<table class='table table-bordered' tal:define="content this['content']; ui this['ui']; fields content[0]['item'].keys()">
 <thead>
 <tr>
-  <th tal:repeat="field fields">${labels[field]}</th>
+  <th tal:repeat="field fields">${ui[field]['label']}</th>
   <th>&nbsp;</th>
 </tr>
 </thead>
 <tbody>
-   <tr tal:repeat="el content">
-     <span tal:repeat="field fields" tal:omit-tag="">
-         <td tal:define="cell el['item'][field]" tal:switch="isinstance(cell,tuple)">
+ <tr tal:repeat="row content">
+     <span tal:define="item row['item']" tal:repeat="field fields" tal:omit-tag="">
+         <td tal:define="cell item[field]" tal:switch="isinstance(cell,tuple)">
              <span tal:case="True" tal:omit-tag=""><a href="${cell[1]}">${cell[0]}</a>&nbsp;</span>
              <span tal:case="False" tal:replace="cell"></span>
          </td>
      </span>
      <td class="text-nowrap">
-         <a tal:repeat="button el['buttons']" href="${button['action']}">
+         <a tal:repeat="button row['buttons']" href="${button['action']}">
            <button class="btn btn-default btn-xs"><span class="${button['icon']}"></span></button></a>
      </td>
    </tr>

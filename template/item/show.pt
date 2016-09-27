@@ -1,8 +1,8 @@
 <!--! content -->
 <table class='table table-bordered'
-       tal:define="item this['content']; ui this['ui']">
+       tal:define="item this['content']; ui this['ui']; fields item.keys()">
   <tbody>
-    <span tal:repeat="key item.keys()" tal:omit-tag="">
+    <span tal:repeat="key fields" tal:omit-tag="">
         <tr tal:condition="ui[key]['formtype'] != 'hidden'">
             <td>${ui[key]['label']}</td>
             <td tal:define="value item[key]">
@@ -21,12 +21,14 @@
 </div>
 <!--! feedback -->
 <div class="row" tal:condition="this['feedback']">
-  <p><span tal:content="structure this['feedback']"></p>
+  <div tal:content="structure this['feedback']"></div>
 </div>
 <!--! buttons -->
 <div class="row">
-<a tal:repeat="button this['buttons']" href="${button['action']}">
-  <button class="btn btn-primary btn-sm">
-    <span class="${button['icon']}"></span>${button['label']}
-  </button></a>&nbsp;
+  <div>
+      <a tal:repeat="button this['buttons']" href="${button['action']}">
+          <button class="btn btn-primary btn-sm">
+              <span class="${button['icon']}"></span>${button['label']}
+          </button></a>&nbsp;
+  </div>
 </div>

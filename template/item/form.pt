@@ -1,26 +1,26 @@
 <!--! content -->
 <form class="form-horizontal" action="${this['buttons'][0]['action']}" method="POST"
-      tal:define="labels this['labels']; controls this['controls']; content this['content']">
+      tal:define="item this['content']; ui this['ui']; fields item.keys()">
   <fieldset>
     <input tal:condition="this['method']" type="hidden" name="_method" value="${this['method']}"/>
-    <span tal:repeat="key [key for key in labels.keys() if key == '']" tal:omit-tag="">
-      <input type="hidden" name="${key}" value="${content[key]['value']}"/>
+    <span tal:repeat="key [key for key in fields if ui[key]['formtype'] == 'hidden']" tal:omit-tag="">
+      <input type="hidden" name="${key}" value="${item[key]}"/>
     </span>
-    <div tal:repeat="key [key for key in labels.keys() if key != '']">
-      <label tal:define="label labels[key]"
+    <div tal:repeat="key [key for key in fields if ui[key]['formtype'] != 'hidden']">
+      <label tal:define="label ui[key]['label']"
              for="${key}" class="col-sm-3 control-label">${label}</label>
         <div class="col-sm-7"
-             tal:define="value content[key]; control controls[key]" tal:switch="control['control']">
+             tal:define="value item[key]; control ui[key]['control']" tal:switch="control">
           <div class="form-control" tal:case="'radio'">
-            <span tal:repeat="option control['range']" tal:omit-tag="">
+            <span tal:repeat="option ui[key]['enum']" tal:omit-tag="">
               <label tal:define="subkey key+'_'+str(repeat.option.index)" class="radio-inline" for="${subkey}">
                 <input type="radio" name="${key}" id="${subkey}"
-                       tal:attributes="checked 'checked' if content[key]==option  else default"
+                       tal:attributes="checked 'checked' if item[key]==option  else default"
                        value="${repeat.option.index}"/>${option}</label>
             </span>
           </div>
           <span tal:case="'input'" tal:omit-tag="">
-            <input class="form-control" type="${control['type']}" name="${key}" id="${key}" value="${value}"/>
+            <input class="form-control" type="${ui[key]['formtype']}" name="${key}" id="${key}" value="${value}"/>
           </span>
           <span tal:case="'textarea'" tal:omit-tag="">
             <textarea class="form-control" rows="4" cols="50" name="${key}" id="${key}">${value}</textarea>
