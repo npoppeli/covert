@@ -73,9 +73,13 @@ def _unflatten(list_rep):
         begin = bisect_left(car_list, key)
         end = bisect_right(car_list, key)
         children = list_rep[begin:end]
-        print("key={} begin={} end={}".format(key, begin, end))
         if len(children) == 1:
-            newdoc[key] = [] if children[0][1] == '' else children[0][1]  # scalar
+            # three cases:
+            # 1. cdr is ['0']
+            # 2. cdr is [a] where a is some string, unrealistic
+            # 3. cdr is empty
+            child = children[0]
+            newdoc[key] = [child[1]] if child[0] == ['0'] else child[1]  # scalar
         else:
             newdoc[key] = _unflatten(children)
     if all([key.isnumeric() for key in car_set]):  # turn dict with numeric keys into list
