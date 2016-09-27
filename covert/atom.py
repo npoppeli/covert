@@ -3,6 +3,7 @@
 covert.atom
 -----
 Objects and functions related to the atomic constituents of items.
+Ideally, this should be a common subset of MongoDB, RethinkDB and ArangoDB.
 
 TODO: Atoms have a partial dependence on the storage engine, namely via the read and write maps.
 """
@@ -44,7 +45,7 @@ register_atom('boolean',
     control  = 'radio'
 )
 
-# date and datetime have new display maps, to avoid Python issue 13305
+# date and datetime use str.format in the display maps, to avoid Python issue 13305
 midnight = time(0, 0, 0, 0)
 register_atom('date',
     schema   = date,

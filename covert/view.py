@@ -12,8 +12,8 @@ from collections import OrderedDict
 from inspect import getmembers, isclass, isfunction
 from itertools import chain
 from .common import str2int, Error
-from .common import decode_dict, encode_dict, show_dict
-from .model import prune, unflatten
+from .common import decode_dict, encode_dict
+from .model import unflatten
 from . import setting
 
 setting.icons = {
@@ -171,8 +171,6 @@ class Cursor:
         if initial: # initial post
             self.query = query
         else: # follow-up post
-            if setting.debug:
-                print('follow-up post: decode saved query')
             self.query = decode_dict(self.query)
 
     def asdict(self):
@@ -258,17 +256,9 @@ class RenderTree:
 
     def flatten_item(self):
         self.content = self.content.display().flatten()
-        print(">> flatten_item")
         for key, value in self.content.items():
             print("{:<10}: {}".format(key, value))
         return self
-
-    # print(">> unflatten")
-    # for key, value in doc.items():
-    #     print("{:<10}: {}".format(key, value))
-    # print(">> flatten")
-    # for key, value in newdoc.items():
-    #     print("{:<10}: {}".format(key, value))
 
     def flatten_items(self):
         for row in self.content:
@@ -282,20 +272,6 @@ class RenderTree:
             path = key.split('.')
             field = path[-2] if path[-1].isnumeric() else path[-1]
             if key.count('.') < depth and skeleton[field].atomic and not skeleton[field].hidden:
-                item[key] = value
-                ui[key] = {'label'   : skeleton[field].label,
-                           'formtype': 'hidden' if skeleton[field].auto else skeleton[field].formtype,
-                           'control' : skeleton[field].control}
-        self.content, self.ui = item, ui
-        return self
-
-    def prune_form(self, depth): # TODO: the only difference between this and prune_item is the addition of 'enum'
-        skeleton = self.model.skeleton
-        ui, item = OrderedDict(), OrderedDict()
-        for key, value in self.content.items():
-            path = key.split('.')
-            field = path[-2] if path[-1].isnumeric() else path[-1]
-            if key.count('.') < depth and skeleton[field].atomic and not skeleton[field].hidden and:
                 item[key] = value
                 ui[key] = {'label'   : skeleton[field].label,
                            'enum'    : skeleton[field].enum,
@@ -398,7 +374,7 @@ class ItemView(BareItemView):
         return self.tree.add_empty_item()\
                         .add_search_button('match')\
                         .flatten_item()\
-                        .prune_form(1)\
+                        .prune_item(1)\
                         .asdict()
 
     @route('/search', method='POST', template='index')
@@ -419,7 +395,7 @@ class ItemView(BareItemView):
         return self.tree.add_empty_item()\
                         .add_form_buttons('create')\
                         .flatten_item()\
-                        .prune_form(1)\
+                        .prune_item(2)\
                         .asdict()
 
     @route('/{id:objectid}/modify', template='form')
@@ -428,7 +404,7 @@ class ItemView(BareItemView):
         return self.tree.add_item(self.params['id'])\
                         .add_form_buttons('update', 'PUT')\
                         .flatten_item()\
-                        .prune_form(2)\
+                        .prune_item(2)\
                         .asdict()
 
     def _convert_form(self):
@@ -436,10 +412,7 @@ class ItemView(BareItemView):
         for key, value in self.request.params.items():
             if not key.startswith('_'):
                 raw_form[key] = value
-        print('>> read form: raw form\n{}'.format(raw_form))
-        unflattened = unflatten(raw_form)
-        print('>> read_form: unflattened\n{}'.format(unflattened))
-        return self.model.convert(unflattened)
+        return self.model.convert(unflatten(raw_form))
 
     @route('/{id:objectid}', method='PUT', template='show;form')
     def update(self):
@@ -448,11 +421,9 @@ class ItemView(BareItemView):
         item = self.model.lookup(self.params['id'])
         form = self._convert_form()
         item.update(form)
-        print('>> update: item updated with form contents\n{}'.format(show_dict(item)))
         validation = item.validate(item)
         if validation['ok']:
             result = item.write(validate=False)
-            print('>> update: modified item written to db')
             if result['ok']:
                 tree = self.tree
                 tree.feedback = 'Modified item'
@@ -465,14 +436,13 @@ class ItemView(BareItemView):
                 raise Error('Modified item {} could not be stored ({})'.\
                             format(item, result['error']))
         else:
-            print('>> update: modified item not valid\n'+validation['error'])
             tree = self.tree
             tree.style = 1
             tree.feedback = 'Modified item {} not valid: {}'.format(item, validation['error'])
             return tree.add_item(item)\
                        .add_form_buttons('update', 'PUT')\
                        .flatten_item()\
-                       .prune_form(1)\
+                       .prune_item(2)\
                        .asdict()
 
     @route('', method='POST', template='show;form')

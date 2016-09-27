@@ -2,11 +2,12 @@
 """
 covert.config
 -----
-Objects and functions related to configuration.
+Objects and functions related to the configuration.
 """
 
 import argparse, sys
 from importlib import import_module
+from inspect import getmembers, isclass, isfunction
 from os import getcwd
 from os.path import join, exists, isfile, splitext
 from . import setting
@@ -61,7 +62,7 @@ def kernel_init():
     elif setting.dbtype == 'rethinkdb':
         from .engine.rethinkdb import init_storage
     else:
-        raise Error('Storage engine should be MongoDB or RethinkDB')
+        raise Error('Other storage engine than MongoDB or RethinkDB are not supported yet')
     init_storage()
 
     # read templates
@@ -76,7 +77,8 @@ def kernel_init():
         name, extension = splitext(item)
         if extension == '.py':
             module = import_module(name)
-            # TODO: add to ...???
+            for class_name, model_class in getmembers(module, isclass):
+                setting.models[class_name] = model_class
         elif extension == '.yml':
             models = read_yaml_file(item)
             read_models(models)
@@ -89,10 +91,10 @@ def kernel_init():
     read_views(module)
 
     # print debugging information
-    # if setting.debug:
-    #     print('Application has {0} routes'.format(len(setting.routes)))
-    #     for route in setting.routes:
-    #         print(str(route))
+    if setting.debug:
+        print('Application has {0} routes'.format(len(setting.routes)))
+        for route in setting.routes:
+            print(str(route))
     if setting.debug:
         print('Application has {0} models'.format(len(setting.models)))
         for name, model in setting.models.items():

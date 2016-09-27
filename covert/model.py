@@ -74,10 +74,8 @@ def _unflatten(list_rep):
         end = bisect_right(car_list, key)
         children = list_rep[begin:end]
         if len(children) == 1:
-            # three cases:
-            # 1. cdr is ['0']
-            # 2. cdr is [a] where a is some string, unrealistic
-            # 3. cdr is empty
+            # We can distinguish 3 cases: 1. cdr is ['0']; 2. cdr is empty;
+            # 3. cdr is [a] where a is some string, but this is unrealistic.
             child = children[0]
             newdoc[key] = [child[1]] if child[0] == ['0'] else child[1]  # scalar
         else:
@@ -151,10 +149,10 @@ class BareItem(dict):
     This class defines common data attributes and storage-independent methods.
     model (%=auto):
       BareItem:
-        - id     string     @%  _Id
-        - ctime  datetime    %   Created
-        - mtime  datetime    %   Modified
-        - active boolean     %  _Active
+        - id     string    % _Id
+        - ctime  datetime  %  Created
+        - mtime  datetime  %  Modified
+        - active boolean   % _Active
     """
     ba = atom_map['boolean']
     sa = atom_map['string']

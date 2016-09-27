@@ -13,7 +13,7 @@ Only in cases where performance matters, save one dictionary lookup with:
     ....
 """
 
-version          = '0.5'
+version          = '0.7'
 store_connection = None # connection for database # TODO: make this thread-safe
 store_db         = None # database
 store_dbname     = ''   # name of database

@@ -2,16 +2,16 @@
 """
 covert.server
 -----
-Objects and functions related to WSGI and HTTP servers.
+Objects and functions related to HTTP and WSGI servers.
 The switching router creates a response object with full HTML, partial HTML or JSON,
 depending on the request parameters.
 """
 
-import html, json, sys, traceback, waitress
+import html, sys, traceback, waitress
 from webob import BaseRequest as Request, Response # performance of BaseRequest is better
 from . import setting
+from .common import encode_dict
 from .report import logger
-from .common import show_dict
 
 def http_server(app, **kwarg):
     logger.debug('starting HTTP server')
@@ -43,7 +43,7 @@ def exception_report(exc, ashtml=True):
     return ''.join(head+body+tail)
 
 class SwitchRouter:
-    """A WSGI application that serves as front-end to a web application"""
+    """A WSGI application that serves as front-end to one or more web applications"""
     # Operating modes
     STATIC_MODE  = 0 # static file
     PAGE_MODE    = 1 # complete HTML page
@@ -97,8 +97,9 @@ class SwitchRouter:
             mode = self.PAGE_MODE
         try:
             response = request.get_response(self._app[mode])
-            print('mode {0}: {1} {2} -> {3}'.\
-                  format(mode, req_method, request.path_qs, response.status))
+            if setting.debug:
+                print('mode {0}: {1} {2} -> {3}'.\
+                format(mode, req_method, request.path_qs, response.status))
         except Exception as e:
             response = Response()
             response.text = exception_report(e)
@@ -162,13 +163,15 @@ class MapRouter:
 class PageRouter(MapRouter):
 
     def __init__(self, name):
-        """"PageRouter is a specialized MapRouter. The 'name' parameter is the name of the template
-        used to render the content to HTML. This should be a template for a complete HTML page."""
+        """"PageRouter is a specialized MapRouter for rendering complete HTML pages.
+        The 'name' parameter is the name of the template used to render the content to
+        HTML. This should be a template for a complete HTML page."""
         super().__init__()
         self.content_type = 'text/html'
         self.template = name
 
     def finalize(self, result):
+        """finalize: remove empty/blank lines and initial whitespace of the other lines"""
         trimmed = '\n'.join([line.lstrip() for line in result.splitlines() if not line.isspace()])
         return setting.templates[self.template].render(content=trimmed)
 
@@ -179,5 +182,4 @@ class JSONRouter(MapRouter):
         self.content_type = 'application/json'
 
     def serialize(self, result, template):
-        # TODO: should this be encode_dict()?
-        return json.dumps(result)
+        return encode_dict(result)
