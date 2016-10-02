@@ -114,8 +114,8 @@ def mapdoc(fnmap, doc):
 class Field:
     __slots__ = ('label', 'schema', 'formtype', 'control', 'optional', 'multiple',
                  'hidden', 'auto', 'atomic',  'control', 'enum')
-    def __init__(self, label, schema, formtype, control, optional=False, multiple=False,
-                 hidden=False, auto=False, atomic=True, enum=None):
+    def __init__(self, label, schema, formtype, optional=False, multiple=False,
+                 control='input', hidden=False, auto=False, atomic=True, enum=None):
         self.label    = label
         self.schema   = schema
         self.formtype = formtype
@@ -162,6 +162,7 @@ class BareItem(dict):
     # schemata for normal and query validation
     _schema  = {'id':sa.schema, 'ctime':da.schema, 'mtime':da.schema, 'active': ba.schema}
     _qschema = {}
+    _empty = {}
     # transformation maps
     cmap  = {'ctime':da.convert, 'mtime':da.convert, 'active': ba.convert}
     dmap  = {'ctime':da.display, 'mtime':da.display, 'active': ba.display}
@@ -170,10 +171,11 @@ class BareItem(dict):
     # skeleton
     skeleton = OrderedDict()
     # TODO: labels should become language-dependent
-    skeleton['id']     = Field(label='Id',       schema='string',   formtype='hidden', control='input', auto=True, hidden=True )
-    skeleton['ctime']  = Field(label='Created',  schema='datetime', formtype='hidden', control='input', auto=True, hidden=False)
-    skeleton['mtime']  = Field(label='Modified', schema='datetime', formtype='hidden', control='input', auto=True, hidden=False)
-    skeleton['active'] = Field(label='Active',   schema='boolean',  formtype='hidden', control='input', auto=True, hidden=True )
+    # TODO: 'active' is not auto, but has a default (True)
+    skeleton['id']     = Field(label='Id',       schema='string',   formtype='hidden',  auto=True,  hidden=True )
+    skeleton['ctime']  = Field(label='Created',  schema='datetime', formtype='hidden',  auto=True,  hidden=False)
+    skeleton['mtime']  = Field(label='Modified', schema='datetime', formtype='hidden',  auto=True,  hidden=False)
+    skeleton['active'] = Field(label='Actief',   schema='boolean',  formtype='boolean', auto=False, hidden=False )
 
     def __init__(self, doc=None):
         """

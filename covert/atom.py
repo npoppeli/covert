@@ -31,7 +31,8 @@ def register_atom(name, **kwarg):
     else:
         atom_map[name] = Atom(**kwarg)
 
-true_strings = ('j', 'y', 'ja', 'yes') # TODO: I18N
+true_strings = ('j', 'ja') # TODO: I18N
+# EN: yes/no or y/n, SV: ja/nej
 bool_repr = {True:'ja', False:'nee'}   # TODO: I18N
 # identity = lambda x: x # when we use dense/full transformation maps
 identity = None # when we use sparse transformation maps (faster)

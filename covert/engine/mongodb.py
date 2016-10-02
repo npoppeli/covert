@@ -104,6 +104,7 @@ class Item(BareItem):
         doc = setting.store_db[cls.name].find_one(cls.query(qdoc))
         return cls(doc)
 
+    # TODO: use JSend specification in write(), set_field(), append_field(), remove()
     def write(self, validate=True):
         """
         write(self): id
@@ -137,15 +138,17 @@ class Item(BareItem):
             return {'ok': False, 'id': None, 'error': message}
 
     # methods to set references (update database directly)
-    @classmethod
-    def set_field(cls, oid, key, value):
-        result = setting.store_db[cls.collection].update_one({'id':oid}, {'$set':{key:value}})
-        return {'ok': result.modified_count == 1, 'id': oid}
+    def set_field(self, key, value):
+        oid = self['_id']
+        collection = setting.store_db[self.name]
+        result = collection.update_one({'id':oid}, {'$set':{key:value}})
+        return {'ok': result.modified_count == 1, 'id': self['id']}
 
-    @classmethod
-    def append_field(cls, oid, key, value):
-        result = setting.store_db[cls.collection].update_one({'id':oid}, {'$addToSet':{key:value}})
-        return {'ok': result.modified_count == 1, 'id': oid}
+    def append_field(self, key, value):
+        oid = self['_id']
+        collection = setting.store_db[self.name]
+        result = collection.update_one({'_id':oid}, {'$addToSet':{key:value}})
+        return {'ok': result.modified_count == 1, 'id': self['id']}
 
     def remove(self):
         """
@@ -153,5 +156,6 @@ class Item(BareItem):
         Remove document from collection.
         """
         oid = self['_id']
-        return setting.store_db[self.name].delete_one({'_id':oid})
-        return {'ok': result.deleted_count == 1, 'id': str(oid)}
+        collection = setting.store_db[self.name]
+        return collection.delete_one({'_id':oid})
+        return {'ok': result.deleted_count == 1, 'id': self['id']}

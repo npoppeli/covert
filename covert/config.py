@@ -7,7 +7,7 @@ Objects and functions related to the configuration.
 
 import argparse, sys
 from importlib import import_module
-from inspect import getmembers, isclass, isfunction
+from inspect import getmembers, isclass
 from os import getcwd
 from os.path import join, exists, isfile, splitext
 from . import setting
@@ -95,15 +95,15 @@ def kernel_init():
         print('Application has {0} routes'.format(len(setting.routes)))
         for route in setting.routes:
             print(str(route))
-    if setting.debug:
-        print('Application has {0} models'.format(len(setting.models)))
-        for name, model in setting.models.items():
-            if name.endswith('Ref'):
-                print('Reference class', name)
-            else:
-                print('{0}\n{1}'.format(name, '-'*len(name)))
-                print('fields', model.fields)
-                for field_name, field in model.skeleton.items():
-                    print("{0}: '{1}' schema={2} optional={3} multiple={4} auto={5}".\
-                        format(field_name, field.label, field.schema, field.optional, field.multiple, field.auto))
-                print('')
+        # print('Application has {0} models'.format(len(setting.models)))
+        # for name in sorted(setting.models.keys()):
+        #     if name.endswith('Ref'):
+        #         print('Reference class', name)
+        #     else:
+        #         model = setting.models[name]
+        #         print('{0}\n{1}'.format(name, '-'*len(name)))
+        #         print('fields', model.fields)
+        #         for field_name, field in model.skeleton.items():
+        #             print("{0}: '{1}' schema={2} optional={3} multiple={4} auto={5}".\
+        #                 format(field_name, field.label, field.schema, field.optional, field.multiple, field.auto))
+        #         print('')

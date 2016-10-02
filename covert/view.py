@@ -75,7 +75,6 @@ class Route:
                format(self.pattern, self.method, self.cls.__name__, self.name,
                       ', '.join(self.templates)))
 
-# decorator used for the routes (view methods)
 class route:
     """
     route: decorator for methods in a View class. This adds attributes to methods.
@@ -152,8 +151,9 @@ def read_views(module):
     setting.routes.sort(key=lambda r: r.pattern, reverse=True)
 
 class Cursor:
-    __slots__ = ['skip', 'limit', 'incl', 'incl0', 'dir', 'filter', 'query', 'prev', 'next', 'action']
-    default = {'skip':0, 'limit':10, 'incl':0, 'incl0':0, 'dir':0}
+    __slots__ = ['skip', 'limit', 'incl', 'incl0', 'dir',
+                 'filter', 'query', 'prev', 'next', 'action', 'submit']
+    default = {'skip':0, 'limit':10, 'incl':0, 'incl0':0, 'dir':0, 'submit':''}
 
     def __init__(self, request):
         initial = '_incl' not in request.params.keys()
@@ -175,7 +175,7 @@ class Cursor:
 
     def asdict(self):
         self.query = encode_dict(self.query)
-        return dict([(key, getattr(self, key)) for key in self.__slots__])
+        return dict([(key, getattr(self, key, '')) for key in self.__slots__])
 
 def store_result(item):
     return item.write()
@@ -190,7 +190,6 @@ def form_button(view_name, route_name, item, button_name):
             'name': button_name, 'method':'POST',
             'action': url_for(view_name, route_name, item)}
 
-# TODO: delete button requires prompt and JS
 def delete_button(view_name, route_name, item):
     # TODO: add enabled; add data-prompt (Bootstrap JS)
     return {'label': label_for(route_name), 'icon': icon_for(route_name),
@@ -222,7 +221,7 @@ class RenderTree:
     def move_cursor(self):
         cursor = self.cursor
         # filter = user query + condition depending on 'incl'
-        cursor.filter = {'active': ''} if cursor.incl == 1 else {}
+        cursor.filter = {} if cursor.incl == 1 else {'active':True}
         cursor.filter.update(cursor.query)
         count = self.model.count(cursor.filter)
         cursor.skip = max(0, min(count, cursor.skip+cursor.dir*cursor.limit))
@@ -236,6 +235,7 @@ class RenderTree:
         else:
             item = oid_or_item
         self.content = item
+        # TODO: add boolean vector 'active' to the render tree
         return self
 
     def add_empty_item(self):
@@ -245,19 +245,23 @@ class RenderTree:
     def add_items(self, buttons, sort):
         items = self.model.find(self.cursor.filter,
                                 limit=self.cursor.limit, skip=self.cursor.skip, sort=sort)
+        self.content = []
         if not items:
             self.feedback += 'Nothing found'
             return self
-        self.content = []
         for item in items:
             self.content.append({'item':item,
                                  'buttons':[normal_button(self.view_name, b, item) for b in buttons]})
+        # TODO: add boolean vector 'active' to the render tree
         return self
 
-    def flatten_item(self):
-        self.content = self.content.display().flatten()
-        for key, value in self.content.items():
-            print("{:<10}: {}".format(key, value))
+    def flatten_item(self, empty=False):
+        if not empty: # convert to string form first
+            self.content = self.content.display()
+        self.content = self.content.flatten()
+        #if setting.debug:
+        #    for key, value in self.content.items():
+        #        print("{:<10}: {}".format(key, value))
         return self
 
     def flatten_items(self):
@@ -303,7 +307,8 @@ class RenderTree:
     def add_buttons(self, buttons):
         if self.content:
             item = self.content[0]['item'] if isinstance(self.content, list) else self.content
-            self.buttons = [normal_button(self.view_name, button, item) for button in buttons]
+            self.buttons = [(delete_button if button == 'delete' else
+                             normal_button)(self.view_name, button, item) for button in buttons]
         return self
 
     def add_form_buttons(self, route_name, method=None):
@@ -317,6 +322,7 @@ class RenderTree:
     def add_search_button(self, route_name):
         if self.content:
             # item = self.content[0]['item']
+            print('>> add_search_button: view={} route={}'.format(self.view_name, route_name))
             self.buttons = [form_button(self.view_name, route_name, {}, 'search')]
         return self
 
@@ -351,6 +357,7 @@ class ItemView(BareItemView):
     @route('/{id:objectid}', template='show')
     def show(self):
         """display one item"""
+        # TODO: delete button is enabled iff item.active
         return self.tree.add_item(self.params['id'])\
                         .add_buttons(['index', 'modify', 'delete'])\
                         .flatten_item()\
@@ -360,6 +367,7 @@ class ItemView(BareItemView):
     @route('/index', method='GET,POST', template='index')
     def index(self):
         """display multiple items (collection)"""
+        # TODO: delete button is enabled iff item.active
         return self.tree.add_cursor('index')\
                         .move_cursor()\
                         .add_items(['show', 'modify', 'delete'], self.sort)\
@@ -368,12 +376,12 @@ class ItemView(BareItemView):
                         .prune_items(1)\
                         .asdict()
 
-    @route('/search', template='search')
+    @route('/search', template='form')
     def search(self):
         """create search form"""
         return self.tree.add_empty_item()\
                         .add_search_button('match')\
-                        .flatten_item()\
+                        .flatten_item(empty=True)\
                         .prune_item(1)\
                         .asdict()
 
@@ -383,10 +391,13 @@ class ItemView(BareItemView):
         # TODO: handle search operators:
         # TODO: {$field $op $value}, where $op is 'cont' for 'text' and 'memo', otherwise 'eq'
         # TODO: engine should translate this to its own API for searches
+        # TODO: translate bare year into {'birthdate': {'$gte': begin, '$lte': end}}
         return self.tree.add_cursor('search')\
                         .move_cursor()\
                         .add_items(['show', 'modify', 'delete'], self.sort)\
                         .add_buttons(['new'])\
+                        .flatten_items()\
+                        .prune_items(1)\
                         .asdict()
 
     @route('/new', template='create')
@@ -426,7 +437,7 @@ class ItemView(BareItemView):
             result = item.write(validate=False)
             if result['ok']:
                 tree = self.tree
-                tree.feedback = 'Modified item'
+                tree.feedback = 'Modified item {}'.format(str(item))
                 return tree.add_item(item) \
                            .add_buttons(['index', 'update', 'delete']) \
                            .flatten_item() \
@@ -434,11 +445,12 @@ class ItemView(BareItemView):
                            .asdict()
             else: # exception, under normal circumstances this should never occur
                 raise Error('Modified item {} could not be stored ({})'.\
-                            format(item, result['error']))
+                            format(str(item), result['error']))
         else:
             tree = self.tree
             tree.style = 1
-            tree.feedback = 'Modified item {} not valid: {}'.format(item, validation['error'])
+            tree.feedback = 'Modified item {} has validation errors {}'.\
+                            format(str(item), validation['error'])
             return tree.add_item(item)\
                        .add_form_buttons('update', 'PUT')\
                        .flatten_item()\
@@ -455,14 +467,14 @@ class ItemView(BareItemView):
     def delete(self):
         """delete one item functionally, i.e. mark as inactive
         item.remove() is only used for permanent removal, i.e. clean-up"""
-        oid = self.params['id']
-        r1 = self.set_field(oid, 'active', False)
+        item = self.model.lookup(self.params['id'])
+        r1 = item.set_field('active', False)
         if r1['ok']:
-            return {'feedback': 'item {} set to inactive'.format(oid),
-                    'buttons':[normal_button(self.prefix, 'index', {})]}
+            return {'status': 'success',
+                    'feedback': 'item {} set to inactive'.format(str(item))}
         else:
-            return {'feedback': 'item {} not modified'.format(oid),
-                    'buttons': [normal_button(self.prefix, 'index', {})]}
+            return {'status': 'failure',
+                    'feedback': 'item {} not modified'.format(str(item))}
 
     #TODO import: import one or more items
     # @route('GET,POST', '/import')

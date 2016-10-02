@@ -38,9 +38,9 @@ def exception_report(exc, ashtml=True):
         tail = ["<div><pre>{0}: {1}</pre></div>".format(exc_type.__name__, html.escape(str(exc_value)))]
     else:
         head = ["Internal error. ", "Traceback (most recent call last:"]
-        body = []
+        body = traceback.format_tb(exc_trace)
         tail = ["{0}: {1}".format(exc_type.__name__, str(exc_value))]
-    return ''.join(head+body+tail)
+    return '\n'.join(head+body+tail)
 
 class SwitchRouter:
     """A WSGI application that serves as front-end to one or more web applications"""
@@ -51,6 +51,8 @@ class SwitchRouter:
     XML_MODE     = 3 # XML document
     JSON_MODE    = 4 # JSON document
     UNKNOWN_MODE = 5 # unknown
+
+    mode_name = ['STATIC', 'PAGE', 'FRAGMENT', 'XML', 'JSON']
 
     def __init__(self):
         self._app = {self.STATIC_MODE : bad_request,
@@ -96,10 +98,13 @@ class SwitchRouter:
         else:
             mode = self.PAGE_MODE
         try:
+            #if setting.debug:
+            #    print('mode {0} (before get_response): {1} {2}'.\
+            #        format(self.mode_name[mode], req_method, request.path_qs))
             response = request.get_response(self._app[mode])
-            if setting.debug:
-                print('mode {0}: {1} {2} -> {3}'.\
-                format(mode, req_method, request.path_qs, response.status))
+            #if setting.debug:
+            #    print('mode {0} (after get_response): {1}'.\
+            #        format(self.mode_name[mode], response.status))
         except Exception as e:
             response = Response()
             response.text = exception_report(e)
@@ -127,6 +132,8 @@ class MapRouter:
         # interpret request
         request = Request(environ)
         req_method = request.params.get('_method', request.method).upper()
+        print('{0}: {1} {2}'.\
+              format(self.__class__.__name__, req_method, request.path_qs))
         req_path = request.path_info
         # find first route that matches request
         view_cls = None
@@ -143,13 +150,11 @@ class MapRouter:
                 route_method = getattr(view_obj, route_name)
                 result = route_method()
                 template = route_templates[result.get('style', 0)]
-                if setting.debug:
-                    print('{0}: {1} {2} -> template {3}'.\
-                          format(self.__class__.__name__, req_method, request.path_qs, template))
-                    # print(show_dict(result))
                 result = self.serialize(result, template)
             except Exception as e:
-                result = exception_report(e)
+                result = exception_report(e, ashtml=(self.content_type=='text/html'))
+                print('{0} found matching route, and exception occurred\n{1}'.\
+                      format(self.__class__.__name__, result))
                 response.status = 500
         else: # no match with the defined setting.routes
             print('{0}: {1} {2}'.format(self.__class__.__name__, 'nothing found for', request.path_qs))
@@ -181,5 +186,6 @@ class JSONRouter(MapRouter):
         super().__init__()
         self.content_type = 'application/json'
 
+    # TODO: use JSend specification here
     def serialize(self, result, template):
-        return encode_dict(result)
+        return result
