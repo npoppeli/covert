@@ -1,7 +1,7 @@
 <!--! content -->
 <table class='table table-bordered'
        tal:define="item this['content']; ui this['ui']; fields item.keys()">
-  <tbody>
+  <tbody id="item01" tal:attributes="class 'text-muted' if item['active'][0]=='n' else default">
     <span tal:repeat="key fields" tal:omit-tag="">
         <tr tal:condition="ui[key]['formtype'] != 'hidden'">
             <td>${ui[key]['label']}</td>
@@ -16,19 +16,16 @@
   </tbody>
 </table>
 <!--! metadata -->
-<div class="row" tal:define="item this['content']">
+<div tal:define="item this['content']">
   <p class="text-muted small">Gemaakt op: ${item['ctime']}. Gewijzigd op: ${item['mtime']}.</p>
 </div>
 <!--! feedback -->
-<div class="row" tal:condition="this['feedback']">
+<div tal:condition="this['feedback']">
   <div tal:content="structure this['feedback']"></div>
 </div>
 <!--! buttons -->
-<div class="row">
-  <div>
-      <a tal:repeat="button this['buttons']" href="${button['action']}">
-          <button class="btn btn-primary btn-sm">
-              <span class="${button['icon']}"></span>${button['label']}
-          </button></a>&nbsp;
-  </div>
+<div>
+  <a tal:repeat="button this['buttons']" href="${button['action']}" data-bind="item01" data-method="${button['method']}">
+    <button class="btn btn-primary btn-sm">
+      <span class="${button['icon']}"></span>${button['label']}</button></a>&nbsp;
 </div>

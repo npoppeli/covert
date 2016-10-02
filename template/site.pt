@@ -7,7 +7,12 @@
     <meta name="title" content="Genealogie @home" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link href="/_static/css/bootstrap.min.css" rel="stylesheet"/>
+    <link rel="icon" href="/_static/favicon.ico" />
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.4.0/css/font-awesome.min.css"/>
+    <!--! place all Javascript modules here -->
+    <script src="/_static/js/jquery-min.js"    defer="defer"></script>
+    <script src="/_static/js/bootstrap.min.js" defer="defer"></script>
+    <script src="/_static/js/site.js"          defer="defer"></script>
   </head>
   <body>
     <div class="container">
@@ -18,10 +23,9 @@
           <a href="/root/info"><i class="fa fa-info-circle"></i></a>
         </div>
       </div>
-      <div class="row" tal:content="structure content"></div>
+      <div class="row">
+        <div class="col-sm-12" tal:content="structure content"></div>
+      </div>
     </div>
-    <!--! place all Javascript modules here -->
-    <script src="/_static/js/jquery-min.js"></script>
-    <script src="/_static/js/bootstrap.min.js"></script>
   </body>
 </html>

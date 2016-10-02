@@ -29,12 +29,13 @@
       </div>
   </fieldset>
 <!--! buttons -->
-  <div class="col-sm-offset-3">
+  <div>
     <button tal:repeat="button this['buttons']" class="btn btn-primary btn-sm"
-            type="submit" name="_submit" value="${button['name']}"><span class="${button['icon']}"></span>${button['label']}</button>&nbsp;
+            type="submit" name="_submit" value="${button['name']}">
+      <span class="${button['icon']}"></span>${button['label']}</button>&nbsp;
   </div>
 </form>
 <!--! feedback -->
-<div class="row" tal:condition="this['feedback']">
+<div tal:condition="this['feedback']">
   <p><span tal:content="structure this['feedback']"></p>
 </div>
