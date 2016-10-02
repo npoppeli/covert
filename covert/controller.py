@@ -177,8 +177,10 @@ class PageRouter(MapRouter):
 
     def finalize(self, result):
         """finalize: remove empty/blank lines and initial whitespace of the other lines"""
-        trimmed = '\n'.join([line.lstrip() for line in result.splitlines() if not line.isspace()])
-        return setting.templates[self.template].render(content=trimmed)
+        page = setting.templates[self.template].render(content=result)
+        trimmed = '\n'.join([line.lstrip() for line in page.splitlines()
+                             if line and not line.isspace()])
+        return trimmed
 
 class JSONRouter(MapRouter):
 
