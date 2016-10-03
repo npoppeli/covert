@@ -177,9 +177,6 @@ class Cursor:
         self.query = encode_dict(self.query)
         return dict([(key, getattr(self, key, '')) for key in self.__slots__])
 
-def store_result(item):
-    return item.write()
-
 def normal_button(view_name, route_name, item):
     # TODO: add 'enabled' attribute
     return {'label': label_for(route_name), 'icon': icon_for(route_name),
@@ -256,7 +253,7 @@ class RenderTree:
         return self
 
     def flatten_item(self, empty=False):
-        if not empty: # convert to string form first
+        if self.content['id']: # not empty item, so convert to string form first
             self.content = self.content.display()
         self.content = self.content.flatten()
         #if setting.debug:
@@ -322,7 +319,6 @@ class RenderTree:
     def add_search_button(self, route_name):
         if self.content:
             # item = self.content[0]['item']
-            print('>> add_search_button: view={} route={}'.format(self.view_name, route_name))
             self.buttons = [form_button(self.view_name, route_name, {}, 'search')]
         return self
 
@@ -381,17 +377,21 @@ class ItemView(BareItemView):
         """create search form"""
         return self.tree.add_empty_item()\
                         .add_search_button('match')\
-                        .flatten_item(empty=True)\
+                        .flatten_item()\
                         .prune_item(1)\
                         .asdict()
 
     @route('/search', method='POST', template='index')
     def match(self):
         """show result list of search"""
-        # TODO: handle search operators:
-        # TODO: {$field $op $value}, where $op is 'cont' for 'text' and 'memo', otherwise 'eq'
-        # TODO: engine should translate this to its own API for searches
-        # TODO: translate bare year into {'birthdate': {'$gte': begin, '$lte': end}}
+        # TODO: handle search operators
+        # - {$field $op $value}, where $op is 'cont' for 'text' and 'memo', otherwise 'eq'
+        #   engine should translate this to its own API for searches
+        # - translate bare year into {'birthdate': {'$gte': begin, '$lte': end}}
+        # - handle free text search
+        # - translate regular expression
+        #   db.collection.find({'family':{'$regex':'^Fel'}}), or
+
         return self.tree.add_cursor('search')\
                         .move_cursor()\
                         .add_items(['show', 'modify', 'delete'], self.sort)\
@@ -400,7 +400,7 @@ class ItemView(BareItemView):
                         .prune_items(1)\
                         .asdict()
 
-    @route('/new', template='create')
+    @route('/new', template='form')
     def new(self):
         """get form for new/create action"""
         return self.tree.add_empty_item()\
@@ -460,8 +460,34 @@ class ItemView(BareItemView):
     @route('', method='POST', template='show;form')
     def create(self):
         """create new item"""
-        return self.tree.read_form()\
-                        .asdict()
+        # fetch item from database and update with converted form contents
+        item = self.model.empty()
+        form = self._convert_form()
+        item.update(form)
+        validation = item.validate(item)
+        if validation['ok']:
+            result = item.write(validate=False)
+            if result['ok']:
+                tree = self.tree
+                tree.feedback = 'New item {}'.format(str(item))
+                return tree.add_item(item) \
+                           .add_buttons(['index', 'update', 'delete']) \
+                           .flatten_item() \
+                           .prune_item(2) \
+                           .asdict()
+            else: # exception, under normal circumstances this should never occur
+                raise Error('New item {} could not be stored ({})'.\
+                            format(str(item), result['error']))
+        else:
+            tree = self.tree
+            tree.style = 1
+            tree.feedback = 'New item {} has validation errors {}'.\
+                            format(str(item), validation['error'])
+            return tree.add_item(item)\
+                       .add_form_buttons('update', 'PUT')\
+                       .flatten_item()\
+                       .prune_item(2)\
+                       .asdict()
 
     @route('/{id:objectid}', method='DELETE', template='delete')
     def delete(self):

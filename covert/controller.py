@@ -10,7 +10,6 @@ depending on the request parameters.
 import html, sys, traceback, waitress
 from webob import BaseRequest as Request, Response # performance of BaseRequest is better
 from . import setting
-from .common import encode_dict
 from .report import logger
 
 def http_server(app, **kwarg):

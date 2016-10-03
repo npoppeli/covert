@@ -3,23 +3,24 @@
 covert.atom
 -----
 Objects and functions related to the atomic constituents of items.
-Ideally, this should be a common subset of MongoDB, RethinkDB and ArangoDB.
-
-TODO: Atoms have a partial dependence on the storage engine, namely via the read and write maps.
+This should be a common subset of MongoDB, RethinkDB and ArangoDB. Otherwise, atoms
+have a partial dependence on the storage engine, via the read and write maps.
 """
 
-from datetime import datetime, date, time
-from operator import itemgetter
+from datetime import datetime, date, time, MINYEAR
 from .common import Error
 
 class Atom:
-    __slots__ = ('schema', 'convert', 'display', 'formtype', 'control', 'read', 'write', 'enum')
-    def __init__(self, schema, convert, display, formtype, control, read=None, write=None, enum=None):
+    __slots__ = ('schema', 'convert', 'display', 'formtype', 'control',
+                 'default', 'read', 'write', 'enum')
+    def __init__(self, schema, convert, display, formtype, control,
+                 default='', read=None, write=None, enum=None):
         self.schema   = schema
         self.convert  = convert
         self.display  = display
         self.formtype = formtype
         self.control  = control
+        self.default  = default
         self.read     = read
         self.write    = write
         self.enum     = enum
@@ -30,6 +31,11 @@ def register_atom(name, **kwarg):
         raise Error('Atom {0} is already registered'.format(name))
     else:
         atom_map[name] = Atom(**kwarg)
+
+EMPTY_DATETIME = datetime(MINYEAR, 1, 1, 0, 0, 0)
+EMPTY_TIME     = time(0, 0, 0)
+EMPTY_DATE     = date(MINYEAR, 1, 1)
+MIDNIGHT       = time(0, 0, 0, 0)
 
 true_strings = ('j', 'ja') # TODO: I18N
 # EN: yes/no or y/n, SV: ja/nej
@@ -47,13 +53,13 @@ register_atom('boolean',
 )
 
 # date and datetime use str.format in the display maps, to avoid Python issue 13305
-midnight = time(0, 0, 0, 0)
 register_atom('date',
     schema   = date,
     convert  = lambda value: datetime.strptime(value, "%Y-%m-%d"),
     display  = lambda value: '{0:04d}-{1:02d}-{2:02d}'.format(value.year, value.month, value.day),
     read     = lambda value: value.date(),
-    write    = lambda value: datetime.combine(value, midnight),
+    write    = lambda value: datetime.combine(value, MIDNIGHT),
+    default  = EMPTY_DATE,
     formtype = 'date',
     control  = 'input'
 )
@@ -63,6 +69,7 @@ register_atom('datetime',
     convert  = lambda value: datetime.strptime(value, "%Y-%m-%dT%H:%M:%S"),
     display  = lambda value: '{0:04d}-{1:02d}-{2:02d}T{3:02d}:{4:02d}:{5:02d}'.\
                format(value.year, value.month, value.day, value.hour, value.minute, value.second),
+    default  = EMPTY_DATETIME,
     formtype = 'datetime',
     control  = 'input'
 )
@@ -82,6 +89,7 @@ register_atom('gender', # TODO: add possibility to define this in application
     display  = lambda value: genders[value],
     formtype = 'gender',
     control  = 'radio',
+    default  = 0,
     enum     = genders
 )
 
@@ -121,6 +129,7 @@ register_atom('time',
     schema   = time,
     convert  = lambda value: datetime.strptime(value, "%H:%M:%S"),
     display  = lambda value: '{0:02d}:{1:02d}:{2:02d}'.format(value.hour, value.minute, value.second),
+    default  = EMPTY_TIME,
     formtype = 'datetime',
     control  = 'input'
 )

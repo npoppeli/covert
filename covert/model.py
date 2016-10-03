@@ -162,7 +162,7 @@ class BareItem(dict):
     # schemata for normal and query validation
     _schema  = {'id':sa.schema, 'ctime':da.schema, 'mtime':da.schema, 'active': ba.schema}
     _qschema = {}
-    _empty = {}
+    _empty   = {'id':''}
     # transformation maps
     cmap  = {'ctime':da.convert, 'mtime':da.convert, 'active': ba.convert}
     dmap  = {'ctime':da.display, 'mtime':da.display, 'active': ba.display}

@@ -71,11 +71,6 @@ class Item(BareItem):
         Find zero or more documents in collection, and return these in the
         form of a list of 'cls' instances. Assumption: stored documents are valid.
         qdoc: dictionary specifying the query, e.g. {'id': '1234'}
-
-        Regular expressions:
-            db.collection.find({'family':{'$regex':'^Fel'}}), or
-            rx = re.compile(r'^Fel')
-            db.collection.find({'family':rx})
         """
         cursor = setting.store_db[cls.name].find(filter=cls.query(qdoc),
                                                  skip=skip, limit=limit, sort=sort)
