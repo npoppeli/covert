@@ -152,8 +152,9 @@ class MapRouter:
                 result = self.serialize(result, template)
             except Exception as e:
                 result = exception_report(e, ashtml=(self.content_type=='text/html'))
-                print('{0} found matching route, and exception occurred\n{1}'.\
-                      format(self.__class__.__name__, result))
+                print('{0} found matching route, and exception occurred'.\
+                      format(self.__class__.__name__))
+                if self.content_type != 'text/html': print(result)
                 response.status = 500
         else: # no match with the defined setting.routes
             print('{0}: {1} {2}'.format(self.__class__.__name__, 'nothing found for', request.path_qs))

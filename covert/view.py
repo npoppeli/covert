@@ -252,13 +252,12 @@ class RenderTree:
         # TODO: add boolean vector 'active' to the render tree
         return self
 
-    def flatten_item(self, empty=False):
-        if self.content['id']: # not empty item, so convert to string form first
-            self.content = self.content.display()
+    def flatten_item(self):
+        self.content = self.content.display()
         self.content = self.content.flatten()
-        #if setting.debug:
-        #    for key, value in self.content.items():
-        #        print("{:<10}: {}".format(key, value))
+        #print('>> flatten_item')
+        #for key, value in self.content.items():
+        #    print("{:<10}: {}".format(key, value))
         return self
 
     def flatten_items(self):
@@ -279,6 +278,9 @@ class RenderTree:
                            'formtype': 'hidden' if skeleton[field].auto else skeleton[field].formtype,
                            'control' : skeleton[field].control}
         self.content, self.ui = item, ui
+        #print('>> prune_item')
+        #for key, value in item.items():
+        #    print("{:<10}: {}".format(key, value))
         return self
 
     def prune_items(self, depth):
@@ -465,6 +467,9 @@ class ItemView(BareItemView):
         form = self._convert_form()
         item.update(form)
         validation = item.validate(item)
+        print('>> create: new item=')
+        for key, value in item.items():
+            print("{:<10}: {}".format(key, value))
         if validation['ok']:
             result = item.write(validate=False)
             if result['ok']:

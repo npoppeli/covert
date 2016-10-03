@@ -106,7 +106,7 @@ class Item(BareItem):
         Save document contained in this instance.
         Return value {'ok':True, 'id':<document id>} or {'ok':False, 'id':None}.
         """
-        new = not ('id' in self and self['id'])
+        new = getattr(self, 'id', '') == ''
         self['mtime'] = datetime.now()
         if new:
             self['_id'] = ObjectId()

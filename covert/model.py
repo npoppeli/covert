@@ -27,7 +27,7 @@ from bisect import bisect_left, bisect_right
 from copy import deepcopy
 from collections import OrderedDict
 from voluptuous import Schema, Optional, MultipleInvalid
-from .atom import atom_map
+from .atom import atom_map, EMPTY_DATETIME
 from .common import Error
 from . import setting
 
@@ -102,6 +102,7 @@ def mapdoc(fnmap, doc):
                 else: # list of scalars
                     newdoc[key] = [fnmap[key](element) for element in value]
             else: # scalar
+                # print('>> mapdoc: key={} value={}'.format(key, value))
                 newdoc[key] = fnmap[key](value)
         else: # no mapping for this element
             newdoc[key] = value
@@ -162,7 +163,7 @@ class BareItem(dict):
     # schemata for normal and query validation
     _schema  = {'id':sa.schema, 'ctime':da.schema, 'mtime':da.schema, 'active': ba.schema}
     _qschema = {}
-    _empty   = {'id':''}
+    _empty   = {'id':'', 'ctime':EMPTY_DATETIME, 'mtime':EMPTY_DATETIME, 'active':True}
     # transformation maps
     cmap  = {'ctime':da.convert, 'mtime':da.convert, 'active': ba.convert}
     dmap  = {'ctime':da.display, 'mtime':da.display, 'active': ba.display}
@@ -350,16 +351,18 @@ def parse_model_def(model_def, model_defs):
                 pm.skeleton[name] = embedded.skeleton[name]
         elif field_type[0] == '^': # reference to model
             ref_name = field_type[1:]+'Ref'
+            ref_class = setting.models[ref_name]
             if ref_name not in setting.models:
                 raise Error("reference to unknown model '{0}' in {1}".format(ref_name, line))
-            # don't add entry to pm.cmap, since conversion is unnecessary
+            # don not extend pm.cmap, since model reference needs no conversion
             pm.dmap[field_name] = ref_tuple # create tuple (label, url)
-            pm.rmap[field_name] = setting.models[ref_name] # create ItemRef instance with argument 'objectid'
+            pm.rmap[field_name] = ref_class # create ItemRef instance with argument 'objectid'
             pm.wmap[field_name] = get_objectid # write only object id to database
             pm.fmap[field_name] = None
-            pm.empty[field_name] = [ '' ] if multiple_field else ''
+            empty_ref = ref_class(None)
+            pm.empty[field_name] = [ empty_ref ] if multiple_field else empty_ref
             pm.qschema[field_name] = None
-            pm.schema[schema_key] = [ setting.models[ref_name] ] if multiple_field else setting.models[ref_name]
+            pm.schema[schema_key] = [ ref_class ] if multiple_field else ref_class
             pm.skeleton[field_name] = Field(label=field_label, schema=ref_name,
                                             formtype='hidden', control='input',
                                             hidden=field_hidden, auto=False, atomic=False,
@@ -370,7 +373,7 @@ def parse_model_def(model_def, model_defs):
             if atom.display: pm.dmap[field_name] = atom.display
             if atom.read:    pm.rmap[field_name] = atom.read
             if atom.write:   pm.wmap[field_name] = atom.write
-            pm.empty[field_name] = [ '' ] if multiple_field else ''
+            pm.empty[field_name] = [ atom.default ] if multiple_field else atom.default
             pm.qschema[field_name] = atom.schema
             pm.schema[schema_key]  = [ atom.schema ] if multiple_field else atom.schema
             pm.skeleton[field_name] = Field(label=field_label, schema=field_type,
@@ -416,6 +419,8 @@ def read_models(model_defs):
         qschema.update(pm.qschema)
         skeleton = BareItem.skeleton.copy()
         skeleton.update(pm.skeleton)
+        empty = BareItem._empty.copy()
+        empty.update(pm.empty)
         pm.cmap.update(BareItem.cmap)
         pm.dmap.update(BareItem.dmap)
         pm.rmap.update(BareItem.rmap)
@@ -427,7 +432,7 @@ def read_models(model_defs):
         class_dict['wmap']       = pm.wmap
         class_dict['fmap']       = pm.fmap
         class_dict['fields']     = pm.names
-        class_dict['_empty']     = pm.empty
+        class_dict['_empty']     = empty
         class_dict['_schema']    = schema
         class_dict['_qschema']   = qschema
         class_dict['_format']    = pm.fmt
