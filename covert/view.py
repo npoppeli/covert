@@ -13,7 +13,7 @@ from inspect import getmembers, isclass, isfunction
 from itertools import chain
 from .common import str2int, Error
 from .common import decode_dict, encode_dict
-from .model import unflatten
+from .model import unflatten, mapdoc
 from . import setting
 
 setting.icons = {
@@ -217,13 +217,15 @@ class RenderTree:
 
     def transform_query(self):
         self.cursor.query = self.model.convert(unflatten(self.cursor.query))
-        # print('>> transform_query: query=', self.cursor.query)
+        print('>> transform_query: converted/unflattened=', self.cursor.query)
+        self.cursor.query = mapdoc(self.model.qmap, self.cursor.query)
+        print('>> transform_query: mapped=', self.cursor.query)
         return self
 
     def move_cursor(self):
         cursor = self.cursor
         # filter = user query + condition depending on 'incl'
-        cursor.filter = {} if cursor.incl == 1 else {'active':True}
+        cursor.filter = {} if cursor.incl == 1 else {'active':('==', True)}
         cursor.filter.update(cursor.query)
         count = self.model.count(cursor.filter)
         print('>> move_cursor: {} items with filter={}'.format(count, cursor.filter))
@@ -394,9 +396,12 @@ class ItemView(BareItemView):
         # TODO: search operators
         # - {'field1': ($op, $value1, $value2?), 'field2':...}
         #   engine translates this to its own API for searches
-        # - bare year: {'birthdate': {'$gte': begin, '$lte': end}}
-        # - full date: {'birthdate': datetime(Y, M, D)}
-        # - text:      {'lastname' : {'$regex':'Cath'}}
+        # - bare year (partial date):
+        #   ('[]', begin, end)       ==> {'birthdate': {'$gte': begin, '$lte': end}}
+        # - full date:
+        #   ('==', datetime(Y. M. D) ==> {'birthdate': datetime(Y, M, D)}
+        # - text:
+        #   ('=~', 'Cath')           ==> {'lastname' : {'$regex':'Cath'}}
         return self.tree.add_cursor('search')\
                         .transform_query()\
                         .move_cursor()\

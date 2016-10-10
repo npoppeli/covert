@@ -47,63 +47,66 @@ class Item(BareItem):
     def query(cls, doc):
         """
         query(cls, doc): dict
-        Make query (dictionary) from dictionary doc, using only known fields and
-        non-null values.
+        Make query from dictionary doc.
         """
         qdoc = dict((name, value) for name, value in doc.items()
                      if name in cls.fields and value)
         return qdoc
 
+    # key op value           MongoDB query
+    # key == value           {key: value}
+    # key =~ value           {key: {'$regex':value}}
+    # key [] value1, value2  {key: {'$gte': value1, '$lte': value2}}
     @classmethod
-    def count(cls, qdoc={}):
+    def count(cls, doc):
         """
-        count(cls, qdoc): integer
+        count(cls, doc): integer
         Find zero or more documents in collection, and count them.
-        qdoc: dictionary specifying the query, e.g. {'id': '1234'}
+        doc: dictionary specifying the query, e.g. {'id': '1234'}
         """
-        cursor = setting.store_db[cls.name].find(filter=cls.query(qdoc))
-        return cursor.count()
+        sequence = setting.store_db[cls.name].find(filter=cls.query(doc))
+        return sequence.count()
 
     @classmethod
-    def find(cls, qdoc={}, skip=0, limit=0, sort=None):
+    def find(cls, doc, skip=0, limit=0, sort=None):
         """
-        find(cls, qdoc): list
+        find(cls, doc): list
         Find zero or more documents in collection, and return these in the
         form of a list of 'cls' instances. Assumption: stored documents are valid.
-        qdoc: dictionary specifying the query, e.g. {'id': '1234'}
+        doc: dictionary specifying the query, e.g. {'id': '1234'}
         """
-        cursor = setting.store_db[cls.name].find(filter=cls.query(qdoc),
-                                                 skip=skip, limit=limit, sort=sort)
-        result = [cls(doc) for doc in cursor]
+        sequence = setting.store_db[cls.name].find(filter=cls.query(doc),
+                                                   skip=skip, limit=limit, sort=sort)
+        result = [cls(item) for item in sequence]
         return result
 
     @classmethod
     def lookup(cls, oid):
         """
-        lookup(cls, oid): doc
-        Return first document in collection matching the given primary key (id),
-        or None if no document matches this key. Assumption: stored documents are valid.
+        lookup(cls, oid): item
+        Return first item in collection matching the given primary key (id),
+        or None if no item matches this key.
         oid: primary key (string)
         """
-        doc = setting.store_db[cls.name].find_one({'id':oid})
-        return cls(doc)
+        item = setting.store_db[cls.name].find_one({'id':oid})
+        return cls(item)
 
     @classmethod
-    def read(cls, qdoc):
+    def read(cls, doc):
         """
-        read(cls, qdoc): doc
-        Return first document in collection matching the given query,
-        or None if no document matches this query. Assumption: stored documents are valid.
-        qdoc: dictionary specifying the query, e.g. {'id': 1234}
+        read(cls, doc): item
+        Return first item in collection matching the given query,
+        or None if no item matches this query.
+        doc: dictionary specifying the query, e.g. {'id': 1234}
         """
-        doc = setting.store_db[cls.name].find_one(cls.query(qdoc))
-        return cls(doc)
+        item = setting.store_db[cls.name].find_one(cls.query(doc))
+        return cls(item)
 
-    # TODO: use JSend specification in write(), set_field(), append_field(), remove()
     def write(self, validate=True):
         """
         write(self): id
         Save document contained in this instance.
+        TODO: use JSend specification in write(), set_field(), append_field(), remove()
         Return value {'ok':True, 'id':<document id>} or {'ok':False, 'id':None}.
         """
         new = getattr(self, 'id', '') == ''
@@ -148,9 +151,9 @@ class Item(BareItem):
     def remove(self):
         """
         remove(self): doc
-        Remove document from collection.
+        Remove item from collection.
         """
         oid = self['_id']
         collection = setting.store_db[self.name]
-        return collection.delete_one({'_id':oid})
+        result = collection.delete_one({'_id':oid})
         return {'ok': result.deleted_count == 1, 'id': self['id']}

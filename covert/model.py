@@ -136,7 +136,7 @@ class ParsedModel:
         self.skeleton = OrderedDict()
         self.empty = {}
         self.schema, self.qschema = {}, {}
-        self.rmap, self.wmap, self.dmap, self.cmap, self.fmap = {}, {}, {}, {}, {}
+        self.rmap, self.wmap, self.dmap, self.cmap, self.qmap = {}, {}, {}, {}, {}
 
 # Document revisions
 # 1. If the number of revisions is low, keep all of them in the storage,
@@ -181,7 +181,7 @@ class BareItem(dict):
     def __init__(self, doc=None):
         """
         __init__(self, doc)
-        Create new instance, initialize from 'doc' (if available).
+        Create new item, initialize from 'doc' (if available).
         """
         super().__init__()
         for field in self.fields:
@@ -192,8 +192,8 @@ class BareItem(dict):
     @classmethod
     def empty(cls):
         """
-        empty(cls): doc
-        Create new item from empty document for this class
+        empty(cls): item
+        Create new empty item
         """
         item = cls()
         item.update(cls._empty)
@@ -228,7 +228,7 @@ class BareItem(dict):
     @classmethod
     def lookup(cls, oid):
         """
-        lookup(cls, oid): doc
+        lookup(cls, oid): item
         Return trivial item (method is redefined in Item class)
         oid: object id (string)
         """
@@ -238,14 +238,16 @@ class BareItem(dict):
     @classmethod
     def convert(cls, doc):
         """
-        convert(cls, doc): newdoc
+        convert(cls, doc): item
         Convert item with only string values to item with typed values.
         """
-        return mapdoc(cls.cmap, doc)
+        item = cls()
+        item.update(mapdoc(cls.cmap, doc))
+        return item
 
     def display(self):
         """
-        display(self): newdoc
+        display(self): newitem
         Convert item with typed values to item with only string values.
         """
         cls = self.__class__
@@ -254,25 +256,27 @@ class BareItem(dict):
         return item
 
     def flatten(self):
-        """flatten(doc) -> newdoc
-           Flatten document with hierarchical structure.
+        """flatten(self) -> dict
+           Flatten item (document with hierarchical structure) to flat dictionary.
         """
-        newdoc = OrderedDict()
+        flat_dict = OrderedDict()
         for key, value in _flatten(self, '', self.fields):
-            newdoc[key] = value
-        return newdoc
+            flat_dict[key] = value
+        return flat_dict
 
     def copy(self):
         """
-        copy(self): newdoc
-        Make deep copy of document, erasing the 'auto' fields, so that it looks new.
+        copy(self): newitem
+        Make deep copy of item, erasing the 'auto' fields, so that it looks new.
         """
         cls = self.__class__
-        newdoc = deepcopy(self)
+        item = cls()
+        clone = deepcopy(self)
         for name in cls.fields:
             if cls.skeleton[name].auto:
-                newdoc[name] = None
-        return cls(newdoc)
+                clone[name] = None
+        item.update(clone)
+        return item
 
 class ItemRef:
     collection = 'Item'
@@ -317,7 +321,7 @@ def parse_model_def(model_def, model_defs):
                 pm.index.append( (field_name, direction) )
         if field_name == '_format':
             pm.fmt = field_label.replace('_', ' ')
-            continue # TODO: should become class attribute, like in BareItem
+            continue
         schema_key = Optional(field_name) if optional_field else field_name
         pm.names.append(field_name)
         field_hidden = field_label.startswith('_')
@@ -330,8 +334,6 @@ def parse_model_def(model_def, model_defs):
             pm.empty[field_name] = [ embedded.empty ] if multiple_field else embedded.empty
             pm.qschema[field_name] = embedded.qschema
             pm.schema[schema_key] = [ embedded.schema ] if multiple_field else embedded.schema
-            # Field(label, schema, formtype, control, optional=False, multiple=False,
-            #       hidden=False, auto=False, atomic=True, enum=None):
             pm.skeleton[field_name] = Field(label=field_label, schema='dict',
                                             formtype='hidden', control='input',
                                             hidden=field_hidden, auto=False, atomic=False,
@@ -341,12 +343,12 @@ def parse_model_def(model_def, model_defs):
             pm.dmap[field_name] = dict
             pm.rmap[field_name] = dict
             pm.wmap[field_name] = dict
-            pm.fmap[field_name] = None
+            pm.qmap[field_name] = None
             pm.cmap.update(embedded.cmap)
             pm.dmap.update(embedded.dmap)
             pm.rmap.update(embedded.rmap)
             pm.wmap.update(embedded.wmap)
-            pm.fmap.update(embedded.fmap)
+            pm.qmap.update(embedded.qmap)
             for name in embedded.names: # necessary for preserving order
                 pm.skeleton[name] = embedded.skeleton[name]
         elif field_type[0] == '^': # reference to model
@@ -358,9 +360,9 @@ def parse_model_def(model_def, model_defs):
             pm.dmap[field_name] = ref_tuple # create tuple (label, url)
             pm.rmap[field_name] = ref_class # create ItemRef instance with argument 'objectid'
             pm.wmap[field_name] = get_objectid # write only object id to database
-            pm.fmap[field_name] = None
+            pm.qmap[field_name] = None
             empty_ref = ref_class(None)
-            pm.empty[field_name] = [ empty_ref ] if multiple_field else empty_ref
+            pm.empty[field_name] = [] if multiple_field else empty_ref
             pm.qschema[field_name] = None
             pm.schema[schema_key] = [ ref_class ] if multiple_field else ref_class
             pm.skeleton[field_name] = Field(label=field_label, schema=ref_name,
@@ -373,7 +375,8 @@ def parse_model_def(model_def, model_defs):
             if atom.display: pm.dmap[field_name] = atom.display
             if atom.read:    pm.rmap[field_name] = atom.read
             if atom.write:   pm.wmap[field_name] = atom.write
-            pm.empty[field_name] = [ atom.default ] if multiple_field else atom.default
+            if atom.query:   pm.qmap[field_name] = atom.query
+            pm.empty[field_name] = [] if multiple_field else atom.default
             pm.qschema[field_name] = atom.schema
             pm.schema[schema_key]  = [ atom.schema ] if multiple_field else atom.schema
             pm.skeleton[field_name] = Field(label=field_label, schema=field_type,
@@ -430,7 +433,7 @@ def read_models(model_defs):
         class_dict['dmap']       = pm.dmap
         class_dict['rmap']       = pm.rmap
         class_dict['wmap']       = pm.wmap
-        class_dict['fmap']       = pm.fmap
+        class_dict['qmap']       = pm.qmap
         class_dict['fields']     = pm.names
         class_dict['_empty']     = empty
         class_dict['_schema']    = schema
