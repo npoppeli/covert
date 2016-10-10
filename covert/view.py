@@ -215,12 +215,18 @@ class RenderTree:
         self.cursor.action = url_for(self.view_name, route_name, {})
         return self
 
+    def transform_query(self):
+        self.cursor.query = self.model.convert(unflatten(self.cursor.query))
+        # print('>> transform_query: query=', self.cursor.query)
+        return self
+
     def move_cursor(self):
         cursor = self.cursor
         # filter = user query + condition depending on 'incl'
         cursor.filter = {} if cursor.incl == 1 else {'active':True}
         cursor.filter.update(cursor.query)
         count = self.model.count(cursor.filter)
+        print('>> move_cursor: {} items with filter={}'.format(count, cursor.filter))
         cursor.skip = max(0, min(count, cursor.skip+cursor.dir*cursor.limit))
         cursor.prev = cursor.skip>0
         cursor.next = cursor.skip+cursor.limit < count
@@ -244,7 +250,7 @@ class RenderTree:
                                 limit=self.cursor.limit, skip=self.cursor.skip, sort=sort)
         self.content = []
         if not items:
-            self.feedback += 'Nothing found'
+            self.feedback += 'Nothing found for query {}'.format(self.cursor.query)
             return self
         for item in items:
             self.content.append({'item':item,
@@ -253,8 +259,7 @@ class RenderTree:
         return self
 
     def flatten_item(self):
-        self.content = self.content.display()
-        self.content = self.content.flatten()
+        self.content = self.content.display().flatten()
         #print('>> flatten_item')
         #for key, value in self.content.items():
         #    print("{:<10}: {}".format(key, value))
@@ -265,14 +270,14 @@ class RenderTree:
           row['item'] = row['item'].display().flatten()
         return self
 
-    def prune_item(self, depth):
+    def prune_item(self, depth, erase=False):
         skeleton = self.model.skeleton
         ui, item = OrderedDict(), OrderedDict()
         for key, value in self.content.items():
             path = key.split('.')
             field = path[-2] if path[-1].isnumeric() else path[-1]
             if key.count('.') < depth and skeleton[field].atomic and not skeleton[field].hidden:
-                item[key] = value
+                item[key] = '' if erase else value
                 ui[key] = {'label'   : skeleton[field].label,
                            'enum'    : skeleton[field].enum,
                            'formtype': 'hidden' if skeleton[field].auto else skeleton[field].formtype,
@@ -354,7 +359,7 @@ class ItemView(BareItemView):
 
     @route('/{id:objectid}', template='show')
     def show(self):
-        """display one item"""
+        """show one item"""
         # TODO: delete button is enabled iff item.active
         return self.tree.add_item(self.params['id'])\
                         .add_buttons(['index', 'modify', 'delete'])\
@@ -364,7 +369,7 @@ class ItemView(BareItemView):
 
     @route('/index', method='GET,POST', template='index')
     def index(self):
-        """display multiple items (collection)"""
+        """show multiple items (collection)"""
         # TODO: delete button is enabled iff item.active
         return self.tree.add_cursor('index')\
                         .move_cursor()\
@@ -376,25 +381,24 @@ class ItemView(BareItemView):
 
     @route('/search', template='form')
     def search(self):
-        """create search form"""
+        """make a search form. Tip for later: Mirage (JS GUI for search queries)"""
         return self.tree.add_empty_item()\
                         .add_search_button('match')\
                         .flatten_item()\
-                        .prune_item(1)\
+                        .prune_item(1, True)\
                         .asdict()
 
     @route('/search', method='POST', template='index')
     def match(self):
-        """show result list of search"""
-        # TODO: handle search operators
-        # - {$field $op $value}, where $op is 'cont' for 'text' and 'memo', otherwise 'eq'
-        #   engine should translate this to its own API for searches
-        # - translate bare year into {'birthdate': {'$gte': begin, '$lte': end}}
-        # - handle free text search
-        # - translate regular expression
-        #   db.collection.find({'family':{'$regex':'^Fel'}}), or
-
+        """show the result list of a search"""
+        # TODO: search operators
+        # - {'field1': ($op, $value1, $value2?), 'field2':...}
+        #   engine translates this to its own API for searches
+        # - bare year: {'birthdate': {'$gte': begin, '$lte': end}}
+        # - full date: {'birthdate': datetime(Y, M, D)}
+        # - text:      {'lastname' : {'$regex':'Cath'}}
         return self.tree.add_cursor('search')\
+                        .transform_query()\
                         .move_cursor()\
                         .add_items(['show', 'modify', 'delete'], self.sort)\
                         .add_buttons(['new'])\
@@ -404,7 +408,7 @@ class ItemView(BareItemView):
 
     @route('/new', template='form')
     def new(self):
-        """get form for new/create action"""
+        """make a form for new/create action"""
         return self.tree.add_empty_item()\
                         .add_form_buttons('create')\
                         .flatten_item()\
@@ -413,7 +417,7 @@ class ItemView(BareItemView):
 
     @route('/{id:objectid}/modify', template='form')
     def modify(self):
-        """get form for modify/update action"""
+        """make a form for modify/update action"""
         return self.tree.add_item(self.params['id'])\
                         .add_form_buttons('update', 'PUT')\
                         .flatten_item()\
@@ -429,7 +433,7 @@ class ItemView(BareItemView):
 
     @route('/{id:objectid}', method='PUT', template='show;form')
     def update(self):
-        """update existing item"""
+        """update an existing item"""
         # fetch item from database and update with converted form contents
         item = self.model.lookup(self.params['id'])
         form = self._convert_form()
@@ -461,15 +465,15 @@ class ItemView(BareItemView):
 
     @route('', method='POST', template='show;form')
     def create(self):
-        """create new item"""
+        """create a new item"""
         # fetch item from database and update with converted form contents
         item = self.model.empty()
         form = self._convert_form()
         item.update(form)
         validation = item.validate(item)
-        print('>> create: new item=')
-        for key, value in item.items():
-            print("{:<10}: {}".format(key, value))
+        #print('>> create: new item=')
+        #for key, value in item.items():
+        #    print("{:<10}: {}".format(key, value))
         if validation['ok']:
             result = item.write(validate=False)
             if result['ok']:
