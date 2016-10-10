@@ -45,7 +45,7 @@ def read_config():
                        else config_default['language']
     label_index = setting.languages.index(setting.language)
     print("Config: language is '{}' ({})".format(setting.language, label_index))
-    # TODO: L10N the right way
+    # TODO: I18N the right way
     # http://inventwithpython.com/blog/2014/12/20/translate-your-python-3-program-with-the-gettext-module/
     # https://flufli18n.readthedocs.io/en/latest/docs/using.html
     # http://pylonsbook.com/en/1.1/internationalization-and-localization.html
