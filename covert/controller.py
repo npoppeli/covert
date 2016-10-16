@@ -13,7 +13,7 @@ from . import setting
 from .report import logger
 
 def http_server(app, **kwarg):
-    logger.debug('starting HTTP server')
+    logger.debug('Starting HTTP server')
     # wrapped = ErrorMiddleware(app, debug=True)
     waitress.serve(app, **kwarg)
 

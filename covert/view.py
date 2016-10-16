@@ -17,7 +17,7 @@ from .model import unflatten, mapdoc
 from . import setting
 
 setting.icons = {
-   'show'   : 'fa fa-photo',
+   'show'   : 'fa fa-eye',
    'index'  : 'fa fa-list-alt',
    'search' : 'fa fa-search',
    'match'  : 'fa fa-search',
@@ -216,10 +216,13 @@ class RenderTree:
         return self
 
     def transform_query(self):
-        self.cursor.query = self.model.convert(unflatten(self.cursor.query))
-        print('>> transform_query: converted/unflattened=', self.cursor.query)
-        self.cursor.query = mapdoc(self.model.qmap, self.cursor.query)
-        print('>> transform_query: mapped=', self.cursor.query)
+        r1 = self.cursor.query
+        # print('>> transform_query: cursor.query={}'.format(r1))
+        r2 = unflatten(r1)
+        # print('>> transform_query: unflattened ={}'.format(r2))
+        r3 = mapdoc(self.model.qmap, r2)
+        # print('>> transform_query: qmapped     ={}'.format(r3))
+        self.cursor.query = r3
         return self
 
     def move_cursor(self):
@@ -228,7 +231,7 @@ class RenderTree:
         cursor.filter = {} if cursor.incl == 1 else {'active':('==', True)}
         cursor.filter.update(cursor.query)
         count = self.model.count(cursor.filter)
-        print('>> move_cursor: {} items with filter={}'.format(count, cursor.filter))
+        # print('>> move_cursor: {} items with filter={}'.format(count, cursor.filter))
         cursor.skip = max(0, min(count, cursor.skip+cursor.dir*cursor.limit))
         cursor.prev = cursor.skip>0
         cursor.next = cursor.skip+cursor.limit < count
@@ -364,7 +367,7 @@ class ItemView(BareItemView):
         """show one item"""
         # TODO: delete button is enabled iff item.active
         return self.tree.add_item(self.params['id'])\
-                        .add_buttons(['index', 'modify', 'delete'])\
+                        .add_buttons(['index', 'search', 'modify', 'delete'])\
                         .flatten_item()\
                         .prune_item(2)\
                         .asdict()
@@ -393,15 +396,6 @@ class ItemView(BareItemView):
     @route('/search', method='POST', template='index')
     def match(self):
         """show the result list of a search"""
-        # TODO: search operators
-        # - {'field1': ($op, $value1, $value2?), 'field2':...}
-        #   engine translates this to its own API for searches
-        # - bare year (partial date):
-        #   ('[]', begin, end)       ==> {'birthdate': {'$gte': begin, '$lte': end}}
-        # - full date:
-        #   ('==', datetime(Y. M. D) ==> {'birthdate': datetime(Y, M, D)}
-        # - text:
-        #   ('=~', 'Cath')           ==> {'lastname' : {'$regex':'Cath'}}
         return self.tree.add_cursor('search')\
                         .transform_query()\
                         .move_cursor()\

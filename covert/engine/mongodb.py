@@ -11,10 +11,39 @@ from ..model import BareItem, mapdoc
 from .. import setting
 from bson.objectid import ObjectId
 
+query_map = {
+    '==': lambda t: t[1],
+    '=~': lambda t: {'$regex':t[1]},
+    '[]': lambda t: {'$gte':t[1], '$lte':t[2]}
+}
+
+def translate_query(query):
+    """translate_query(query) -> result
+       Translate query to a form suitable for this storage engine.
+    """
+    result = {}
+    for key, value in query.items():
+        operator =value[0]
+        if operator in query_map:  # apply mapping function
+            if isinstance(value, dict):  # embedded document
+                result[key] = mapdoc(query_map, value)
+            elif isinstance(value, list):  # list of scalars or documents
+                if len(value) == 0:  # empty list
+                    result[key] = []
+                elif isinstance(value[0], dict):  # list of documents
+                    result[key] = [mapdoc(query_map, element) for element in value]
+                else:  # list of scalars
+                    result[key] = [query_map[operator](element) for element in value]
+            else:  # scalar
+                result[key] = query_map[operator](value)
+        else:  # no mapping for this element
+            result[key] = value
+    return result
+
 def init_storage():
-    print('setting MongoDB connection')
+    print('Creating MongoDB connection')
     setting.store_connection = MongoClient() # TODO: make this thread-safe
-    print('setting MongoDB database to', setting.store_dbname)
+    print('Setting MongoDB database to', setting.store_dbname)
     setting.store_db = setting.store_connection[setting.store_dbname]
 
 class Item(BareItem):
@@ -49,14 +78,8 @@ class Item(BareItem):
         query(cls, doc): dict
         Make query from dictionary doc.
         """
-        qdoc = dict((name, value) for name, value in doc.items()
-                     if name in cls.fields and value)
-        return qdoc
+        return translate_query(doc)
 
-    # key op value           MongoDB query
-    # key == value           {key: value}
-    # key =~ value           {key: {'$regex':value}}
-    # key [] value1, value2  {key: {'$gte': value1, '$lte': value2}}
     @classmethod
     def count(cls, doc):
         """

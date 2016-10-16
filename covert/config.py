@@ -44,7 +44,7 @@ def read_config():
     setting.language = config['language'] if config['language'] in setting.languages\
                        else config_default['language']
     label_index = setting.languages.index(setting.language)
-    print("Config: language is '{}' ({})".format(setting.language, label_index))
+    print("Config: language is '{}'".format(setting.language))
     # TODO: I18N the right way
     # http://inventwithpython.com/blog/2014/12/20/translate-your-python-3-program-with-the-gettext-module/
     # https://flufli18n.readthedocs.io/en/latest/docs/using.html
@@ -62,7 +62,7 @@ def kernel_init():
     elif setting.dbtype == 'rethinkdb':
         from .engine.rethinkdb import init_storage
     else:
-        raise Error('Other storage engine than MongoDB or RethinkDB are not supported yet')
+        raise Error('Unknown storage engine: only MongoDB and RethinkDB are supported')
     init_storage()
 
     # read templates

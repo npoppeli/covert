@@ -56,7 +56,7 @@ def prune(doc, depth):
     return OrderedDict((key, value) for (key, value) in doc.items() if key.count('.') <= depth)
 
 def unflatten(doc):
-    """unflatten(doc) -> newdoc
+    """unflatten(doc) -> result
        Unflatten document to (re)create hierarchical structure.
        A flattened document has keys 'a' or 'a.b'. As preparation, the keys are
        transformed into lists (25% faster than keeping them as strings), and
@@ -66,9 +66,9 @@ def unflatten(doc):
     return _unflatten(list_rep)
 
 def _unflatten(list_rep):
-    newdoc = {}
+    result = {}
     car_list = [elt[0].pop(0) for elt in list_rep]  # take first element (car) from each key
-    car_set = set(car_list)  # set of (unique) car's is the set of keys of newdoc
+    car_set = set(car_list)  # set of (unique) car's is the set of keys of result
     for key in car_set:
         begin = bisect_left(car_list, key)
         end = bisect_right(car_list, key)
@@ -77,36 +77,35 @@ def _unflatten(list_rep):
             # We can distinguish 3 cases: 1. cdr is ['0']; 2. cdr is empty;
             # 3. cdr is [a] where a is some string, but this is unrealistic.
             child = children[0]
-            newdoc[key] = [child[1]] if child[0] == ['0'] else child[1]  # scalar
+            result[key] = [child[1]] if child[0] == ['0'] else child[1]  # scalar
         else:
-            newdoc[key] = _unflatten(children)
+            result[key] = _unflatten(children)
     if all([key.isnumeric() for key in car_set]):  # turn dict with numeric keys into list
-        return [t[1] for t in sorted(newdoc.items(), key=lambda t: int(t[0]))]
+        return [t[1] for t in sorted(result.items(), key=lambda t: int(t[0]))]
     else:
-        return newdoc
+        return result
 
 def mapdoc(fnmap, doc):
-    """mapdoc(doc) -> newdoc
+    """mapdoc(doc) -> result
        Map doc using functions in fnmap
     """
-    newdoc = {}
+    result = {}
     for key, value in doc.items():
         if key in fnmap: # apply mapping function
             if isinstance(value, dict): # embedded document
-                newdoc[key] = mapdoc(fnmap, value)
+                result[key] = mapdoc(fnmap, value)
             elif isinstance(value, list): # list of scalars or documents
                 if len(value) == 0: # empty list
-                    newdoc[key] = []
+                    result[key] = []
                 elif isinstance(value[0], dict): # list of documents
-                    newdoc[key] = [mapdoc(fnmap, element) for element in value]
+                    result[key] = [mapdoc(fnmap, element) for element in value]
                 else: # list of scalars
-                    newdoc[key] = [fnmap[key](element) for element in value]
+                    result[key] = [fnmap[key](element) for element in value]
             else: # scalar
-                # print('>> mapdoc: key={} value={}'.format(key, value))
-                newdoc[key] = fnmap[key](value)
+                result[key] = fnmap[key](value)
         else: # no mapping for this element
-            newdoc[key] = value
-    return newdoc
+            result[key] = value
+    return result
 
 # Atom defines: 'schema', 'convert', 'display', 'formtype', 'control', 'read', 'write', 'enum'
 # schema: used for Item._schema, for validation purposes
