@@ -188,6 +188,5 @@ class JSONRouter(MapRouter):
         super().__init__()
         self.content_type = 'application/json'
 
-    # TODO: use JSend specification here
     def serialize(self, result, template):
         return result

@@ -8,7 +8,7 @@ have a partial dependence on the storage engine, via the read and write maps.
 """
 
 from datetime import datetime, date, time, MINYEAR
-from .common import Error
+from .common import InternalError
 
 class Atom:
     __slots__ = ('schema', 'convert', 'display', 'query', 'formtype', 'control',
@@ -29,7 +29,7 @@ class Atom:
 atom_map = {}
 def register_atom(name, **kwarg):
     if name in atom_map:
-        raise Error('Atom {0} is already registered'.format(name))
+        raise InternalError('Atom {0} is already registered'.format(name))
     else:
         atom_map[name] = Atom(**kwarg)
 

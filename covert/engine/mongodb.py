@@ -7,6 +7,7 @@ Objects and functions related to the MongoDB storage engine.
 
 from datetime import datetime
 from pymongo import MongoClient
+from ..common import SUCCESS, ERROR, FAIL
 from ..model import BareItem, mapdoc
 from .. import setting
 from bson.objectid import ObjectId
@@ -130,7 +131,7 @@ class Item(BareItem):
         write(self): id
         Save document contained in this instance.
         TODO: use JSend specification in write(), set_field(), append_field(), remove()
-        Return value {'ok':True, 'id':<document id>} or {'ok':False, 'id':None}.
+        Return value {'status':SUCCESS, 'id':<document id>} or {'status':FAIL, 'id':None}.
         """
         new = getattr(self, 'id', '') == ''
         self['mtime'] = datetime.now()
@@ -141,35 +142,35 @@ class Item(BareItem):
             self['ctime'] = self['mtime']
         if validate:
             validate_result = self.validate(self)
-            if not validate_result['ok']:
+            if not validate_result['status']:
                 message = "document {}\ndoes not validate because of error\n{}\n".\
                     format(self, validate_result['error'])
-                return {'ok': False, 'error': message}
+                return {'status':FAIL, 'message':message}
         try:
             doc = mapdoc(self.wmap, self)
             collection = setting.store_db[self.name]
             if new:
                 result = collection.insert_one(doc)
-                return {'ok':True, 'id':str(result.inserted_id)}
+                return {'status':SUCCESS, 'id':str(result.inserted_id)}
             else:
                 result = collection.replace_one({'_id':self['_id']}, doc)
-                return {'ok':True, 'id':str(result.upserted_id)}
+                return {'status':SUCCESS, 'id':str(result.upserted_id)}
         except Exception as e:
             message = 'document {}\nnot written because of error\n{}\n'.format(doc, str(e))
-            return {'ok': False, 'id': None, 'error': message}
+            return {'status':ERROR, 'id':None, 'message':message}
 
     # methods to set references (update database directly)
     def set_field(self, key, value):
         oid = self['_id']
         collection = setting.store_db[self.name]
         result = collection.update_one({'id':oid}, {'$set':{key:value}})
-        return {'ok': result.modified_count == 1, 'id': self['id']}
+        return {'status':'successs' if result.modified_count == 1 else FAIL, 'id': self['id']}
 
     def append_field(self, key, value):
         oid = self['_id']
         collection = setting.store_db[self.name]
         result = collection.update_one({'_id':oid}, {'$addToSet':{key:value}})
-        return {'ok': result.modified_count == 1, 'id': self['id']}
+        return {'status':SUCCESS if result.modified_count == 1 else FAIL, 'id': self['id']}
 
     def remove(self):
         """
@@ -179,4 +180,4 @@ class Item(BareItem):
         oid = self['_id']
         collection = setting.store_db[self.name]
         result = collection.delete_one({'_id':oid})
-        return {'ok': result.deleted_count == 1, 'id': self['id']}
+        return {'status':SUCCESS if result.deleted_count == 1 else FAIL, 'id': self['id']}

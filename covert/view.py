@@ -11,7 +11,7 @@ import re
 from collections import OrderedDict
 from inspect import getmembers, isclass, isfunction
 from itertools import chain
-from .common import str2int, Error
+from .common import str2int, InternalError, SUCCESS, ERROR, FAIL
 from .common import decode_dict, encode_dict
 from .model import unflatten, mapdoc
 from . import setting
@@ -194,7 +194,7 @@ def delete_button(view_name, route_name, item):
 
 class RenderTree:
     # elements listed here are included by RenderTree.asdict()
-    nodes = ['buttons', 'content', 'cursor', 'feedback', 'method', 'style', 'ui']
+    nodes = ['buttons', 'cursor', 'data', 'message', 'meta', 'method', 'status', 'style']
     def __init__(self, request, model, view_name, route_name):
         self.request = request
         self.model = model
@@ -203,12 +203,13 @@ class RenderTree:
         self.form = None
         # content of render tree
         self.buttons = []
-        self.content = None
         self.cursor = None
-        self.feedback = ''
+        self.data = None
+        self.message = ''
+        self.meta = None
         self.method = ''
+        self.status = '' # success, fail, error
         self.style = 0
-        self.ui = None
 
     def add_cursor(self, route_name):
         self.cursor = Cursor(self.request)
@@ -242,95 +243,93 @@ class RenderTree:
             item = self.model.lookup(oid_or_item)
         else:
             item = oid_or_item
-        self.content = item
+        self.data = item
         # TODO: add boolean vector 'active' to the render tree
         return self
 
     def add_empty_item(self):
-        self.content = self.model.empty()
+        self.data = self.model.empty()
         return self
 
     def add_items(self, buttons, sort):
         items = self.model.find(self.cursor.filter,
                                 limit=self.cursor.limit, skip=self.cursor.skip, sort=sort)
-        self.content = []
+        self.data = []
         if not items:
-            self.feedback += 'Nothing found for query {}'.format(self.cursor.query)
+            self.message += 'Nothing found for query {}'.format(self.cursor.query)
             return self
         for item in items:
-            self.content.append({'item':item,
-                                 'buttons':[normal_button(self.view_name, b, item) for b in buttons]})
+            self.data.append({'item':item,
+                              'buttons':[normal_button(self.view_name, b, item) for b in buttons]})
         # TODO: add boolean vector 'active' to the render tree
         return self
 
     def flatten_item(self):
-        self.content = self.content.display().flatten()
-        #print('>> flatten_item')
-        #for key, value in self.content.items():
-        #    print("{:<10}: {}".format(key, value))
+        self.data = self.data.display().flatten()
         return self
 
     def flatten_items(self):
-        for row in self.content:
-          row['item'] = row['item'].display().flatten()
+        for row in self.data:
+            row['item'] = row['item'].display().flatten()
         return self
 
-    def prune_item(self, depth, erase=False):
-        skeleton = self.model.skeleton
-        ui, item = OrderedDict(), OrderedDict()
-        for key, value in self.content.items():
+    def prune_item(self, depth, erase=False, form=False):
+        item_meta = self.model.meta
+        meta, item = OrderedDict(), OrderedDict()
+        for key, value in self.data.items():
             path = key.split('.')
             field = path[-2] if path[-1].isnumeric() else path[-1]
-            if key.count('.') < depth and skeleton[field].atomic and not skeleton[field].hidden:
+            field_meta = item_meta[field]
+            if (key.count('.') < depth) and not\
+                    (field_meta.schema=='itemref' and form):
                 item[key] = '' if erase else value
-                ui[key] = {'label'   : skeleton[field].label,
-                           'enum'    : skeleton[field].enum,
-                           'formtype': 'hidden' if skeleton[field].auto else skeleton[field].formtype,
-                           'control' : skeleton[field].control}
-        self.content, self.ui = item, ui
-        #print('>> prune_item')
-        #for key, value in item.items():
-        #    print("{:<10}: {}".format(key, value))
+                meta[key] = {'label'   : field_meta.label,
+                             'enum'    : field_meta.enum,
+                             'formtype': 'hidden' if field_meta.auto else field_meta.formtype,
+                             'auto'    : field_meta.auto,
+                             'control' : field_meta.control}
+        self.data, self.meta = item, meta
         return self
 
     def prune_items(self, depth):
-        skeleton = self.model.skeleton
-        ui, ui_ready = OrderedDict(), False
-        for row in self.content:
+        item_meta = self.model.meta
+        meta, ready = OrderedDict(), False
+        for row in self.data:
             item = OrderedDict()
             for key, value in row['item'].items():
                 path = key.split('.')
                 field = path[-2] if path[-1].isnumeric() else path[-1]
-                if key.count('.') < depth and skeleton[field].atomic and not skeleton[field].hidden and\
-                                          not skeleton[field].multiple and not skeleton[field].auto and\
-                                          skeleton[field].schema not in ('text', 'memo'):
+                field_meta = item_meta[field]
+                if (key.count('.') < depth) and not\
+                        (field_meta.multiple or field_meta.auto or\
+                         field_meta.schema in ('text', 'memo', 'itemref')):
                     item[key] = value
-                    if not ui_ready:
-                        ui[key] = {'label'   : skeleton[field].label,
-                                   'formtype': skeleton[field].formtype,
-                                   'control' : skeleton[field].control}
+                    if not ready:
+                        meta[key] = {'label'   : field_meta.label,
+                                     'formtype': field_meta.formtype,
+                                     'control' : field_meta.control}
             row['item'] = item
-            self.ui, ui_ready = ui, True
+            self.meta, ready = meta, True
         return self
 
     def add_buttons(self, buttons):
-        if self.content:
-            item = self.content[0]['item'] if isinstance(self.content, list) else self.content
+        if self.data:
+            item = self.data[0]['item'] if isinstance(self.data, list) else self.data
             self.buttons = [(delete_button if button == 'delete' else
                              normal_button)(self.view_name, button, item) for button in buttons]
         return self
 
     def add_form_buttons(self, route_name, method=None):
-        if self.content:
-            item = self.content
+        if self.data:
+            item = self.data
             self.buttons = [form_button(self.view_name, route_name, item, 'ok')]
             if method: # hide method (e.g. PUT) inside the form
                 self.method = method
         return self
 
     def add_search_button(self, route_name):
-        if self.content:
-            # item = self.content[0]['item']
+        if self.data:
+            # item = self.data[0]['item']
             self.buttons = [form_button(self.view_name, route_name, {}, 'search')]
         return self
 
@@ -386,11 +385,11 @@ class ItemView(BareItemView):
 
     @route('/search', template='form')
     def search(self):
-        """make a search form. Tip for later: Mirage (JS GUI for search queries)"""
+        """make a search form. Tip for later: Mirage (JS Gmeta for search queries)"""
         return self.tree.add_empty_item()\
                         .add_search_button('match')\
                         .flatten_item()\
-                        .prune_item(1, True)\
+                        .prune_item(1, erase=True, form=True)\
                         .asdict()
 
     @route('/search', method='POST', template='index')
@@ -411,7 +410,7 @@ class ItemView(BareItemView):
         return self.tree.add_empty_item()\
                         .add_form_buttons('create')\
                         .flatten_item()\
-                        .prune_item(2)\
+                        .prune_item(2, erase=True, form=True)\
                         .asdict()
 
     @route('/{id:objectid}/modify', template='form')
@@ -420,7 +419,7 @@ class ItemView(BareItemView):
         return self.tree.add_item(self.params['id'])\
                         .add_form_buttons('update', 'PUT')\
                         .flatten_item()\
-                        .prune_item(2)\
+                        .prune_item(2, form=True)\
                         .asdict()
 
     def _convert_form(self):
@@ -440,26 +439,26 @@ class ItemView(BareItemView):
         validation = item.validate(item)
         if validation['ok']:
             result = item.write(validate=False)
-            if result['ok']:
+            if result['status'] == SUCCESS:
                 tree = self.tree
-                tree.feedback = 'Modified item {}'.format(str(item))
+                tree.message = 'Modified item {}'.format(str(item))
                 return tree.add_item(item) \
                            .add_buttons(['index', 'update', 'delete']) \
                            .flatten_item() \
                            .prune_item(2) \
                            .asdict()
             else: # exception, under normal circumstances this should never occur
-                raise Error('Modified item {} could not be stored ({})'.\
+                raise InternalError('Modified item {} could not be stored ({})'.\
                             format(str(item), result['error']))
         else:
             tree = self.tree
             tree.style = 1
-            tree.feedback = 'Modified item {} has validation errors {}'.\
+            tree.message = 'Modified item {} has validation errors {}'.\
                             format(str(item), validation['error'])
             return tree.add_item(item)\
                        .add_form_buttons('update', 'PUT')\
                        .flatten_item()\
-                       .prune_item(2)\
+                       .prune_item(2, form=True)\
                        .asdict()
 
     @route('', method='POST', template='show;form')
@@ -477,24 +476,24 @@ class ItemView(BareItemView):
             result = item.write(validate=False)
             if result['ok']:
                 tree = self.tree
-                tree.feedback = 'New item {}'.format(str(item))
+                tree.message = 'New item {}'.format(str(item))
                 return tree.add_item(item) \
                            .add_buttons(['index', 'update', 'delete']) \
                            .flatten_item() \
                            .prune_item(2) \
                            .asdict()
             else: # exception, under normal circumstances this should never occur
-                raise Error('New item {} could not be stored ({})'.\
+                raise InternalError('New item {} could not be stored ({})'.\
                             format(str(item), result['error']))
         else:
             tree = self.tree
             tree.style = 1
-            tree.feedback = 'New item {} has validation errors {}'.\
+            tree.message = 'New item {} has validation errors {}'.\
                             format(str(item), validation['error'])
             return tree.add_item(item)\
                        .add_form_buttons('update', 'PUT')\
                        .flatten_item()\
-                       .prune_item(2)\
+                       .prune_item(2, form=True, erase=True)\
                        .asdict()
 
     @route('/{id:objectid}', method='DELETE', template='delete')
@@ -505,10 +504,10 @@ class ItemView(BareItemView):
         r1 = item.set_field('active', False)
         if r1['ok']:
             return {'status': 'success',
-                    'feedback': 'item {} set to inactive'.format(str(item))}
+                    'message': 'item {} set to inactive'.format(str(item))}
         else:
             return {'status': 'failure',
-                    'feedback': 'item {} not modified'.format(str(item))}
+                    'message': 'item {} not modified'.format(str(item))}
 
     #TODO import: import one or more items
     # @route('GET,POST', '/import')

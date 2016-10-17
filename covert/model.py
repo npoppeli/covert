@@ -5,13 +5,11 @@ covert.model
 Objects and functions related to models. A model defines the structure
 of an item.
 
-A basic item is a simple dictionary. A more complicated item can also
-contain lists and dictionaries. This is fully recursive.  Instead of
-embedding a basic item of class B inside an item of class A, you can
-also add references to items of class B inside an item of class A
-('linking'). A reference to an item is essentially a 3-tuple (collection
-name, item id, string representation). The third item is dynamically computed
-upon using the item reference.
+A basic item is a simple dictionary. A more complicated item can also contain lists and
+dictionaries. This is fully recursive.  Instead of embedding a basic item of class B inside an
+item of class A, you can also add references to items of class B inside an item of class A
+('linking'). A reference to an item is essentially a 3-tuple (collection name, item id,
+string representation). The third item is dynamically computed upon using the item reference.
 
 storage -> [JSON document] -> read -> [item] -> display -> [item stringified] -> HTML page
 HTML form -> [item stringified] -> convert -> [item] -> write -> [JSON document] -> storage
@@ -28,7 +26,7 @@ from copy import deepcopy
 from collections import OrderedDict
 from voluptuous import Schema, Optional, MultipleInvalid
 from .atom import atom_map, EMPTY_DATETIME
-from .common import Error
+from .common import InternalError
 from . import setting
 
 def _flatten(doc, prefix, keys):
@@ -113,16 +111,15 @@ def mapdoc(fnmap, doc):
 
 class Field:
     __slots__ = ('label', 'schema', 'formtype', 'control', 'optional', 'multiple',
-                 'hidden', 'auto', 'atomic',  'control', 'enum')
+                 'auto', 'atomic',  'control', 'enum')
     def __init__(self, label, schema, formtype, optional=False, multiple=False,
-                 control='input', hidden=False, auto=False, atomic=True, enum=None):
+                 control='input', auto=False, atomic=True, enum=None):
         self.label    = label
         self.schema   = schema
         self.formtype = formtype
         self.control  = control
         self.optional = optional
         self.multiple = multiple
-        self.hidden   = hidden
         self.auto     = auto
         self.atomic   = atomic
         self.enum     = enum
@@ -132,9 +129,9 @@ class ParsedModel:
     def __init__(self):
         self.names, self.index = [], []
         self.fmt = ''
-        self.skeleton = OrderedDict()
+        self.meta = OrderedDict()
         self.empty = {}
-        self.schema, self.qschema = {}, {}
+        self.schema = {}
         self.rmap, self.wmap, self.dmap, self.cmap, self.qmap = {}, {}, {}, {}, {}
 
 # Document revisions
@@ -159,23 +156,23 @@ class BareItem(dict):
     da = atom_map['datetime']
     name = 'BareItem'
     fields  = ['id', 'ctime', 'mtime', 'active']
-    # schemata for normal and query validation
-    _schema  = {'id':sa.schema, 'ctime':da.schema, 'mtime':da.schema, 'active': ba.schema}
-    _qschema = {}
-    _empty   = {'id':'', 'ctime':EMPTY_DATETIME, 'mtime':EMPTY_DATETIME, 'active':True}
-    # transformation maps
+    # validation
+    _schema   = {'id':sa.schema, 'ctime':da.schema, 'mtime':da.schema, 'active': ba.schema}
+    _validate = None
+    _empty    = {'id':'', 'ctime':EMPTY_DATETIME, 'mtime':EMPTY_DATETIME, 'active':True}
+    # transformation
     cmap  = {'ctime':da.convert, 'mtime':da.convert, 'active': ba.convert}
     dmap  = {'ctime':da.display, 'mtime':da.display, 'active': ba.display}
     rmap = {}
     wmap = {}
-    # skeleton
-    skeleton = OrderedDict()
+    # meta
+    meta = OrderedDict()
     # TODO: labels should become language-dependent
     # TODO: 'active' is not auto, but has a default (True)
-    skeleton['id']     = Field(label='Id',       schema='string',   formtype='hidden',  auto=True,  hidden=True )
-    skeleton['ctime']  = Field(label='Created',  schema='datetime', formtype='hidden',  auto=True,  hidden=False)
-    skeleton['mtime']  = Field(label='Modified', schema='datetime', formtype='hidden',  auto=True,  hidden=False)
-    skeleton['active'] = Field(label='Actief',   schema='boolean',  formtype='boolean', auto=False, hidden=False )
+    meta['id']     = Field(label='Id',       schema='string',   formtype='hidden',  auto=True)
+    meta['ctime']  = Field(label='Created',  schema='datetime', formtype='hidden',  auto=True)
+    meta['mtime']  = Field(label='Modified', schema='datetime', formtype='hidden',  auto=True)
+    meta['active'] = Field(label='Actief',   schema='boolean',  formtype='boolean', auto=False)
 
     def __init__(self, doc=None):
         """
@@ -184,7 +181,7 @@ class BareItem(dict):
         """
         super().__init__()
         for field in self.fields:
-            self[field] = [] if self.skeleton[field].multiple else None
+            self[field] = [] if self.meta[field].multiple else None
         if doc:
             self.update(mapdoc(self.rmap, doc))
 
@@ -207,21 +204,20 @@ class BareItem(dict):
         return '{}({})'.format(self.__class__.__name__, content)
 
     @classmethod
-    def validate(cls, doc, kind=''):
+    def validate(cls, doc):
         """
         validate(cls, doc): result
         Validate document and return
-        - {'ok': True, error:{} } if validation OK
-        - {'ok': False, error:{field1:error1, ...} } if validation not OK
+        - {'ok': True, 'error':{} } if validation OK
+        - {'ok': False, 'error':{field1:error1, ...} } if validation not OK
         Class method: allows validation of search queries and items fresh from the storage.
         """
-        validator = cls._qvalidate if kind == 'query' else cls._validate
+        validator = cls._validate
         try:
             _ = validator(doc)
             return {'ok': True, 'error':{} }
         except MultipleInvalid as e:
             error = '; '.join([str(el) for el in e.errors ])
-            # error = str(e.errors)
             return {'ok': False, 'error':error }
 
     @classmethod
@@ -231,8 +227,8 @@ class BareItem(dict):
         Return trivial item (method is redefined in Item class)
         oid: object id (string)
         """
-        doc = {'id':oid}
-        return cls(doc)
+        item = {'id':oid}
+        return cls(item)
 
     @classmethod
     def convert(cls, doc):
@@ -272,7 +268,7 @@ class BareItem(dict):
         item = cls()
         clone = deepcopy(self)
         for name in cls.fields:
-            if cls.skeleton[name].auto:
+            if cls.meta[name].auto:
                 clone[name] = None
         item.update(clone)
         return item
@@ -305,7 +301,7 @@ def parse_model_def(model_def, model_defs):
     for line in model_def:
         field_def = line.split()
         if len(field_def) not in (3, 4):
-            raise Error("field definition '{0}' should have 3 or 4 components".format(line))
+            raise InternalError("field definition '{0}' should have 3 or 4 components".format(line))
         optional_field, multiple_field, auto_field = False, False, False
         if len(field_def) == 3:
             field_name, field_type, field_label = field_def
@@ -323,20 +319,17 @@ def parse_model_def(model_def, model_defs):
             continue
         schema_key = Optional(field_name) if optional_field else field_name
         pm.names.append(field_name)
-        field_hidden = field_label.startswith('_')
-        if not field_hidden:
-            field_label = field_label.replace('_', ' ')
+        field_label = field_label.replace('_', ' ')
         parts = field_label.split('|')
         field_label = parts[label_index]
         if field_type[0] == '_': # embedded model (comparable to inner class)
             embedded = parse_model_def(model_defs[field_type], model_defs)
-            pm.empty[field_name] = [ embedded.empty ] if multiple_field else embedded.empty
-            pm.qschema[field_name] = embedded.qschema
-            pm.schema[schema_key] = [ embedded.schema ] if multiple_field else embedded.schema
-            pm.skeleton[field_name] = Field(label=field_label, schema='dict',
-                                            formtype='hidden', control='input',
-                                            hidden=field_hidden, auto=False, atomic=False,
-                                            optional=optional_field, multiple=multiple_field)
+            pm.empty[field_name] = [] if multiple_field else embedded.empty
+            pm.schema[schema_key] = [embedded.schema] if multiple_field else embedded.schema
+            pm.meta[field_name] = Field(label=field_label, schema='dict',
+                                        formtype='hidden', control='input',
+                                        auto=False, atomic=False,
+                                        optional=optional_field, multiple=multiple_field)
             pm.names.extend(embedded.names)
             pm.cmap[field_name] = dict
             pm.dmap[field_name] = dict
@@ -349,12 +342,12 @@ def parse_model_def(model_def, model_defs):
             pm.wmap.update(embedded.wmap)
             pm.qmap.update(embedded.qmap)
             for name in embedded.names: # necessary for preserving order
-                pm.skeleton[name] = embedded.skeleton[name]
+                pm.meta[name] = embedded.meta[name]
         elif field_type[0] == '^': # reference to model
             ref_name = field_type[1:]+'Ref'
             ref_class = setting.models[ref_name]
             if ref_name not in setting.models:
-                raise Error("reference to unknown model '{0}' in {1}".format(ref_name, line))
+                raise InternalError("reference to unknown model '{0}' in {1}".format(ref_name, line))
             # don not extend pm.cmap, since model reference needs no conversion
             pm.dmap[field_name] = ref_tuple # create tuple (label, url)
             pm.rmap[field_name] = ref_class # create ItemRef instance with argument 'objectid'
@@ -362,12 +355,11 @@ def parse_model_def(model_def, model_defs):
             pm.qmap[field_name] = None
             empty_ref = ref_class(None)
             pm.empty[field_name] = [] if multiple_field else empty_ref
-            pm.qschema[field_name] = None
-            pm.schema[schema_key] = [ ref_class ] if multiple_field else ref_class
-            pm.skeleton[field_name] = Field(label=field_label, schema=ref_name,
-                                            formtype='hidden', control='input',
-                                            hidden=field_hidden, auto=False, atomic=False,
-                                            optional=optional_field, multiple=multiple_field)
+            pm.schema[schema_key] = [ref_class] if multiple_field else ref_class
+            pm.meta[field_name] = Field(label=field_label, schema='itemref',
+                                        formtype='hidden', control='input',
+                                        auto=False, atomic=False,
+                                        optional=optional_field, multiple=multiple_field)
         else: # atom class
             atom = atom_map[field_type]
             if atom.convert: pm.cmap[field_name] = atom.convert
@@ -376,12 +368,11 @@ def parse_model_def(model_def, model_defs):
             if atom.write:   pm.wmap[field_name] = atom.write
             if atom.query:   pm.qmap[field_name] = atom.query
             pm.empty[field_name] = [] if multiple_field else atom.default
-            pm.qschema[field_name] = atom.schema
-            pm.schema[schema_key]  = [ atom.schema ] if multiple_field else atom.schema
-            pm.skeleton[field_name] = Field(label=field_label, schema=field_type,
-                                            formtype=atom.formtype, control=atom.control,
-                                            enum=atom.enum, hidden=field_hidden, auto=auto_field,
-                                            optional=optional_field, multiple=multiple_field)
+            pm.schema[schema_key] = [atom.schema] if multiple_field else atom.schema
+            pm.meta[field_name] = Field(label=field_label, schema=field_type,
+                                        formtype=atom.formtype, control=atom.control,
+                                        enum=atom.enum, auto=auto_field,
+                                        optional=optional_field, multiple=multiple_field)
     return pm
 
 def read_models(model_defs):
@@ -399,7 +390,7 @@ def read_models(model_defs):
     elif setting.config['dbtype'] == 'rethinkdb':
         from .engine.rethinkdb import Item
     else:
-        raise Error('Storage engine should be MongoDB or RethinkDB')
+        raise InternalError('Storage engine should be MongoDB or RethinkDB')
     setting.models['BareItem'] = BareItem
     setting.models['Item'] = Item
 
@@ -417,30 +408,26 @@ def read_models(model_defs):
         class_dict['index'].extend(pm.index)
         schema = BareItem._schema.copy()
         schema.update(pm.schema)
-        qschema = BareItem._qschema.copy()
-        qschema.update(pm.qschema)
-        skeleton = BareItem.skeleton.copy()
-        skeleton.update(pm.skeleton)
+        meta = BareItem.meta.copy()
+        meta.update(pm.meta)
         empty = BareItem._empty.copy()
         empty.update(pm.empty)
         pm.cmap.update(BareItem.cmap)
         pm.dmap.update(BareItem.dmap)
         pm.rmap.update(BareItem.rmap)
         pm.wmap.update(BareItem.wmap)
-        class_dict['name']       = model_name
-        class_dict['cmap']       = pm.cmap
-        class_dict['dmap']       = pm.dmap
-        class_dict['rmap']       = pm.rmap
-        class_dict['wmap']       = pm.wmap
-        class_dict['qmap']       = pm.qmap
-        class_dict['fields']     = pm.names
-        class_dict['_empty']     = empty
-        class_dict['_schema']    = schema
-        class_dict['_qschema']   = qschema
-        class_dict['_format']    = pm.fmt
-        class_dict['skeleton']   = skeleton
-        class_dict['_validate']  = Schema(schema, required=True, extra=True)
-        class_dict['_qvalidate'] = Schema(qschema)
+        class_dict['name']      = model_name
+        class_dict['cmap']      = pm.cmap
+        class_dict['dmap']      = pm.dmap
+        class_dict['rmap']      = pm.rmap
+        class_dict['wmap']      = pm.wmap
+        class_dict['qmap']      = pm.qmap
+        class_dict['fields']    = pm.names
+        class_dict['_empty']    = empty
+        class_dict['_schema']   = schema
+        class_dict['_format']   = pm.fmt
+        class_dict['meta']      = meta
+        class_dict['_validate'] = Schema(schema, required=True, extra=True)
         model_class = type(model_name, (Item,), class_dict)
         model_class.create_collection()
         model_class.create_index(class_dict['index'])

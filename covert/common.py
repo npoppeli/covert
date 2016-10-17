@@ -13,7 +13,7 @@ except ImportError:
     from yaml import Loader
 
 # exceptions
-class Error(Exception):
+class InternalError(Exception):
     def __init__(self, message):
         self.message = message
     def __str__(self):
@@ -44,6 +44,11 @@ def str2int(s):
 #     if not target or not is_safe_url(target):
 #         target = default
 #     raise HTTPSeeOther(location=target)
+
+# JSend
+SUCCESS = 'success'
+FAIL    = 'fail'
+ERROR   = 'error'
 
 # YAML-related functions
 def read_file(filename):

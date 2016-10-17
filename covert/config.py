@@ -14,7 +14,7 @@ from . import setting
 from .model import read_models
 from .view import read_views
 from .layout import read_templates
-from .common import read_yaml_file, Error
+from .common import read_yaml_file, InternalError
 
 def parse_cmdline():
     """parse command line, return parsed argument list"""
@@ -62,7 +62,7 @@ def kernel_init():
     elif setting.dbtype == 'rethinkdb':
         from .engine.rethinkdb import init_storage
     else:
-        raise Error('Unknown storage engine: only MongoDB and RethinkDB are supported')
+        raise InternalError('Unknown storage engine: only MongoDB and RethinkDB are supported')
     init_storage()
 
     # read templates
@@ -96,14 +96,18 @@ def kernel_init():
         #for route in setting.routes:
         #    print(str(route))
         print('Application has {0} models'.format(len(setting.models)))
-        # for name in sorted(setting.models.keys()):
-        #     if name.endswith('Ref'):
-        #         print('Reference class', name)
-        #     else:
-        #         model = setting.models[name]
-        #         print('{0}\n{1}'.format(name, '-'*len(name)))
-        #         print('fields', model.fields)
-        #         for field_name, field in model.skeleton.items():
-        #             print("{0}: '{1}' schema={2} optional={3} multiple={4} auto={5}".\
-        #                 format(field_name, field.label, field.schema, field.optional, field.multiple, field.auto))
-        #         print('')
+        for name in sorted(setting.models.keys()):
+            if name.endswith('Ref'):
+                print('Reference class', name)
+            else:
+                model = setting.models[name]
+                print('{0}\n{1}'.format(name, '-'*len(name)))
+                fmt = "{:<15}: {:<15} {:<10} {!s:<10} {!s:<10} {!s:<10} {!s:<10}"
+                print(fmt.format('name', 'label', 'schema', 'optional',
+                                 'multiple', 'auto', 'formtype'))
+                print('-'*95)
+                for field_name in model.fields:
+                    meta = model.meta[field_name]
+                    print(fmt.format(field_name, meta.label, meta.schema, meta.optional,
+                                     meta.multiple, meta.auto, meta.formtype))
+            print('')
