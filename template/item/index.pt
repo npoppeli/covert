@@ -1,40 +1,42 @@
 <!--! cursor -->
-<form tal:define="cursor this['cursor']" class="form-inline" action="${cursor.action}" method="POST">
-  <input type="hidden" name="_incl0" value="${cursor.incl0}"/>
-  <input type="hidden" name="_skip"  value="${cursor.skip}" />
-  <input type="hidden" name="_query" value="${cursor.query}"/>
-  <div class="form-group">
-    <label for="incl" class="text-info control-label">Toon vervallen: </label>
-    <input type="checkbox" name="_incl" value="1" id="incl" tal:attributes="checked 'checked' if cursor.incl else default"/>
-  </div>
-  <div class="form-group">
-    <label for="limit" class="text-info control-label">Aantal items: </label>
-    <select class="form-control input-sm" name="_limit" id="limit">
-      <option tal:attributes="selected 'selected' if cursor.limit==5  else default">5</option>
-      <option tal:attributes="selected 'selected' if cursor.limit==10 else default">10</option>
-      <option tal:attributes="selected 'selected' if cursor.limit==15 else default">15</option>
-      <option tal:attributes="selected 'selected' if cursor.limit==20 else default">20</option>
-    </select>
-  </div>
-  <div class="form-group">
-    <button class="btn btn-default btn-sm" type="submit" name="_dir" value="-1"
-        tal:attributes="disabled 'disabled' if not cursor.prev else default"><span class="fa fa-chevron-left"></span></button>
-    <button class="btn btn-default btn-sm" type="submit" name="_dir" value="0"><span class="fa fa-refresh"></span></button>
-    <button class="btn btn-default btn-sm" type="submit" name="_dir" value="1"
-        tal:attributes="disabled 'disabled' if not cursor.next else default"><span class="fa fa-chevron-right"></span></button>
-  </div>
-</form>
-<!--! content -->
-<div tal:condition="len(this['content'])>0">
-  <table class='table table-bordered table-condensed' tal:define="content this['content']; ui this['ui']; fields content[0]['item'].keys()">
+<div style="margin-bottom:20px">
+  <form tal:define="cursor this['cursor']" class="form-inline" action="${cursor.action}" method="POST">
+    <input type="hidden" name="_incl0" value="${cursor.incl0}"/>
+    <input type="hidden" name="_skip"  value="${cursor.skip}" />
+    <input type="hidden" name="_query" value="${cursor.query}"/>
+    <div class="form-group">
+      <label for="incl" class="text-info control-label">Toon vervallen: </label>
+      <input type="checkbox" name="_incl" value="1" id="incl" tal:attributes="checked 'checked' if cursor.incl else default"/>
+    </div>
+    <div class="form-group">
+      <label for="limit" class="text-info control-label">Aantal items: </label>
+      <select class="form-control input-sm" name="_limit" id="limit">
+        <option tal:attributes="selected 'selected' if cursor.limit==5  else default">5</option>
+        <option tal:attributes="selected 'selected' if cursor.limit==10 else default">10</option>
+        <option tal:attributes="selected 'selected' if cursor.limit==15 else default">15</option>
+        <option tal:attributes="selected 'selected' if cursor.limit==20 else default">20</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <button class="btn btn-default btn-sm" type="submit" name="_dir" value="-1"
+          tal:attributes="disabled 'disabled' if not cursor.prev else default"><span class="fa fa-chevron-left"></span></button>
+      <button class="btn btn-default btn-sm" type="submit" name="_dir" value="0"><span class="fa fa-refresh"></span></button>
+      <button class="btn btn-default btn-sm" type="submit" name="_dir" value="1"
+          tal:attributes="disabled 'disabled' if not cursor.next else default"><span class="fa fa-chevron-right"></span></button>
+    </div>
+  </form>
+</div>
+<!--! data -->
+<div tal:condition="len(this['data'])>0">
+  <table class='table table-bordered table-condensed' tal:define="data this['data']; meta this['meta']; fields data[0]['item'].keys()">
   <thead>
   <tr>
-    <th tal:repeat="field fields">${ui[field]['label']}</th>
+    <th tal:repeat="field fields">${meta[field]['label']}</th>
     <th>&nbsp;</th>
   </tr>
   </thead>
   <tbody>
-   <tr tal:repeat="row content" tal:attributes="class 'text-muted' if row['item']['active'][0]=='n' else default">
+   <tr tal:repeat="row data" tal:attributes="class 'text-muted' if row['item']['active'][0]=='n' else default">
        <span tal:define="item row['item']" tal:repeat="field fields" tal:omit-tag="">
            <td tal:define="cell item[field]" tal:switch="isinstance(cell,tuple)">
                <span tal:case="True" tal:omit-tag=""><a href="${cell[1]}">${cell[0]}</a>&nbsp;</span>
@@ -49,9 +51,9 @@
   </tbody>
   </table>
 </div>
-<!--! feedback -->
-<div tal:condition="this['feedback']">
-  <p><span tal:content="structure this['feedback']"></span></p>
+<!--! message -->
+<div tal:condition="this['message']">
+  <p><span tal:content="structure this['message']"></span></p>
 </div>
 <!--! buttons -->
 <div>
