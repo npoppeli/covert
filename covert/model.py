@@ -29,7 +29,10 @@ from .atom import atom_map, EMPTY_DATETIME
 from .common import InternalError
 from . import setting
 
+# functions for flattening and unflattening items (documents)
 def _flatten(doc, prefix, keys):
+    """_flatten(doc) -> sequence
+    flatten is a generator to flatten documents. Used in Item.flatten()."""
     for key in [key for key in keys if key in doc.keys()]:  # keys in model order
         value = doc[key]
         sub_prefix = '{}{}.'.format(prefix, key)
@@ -47,23 +50,19 @@ def _flatten(doc, prefix, keys):
         else:  # scalar
             yield prefix + key, value
 
-def prune(doc, depth):
-    """prune(doc) -> newdoc
-       Prune a flattened document to given depth, where depth = key.count('.')
-    """
-    return OrderedDict((key, value) for (key, value) in doc.items() if key.count('.') <= depth)
-
 def unflatten(doc):
     """unflatten(doc) -> result
-       Unflatten document to (re)create hierarchical structure.
-       A flattened document has keys 'a' or 'a.b'. As preparation, the keys are
-       transformed into lists (25% faster than keeping them as strings), and
-       the document is transformed to a list of 2-tuples, sorted on key.
-    """
+    Unflatten document to (re)create hierarchical structure. A flattened document
+    has keys 'a', 'a.b', 'a.b.c' etcetera. As preparation, the keys are transformed
+    into lists (which makes the algorithm faster than when you keep the keys as strings),
+    and the document is transformed to a list of 2-tuples, sorted on key.
+ """
     list_rep = [(key.split('.'), doc[key]) for key in sorted(doc.keys())]
     return _unflatten(list_rep)
 
 def _unflatten(list_rep):
+    """_unflatten(doc) -> result
+    _unflatten is a generator to unflatten documents. Used in unflatten()."""
     result = {}
     car_list = [elt[0].pop(0) for elt in list_rep]  # take first element (car) from each key
     car_set = set(car_list)  # set of (unique) car's is the set of keys of result
