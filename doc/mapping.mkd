@@ -1,0 +1,9 @@
+Tree transformations are a cornerstone of the framework. There are two types
+of transformation maps: (1) dense or full maps, where every node has a mapping function,
+possibly the identity, or (2) spare maps, where a node has a mapping function only
+when necessary (other nodes get mapping function=None). Performance measurements
+show that option 2 is faster.
+
+Query transformations use 2-tuples and 3-tuples. The first member of the tuple is
+a 2-character operator: == for equal, =~ for regex match (Perl5 influence in a Python application),
+[] for 'between boundaries (boundaries included)' etcetera.
