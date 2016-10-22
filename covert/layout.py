@@ -1,8 +1,5 @@
 # -*- coding: utf-8 -*-
-"""
-covert.template
------
-Objects and functions related to templates.
+"""Objects and functions related to templates.
 """
 
 from os import walk
@@ -14,7 +11,7 @@ def read_templates():
     """read templates from layout directory"""
     template_types = ['.xml', '.pt']
     print('Scanning for templates in {0}'.format(setting.layout))
-    for (dirpath, _, filenames) in walk(setting.layout):
+    for (dirpath, __, filenames) in walk(setting.layout):
         prefix = relpath(dirpath, setting.layout)
         for filename in filenames:
             name, extension = splitext(filename)

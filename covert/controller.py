@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
-"""
-covert.server
------
-Objects and functions related to HTTP and WSGI servers.
+"""Classes and functions related to HTTP and WSGI servers.
+
 The switching router creates a response object with full HTML, partial HTML or JSON,
 depending on the request parameters.
 """
@@ -13,22 +11,25 @@ from . import setting
 from .report import logger
 
 def http_server(app, **kwarg):
+    """HTTP server for development purposes"""
     logger.debug('Starting HTTP server')
     # wrapped = ErrorMiddleware(app, debug=True)
     waitress.serve(app, **kwarg)
 
 def not_found(environ, start_response):
-    """Called if no URL matches."""
+    """Function that can be called by WSGI dispatcher if no URL matches"""
     start_response('404 Not Found', [('Content-Type', 'text/plain')])
     return ['Not Found']
 
 def bad_request(environ, start_response):
-    """Called if no app is available."""
+    """Function that can be called by WSGI dispatcher if no application
+    is available for the type of request
+    """
     start_response('400 Not Found', [('Content-Type', 'text/plain')])
     return ['Bad request']
 
 def exception_report(exc, ashtml=True):
-    """generate exception traceback"""
+    """Generate exception traceback, as plain text or HTML"""
     exc_type, exc_value, exc_trace = sys.exc_info()
     if ashtml:
         head = ["<h2>Internal error</h2>", "<p>Traceback (most recent call last:</p>"]
@@ -42,7 +43,10 @@ def exception_report(exc, ashtml=True):
     return '\n'.join(head+body+tail)
 
 class SwitchRouter:
-    """A WSGI application that serves as front-end to one or more web applications"""
+    """WSGI application that serves as front-end to one or more web applications.
+
+    This application ...
+    """
     # Operating modes
     STATIC_MODE  = 0 # static file
     PAGE_MODE    = 1 # complete HTML page
@@ -111,11 +115,12 @@ class SwitchRouter:
 
 
 class MapRouter:
-    """A WSGI application to dispatch on the first component of PATH_INFO using patterns.
-       This application uses a global route map to map a regular expression to a view and a route.
-       The route is a method of a view class. The view class is instantiated with two parameters:
-       the request object, and the match dict. Then the route method is called, which is expected to
-       return a render tree, a dictionary containing the content to be serialized and delivered.
+    """WSGI application that dispatches on the first component of PATH_INFO using patterns.
+
+    This application uses a global route map to map a regular expression to a view and a route.
+    The route is a method of a view class. The view class is instantiated with two parameters:
+    the request object, and the match dict. Then the route method is called, which is expected to
+    return a render tree, a dictionary containing the content to be serialized and delivered.
     """
 
     def __init__(self):
@@ -136,7 +141,7 @@ class MapRouter:
         req_path = request.path_info
         # find first route that matches request
         view_cls = None
-        for route in setting.routes: # route=(pattern, method, template, regex, cls, name)
+        for route in setting.routes: # route=(pattern, method, templates, regex, cls, name)
             match = route.regex.match(req_path)
             if route.method == req_method and match: # exit loop if matching route found
                 view_cls, route_name, route_templates = route.cls, route.name, route.templates
@@ -166,23 +171,33 @@ class MapRouter:
         return response(environ, start_response)
 
 class PageRouter(MapRouter):
+    """"Subclass of MapRouter for rendering complete HTML pages.
+
+    This application wraps the generated result in an HTML page.
+    The HTML page is defined by a template that is passed to the constructor method.
+    """
 
     def __init__(self, name):
-        """"PageRouter is a specialized MapRouter for rendering complete HTML pages.
-        The 'name' parameter is the name of the template used to render the content to
-        HTML. This should be a template for a complete HTML page."""
+        """"The 'name' parameter is the name of the template used to render the content to
+        HTML. This should be a template for a complete HTML page.
+        """
         super().__init__()
         self.content_type = 'text/html'
         self.template = name
 
     def finalize(self, result):
-        """finalize: remove empty/blank lines and initial whitespace of the other lines"""
+        """remove empty/blank lines and initial whitespace of the other lines"""
         page = setting.templates[self.template].render(content=result)
         trimmed = '\n'.join([line.lstrip() for line in page.splitlines()
                              if line and not line.isspace()])
         return trimmed
 
 class JSONRouter(MapRouter):
+    """"Subclass of MapRouter for generating JSON content.
+
+    This application sets the result type to application/json and returns
+    a JSON document with HTML encoding applied where necessary.
+    """
 
     def __init__(self):
         super().__init__()
