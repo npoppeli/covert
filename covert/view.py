@@ -11,10 +11,18 @@ import re
 from collections import OrderedDict
 from inspect import getmembers, isclass, isfunction
 from itertools import chain
-from .common import str2int, InternalError, SUCCESS, ERROR, FAIL
+from .common import InternalError, SUCCESS
 from .common import decode_dict, encode_dict
 from .model import unflatten, mapdoc
 from . import setting
+
+def str2int(s):
+    """convert str to integer, or otherwise 0"""
+    try:
+        number = int(s)
+    except:
+        number = 0
+    return number
 
 setting.icons = {
    'show'   : 'fa fa-eye',

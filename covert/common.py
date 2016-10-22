@@ -1,8 +1,5 @@
 # -*- coding: utf-8 -*-
-"""
-covert.common
------
-Objects and functions common to two or more modules in the package.
+"""Objects and functions common to two or more modules in the package.
 """
 
 import html, json
@@ -18,14 +15,6 @@ class InternalError(Exception):
         self.message = message
     def __str__(self):
         return repr(self.message)
-
-def str2int(s):
-    try:
-        number = int(s)
-    except:
-        number = 0
-    return number
-
 
 # HTTP-related functions
 # def is_safe_url(target, req):
@@ -68,6 +57,7 @@ def read_yaml_file(path, multi=False):
 
 # JSON-related functions
 class ExtendedEncoder(json.JSONEncoder):
+    """JSON encoder that can handle all atom types"""
     def default(self, obj):
         if isinstance(obj, (dict, list, tuple, int, float, bool, str)):
             return json.JSONEncoder.default(self, obj)
@@ -75,18 +65,25 @@ class ExtendedEncoder(json.JSONEncoder):
             return str(obj)
 
 def decode_dict(s):
+    """decode string s to JSON document"""
     return json.loads(html.unescape(s)) if s else {}
 
-def encode_dict(s):
-    return html.escape(json.dumps(s, separators=(',',':'), cls=ExtendedEncoder))
+def encode_dict(d):
+    """encode JSON document d to string"""
+    return html.escape(json.dumps(d, separators=(',',':'), cls=ExtendedEncoder))
 
 def show_dict(s):
+    """encode JSON document d to pretty-printed string"""
     return json.dumps(s, separators=(',',':'), sort_keys=True, indent=2, cls=ExtendedEncoder)
 
 
-# lightweight Trie data structure, based on an example by James Tauber
-# A Trie is a radix or prefix tree, and can be used to represent a dictionary, for example.
 class Trie:
+    """Trie data structure
+
+    Lightweight trie data structure, based on an example by James Tauber.
+    A Trie is a radix or prefix tree, and can be used to represent a dictionary or
+    classification scheme, for example.
+    """
     def __init__(self):
         self.root = [None, None, {}]
 

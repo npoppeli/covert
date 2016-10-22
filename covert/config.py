@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""
-covert.config
------
-Objects and functions related to the configuration.
+"""Objects and functions related to the configuration and the command line.
+
+Attributes:
+    config_default (dict): default values for configuration options
 """
 
 import argparse, sys
@@ -17,7 +17,14 @@ from .layout import read_templates
 from .common import read_yaml_file, InternalError
 
 def parse_cmdline():
-    """parse command line, return parsed argument list"""
+    """Parse command line
+
+    Parse command line and return parsed argument list.
+    Set global debug option if -d option present on command line.
+
+    Returns:
+        Namespace object: return value of parser.parse_args()
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument('-d', '--debug',  help='debug',  action='store_true', default=False)
     args = parser.parse_args()
@@ -28,7 +35,7 @@ config_default = dict(content='content', layout='layout',
                       models='models', views='views', language='en')
 
 def read_config():
-    """read configuration file, define global settings"""
+    """Read configuration file, define global settings"""
     setting.site = getcwd() # assumption: cwd == site directory
     sys.path.insert(0, setting.site)
     config_file = join(setting.site, 'config')
@@ -40,7 +47,6 @@ def read_config():
     setting.layout  = join(setting.site, config['layout'])
     setting.store_dbname  = config['dbname']
     setting.dbtype  = config['dbtype']
-    # I18N: partly here, partly in 'model' module
     setting.language = config['language'] if config['language'] in setting.languages\
                        else config_default['language']
     label_index = setting.languages.index(setting.language)
@@ -52,7 +58,7 @@ def read_config():
     for name in setting.labels.keys():
         parts = setting.labels[name].split('|')
         setting.labels[name] = parts[label_index]
-    #   keep original configuration
+    # save original configuration
     setting.config  = config
 
 def kernel_init():
