@@ -12,7 +12,7 @@ class Atom:
     """Instance of this class define the atomic constituents of items.
 
     Each item stored in the database is built from atoms or atomic constituents.
-    Examples are integer, float, boolean and text.
+    The standard atoms are: integer, float, boolean, date, time, datetime and text (3 types).
     Applications can define extra atoms with define_atom().
     """
 
@@ -45,7 +45,7 @@ class Atom:
 
 atom_map = {}
 def define_atom(name, **kwarg):
-    """Define new type of atom
+    """Define new type of atom.
 
     Arguments:
         name  (str): name of atom type
