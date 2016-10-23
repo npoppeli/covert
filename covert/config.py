@@ -35,7 +35,14 @@ config_default = dict(content='content', layout='layout',
                       models='models', views='views', language='en')
 
 def read_config():
-    """Read configuration file, define global settings"""
+    """Read configuration file.
+
+    Read configuration file and define global settings (variables in module 'setting')
+
+    Returns:
+        None
+    """
+
     setting.site = getcwd() # assumption: cwd == site directory
     sys.path.insert(0, setting.site)
     config_file = join(setting.site, 'config')
@@ -62,6 +69,14 @@ def read_config():
     setting.config  = config
 
 def kernel_init():
+    """Initialize kernel.
+
+    Initialize various parts of kernel (storage, layout, models, views).
+    Print debugging information if called with '-d' option.
+
+    Returns:
+        None
+    """
     # initialize storage
     if setting.dbtype == 'mongodb':
         from .engine.mongodb import init_storage
