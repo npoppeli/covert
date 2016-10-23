@@ -29,7 +29,15 @@ def bad_request(environ, start_response):
     return ['Bad request']
 
 def exception_report(exc, ashtml=True):
-    """Generate exception traceback, as plain text or HTML"""
+    """Generate exception traceback, as plain text or HTML
+
+    Arguments:
+        exc    (Exception): exception object
+        ashmtl (bool):      render as HTML (True) or plain text (False)
+
+    Returns:
+        str: exception report as plain or HTML text
+    """
     exc_type, exc_value, exc_trace = sys.exc_info()
     if ashtml:
         head = ["<h2>Internal error</h2>", "<p>Traceback (most recent call last:</p>"]
@@ -45,7 +53,11 @@ def exception_report(exc, ashtml=True):
 class SwitchRouter:
     """WSGI application that serves as front-end to one or more web applications.
 
-    This application ...
+    This WSGI application checks PATH_INFO and the 'X-Requested-With' request header
+    to determine what the operating mode is: static file, complete HTML page, HTML
+    fragment, XML document or JSON document. Each operating mode is handled by a
+    different WSGI application. These applications should be registered by calling
+    static(), page(), fragment(), xml() and json() methods.
     """
     # Operating modes
     STATIC_MODE  = 0 # static file
@@ -120,7 +132,10 @@ class MapRouter:
     This application uses a global route map to map a regular expression to a view and a route.
     The route is a method of a view class. The view class is instantiated with two parameters:
     the request object, and the match dict. Then the route method is called, which is expected to
-    return a render tree, a dictionary containing the content to be serialized and delivered.
+    return a render tree, a dictionary containing the content to be serialized and delivered. The
+    render tree is serialized by serialize(). The result of the serialization is processed by
+    finalize(). Sub-classes of MapRouter can redefine serialize() and finalize() to achieve
+    certain effects.
     """
 
     def __init__(self):
