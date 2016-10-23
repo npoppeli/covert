@@ -14,6 +14,9 @@ class Atom:
     Each item stored in the database is built from atoms or atomic constituents.
     The standard atoms are: integer, float, boolean, date, time, datetime and text (3 types).
     Applications can define extra atoms with define_atom().
+
+    Attributes:
+        * see constructor method
     """
 
     __slots__ = ('schema', 'convert', 'display', 'query', 'formtype', 'control',
@@ -21,7 +24,7 @@ class Atom:
 
     def __init__(self, schema, convert, display, query, formtype, control,
                  default='', read=None, write=None, enum=None):
-        """Initialize atom
+        """Initialize atom.
 
         Arguments:
             schema   (class):    class of atom, used for item validation
