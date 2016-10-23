@@ -142,10 +142,10 @@ class Item(BareItem):
             self['ctime'] = self['mtime']
         if validate:
             validate_result = self.validate(self)
-            if not validate_result['status']:
+            if validate_result['status'] != SUCCESS:
                 message = "document {}\ndoes not validate because of error\n{}\n".\
-                    format(self, validate_result['error'])
-                return {'status':FAIL, 'message':message}
+                    format(self, validate_result['data'])
+                return {'status':FAIL, 'data':message}
         try:
             doc = mapdoc(self.wmap, self)
             collection = setting.store_db[self.name]
@@ -164,7 +164,7 @@ class Item(BareItem):
         oid = self['_id']
         collection = setting.store_db[self.name]
         result = collection.update_one({'id':oid}, {'$set':{key:value}})
-        return {'status':'successs' if result.modified_count == 1 else FAIL, 'id': self['id']}
+        return {'status':SUCCESS if result.modified_count == 1 else FAIL, 'id': self['id']}
 
     def append_field(self, key, value):
         oid = self['_id']
