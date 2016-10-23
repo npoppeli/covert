@@ -1,8 +1,5 @@
 # -*- coding: utf-8 -*-
-"""
-covert.report
------
-Objects and functions related to reporting, logging etcetera.
+"""Objects and functions related to reporting and logging.
 """
 
 import logging
