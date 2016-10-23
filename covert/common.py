@@ -11,6 +11,11 @@ except ImportError:
 
 # exceptions
 class InternalError(Exception):
+    """Internal error exception.
+
+      Attributes:
+          messsage (str): human-readable string describing the exception
+      """
     def __init__(self, message):
         self.message = message
     def __str__(self):
@@ -41,13 +46,28 @@ ERROR   = 'error'
 
 # YAML-related functions
 def read_file(filename):
-    """read entire file, return content as one string"""
+    """Read entire text file.
+
+    Arguments:
+        filename (str): name of text file
+
+    Returns:
+        str: content as one string
+    """
     with open(filename, 'rU') as f:
         text = ''.join(f.readlines())
     return text
 
 def read_yaml_file(path, multi=False):
-    """read file, return YAML content as (list of) document(s)"""
+    """Read YAML file.
+
+    Arguments:
+        filename (str): name of YAML file
+        multi (bool): True if file can contain multiple documents
+
+    Returns:
+        list|dict: list of documents (multi is True) or single document (otherwise)
+    """
     with open(path, 'r') as f:
         if multi:
             result = list(load_all(f, Loader=Loader))
@@ -65,30 +85,36 @@ class ExtendedEncoder(json.JSONEncoder):
             return str(obj)
 
 def decode_dict(s):
-    """decode string s to JSON document"""
+    """Decode string to JSON document.
+
+    Arguments:
+        s (str): string in JSON notation
+
+    Returns:
+        list|dict: JSON document
+    """
     return json.loads(html.unescape(s)) if s else {}
 
 def encode_dict(d):
-    """encode JSON document d to string"""
+    """Encode JSON document to string.
+
+    Arguments:
+        d (dict): JSON document
+
+    Returns:
+        str: content as one string
+    """
     return html.escape(json.dumps(d, separators=(',',':'), cls=ExtendedEncoder))
 
-def show_dict(s):
-    """encode JSON document d to pretty-printed string"""
-    return json.dumps(s, separators=(',',':'), sort_keys=True, indent=2, cls=ExtendedEncoder)
+def show_dict(d):
+    """Encode JSON document to pretty-printed string.
 
+    Arguments:
+        d (dict): JSON document
 
-class Trie:
-    """Trie data structure
-
-    Lightweight trie data structure, based on an example by James Tauber.
-    A Trie is a radix or prefix tree, and can be used to represent a dictionary or
-    classification scheme, for example.
+    Returns:
+        str: content as one pretty-printed string
     """
-    def __init__(self):
-        self.root = [None, None, {}]
+    return json.dumps(d, separators=(',',':'), sort_keys=True, indent=2, cls=ExtendedEncoder)
 
-    def __setitem__(self, path, value):
-        node = self.root
-        for edge in path:
-            node = node[2].setdefault(edge, [None, None, {}])
-        node[0] = value
+# Trie data structure: see http://jtauber.com/2005/02/trie.py for Python implementation
