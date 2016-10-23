@@ -445,7 +445,7 @@ class ItemView(BareItemView):
         form = self._convert_form()
         item.update(form)
         validation = item.validate(item)
-        if validation['ok']:
+        if validation['status'] == SUCCESS:
             result = item.write(validate=False)
             if result['status'] == SUCCESS:
                 tree = self.tree
@@ -480,9 +480,9 @@ class ItemView(BareItemView):
         #print('>> create: new item=')
         #for key, value in item.items():
         #    print("{:<10}: {}".format(key, value))
-        if validation['ok']:
+        if validation['status'] == SUCCESS:
             result = item.write(validate=False)
-            if result['ok']:
+            if result['status'] == SUCCESS:
                 tree = self.tree
                 tree.message = 'New item {}'.format(str(item))
                 return tree.add_item(item) \

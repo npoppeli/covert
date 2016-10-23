@@ -1,24 +1,24 @@
 # -*- coding: utf-8 -*-
-"""
-covert.model
------
-Objects and functions related to models. A model defines the structure
-of an item.
+"""Objects and functions related to models.
 
-A basic item is a simple dictionary. A more complicated item can also contain lists and
-dictionaries. This is fully recursive.  Instead of embedding a basic item of class B inside an
-item of class A, you can also add references to items of class B inside an item of class A
-('linking'). A reference to an item is essentially a 3-tuple (collection name, item id,
-string representation). The third item is dynamically computed upon using the item reference.
+A model defines the structure of an item. A basic item is a flat dictionary (all values are
+scalars). A more complicated item has lists and dictionaries as values. This is fully recursive.
 
-storage -> [JSON document] -> read -> [item] -> display -> [item stringified] -> HTML page
-HTML form -> [item stringified] -> convert -> [item] -> write -> [JSON document] -> storage
+Instead of embedding a basic item of class B inside an item of class A, you can also add
+references to items of class B inside an item of class A ('linking').
 
-TODO:
-- embedding and linking in show panels
-- embedding and linking in form panels
-- tools (JS) for adding, modifying and deleting item references
-- tools (JS) for adding, modifying and deleting sub-items
+A reference to an item is essentially a 3-tuple (collection name, item id, description).
+The third item is dynamically computed upon using the item reference.
+
+Various mappings take place:
+storage   -> [JSON document] -> read    -> [item] -> display -> [item']         -> HTML page
+HTML form -> [item']         -> convert -> [item] -> write   -> [JSON document] -> storage
+
+Todo:
+    * embedding in show panels
+    * embedding and linking in form panels
+    * tools for adding, modifying and deleting item references
+    * tools for adding, modifying and deleting sub-items
 """
 
 from bisect import bisect_left, bisect_right
@@ -26,13 +26,25 @@ from copy import deepcopy
 from collections import OrderedDict
 from voluptuous import Schema, Optional, MultipleInvalid
 from .atom import atom_map, EMPTY_DATETIME
-from .common import InternalError
+from .common import InternalError, SUCCESS, FAIL
 from . import setting
 
 # functions for flattening and unflattening items (documents)
 def _flatten(doc, prefix, keys):
-    """_flatten(doc) -> sequence
-    flatten is a generator to flatten documents. Used in Item.flatten()."""
+    """Generator for flattening an item (document).
+
+    The result of flattening an item is a flat dictionary. The keys of this flat dictionary are
+    the paths in the original item, e.g. 'children', 'children.0', 'children.0.firstname'
+    etcetera. This generator is used by Item.flatten().
+
+    Arguments:
+        doc (Item): original document
+        prefix (str): path prefix (for recursion)
+        keys: keys of doc, in model definition order
+
+    Yields:
+        (key, value): key-value pair to build up flat dictionaru
+    """
     for key in [key for key in keys if key in doc.keys()]:  # keys in model order
         value = doc[key]
         sub_prefix = '{}{}.'.format(prefix, key)
@@ -104,11 +116,13 @@ def mapdoc(fnmap, doc):
             result[key] = value
     return result
 
-# Atom defines: 'schema', 'convert', 'display', 'formtype', 'control', 'read', 'write', 'enum'
-# schema: used for Item._schema, for validation purposes
-# formtype, control, enum: used for UI metadata, supplemented by label
 
 class Field:
+    """Meta-data for one field in an item.
+    Atom defines: 'schema', 'convert', 'display', 'formtype', 'control', 'read', 'write', 'enum'
+    schema: used for Item._schema, for validation purposes
+    formtype, control, enum: used for UI metadata, supplemented by label
+    """
     __slots__ = ('label', 'schema', 'formtype', 'control', 'optional', 'multiple',
                  'auto', 'atomic',  'control', 'enum')
     def __init__(self, label, schema, formtype, optional=False, multiple=False,
@@ -123,21 +137,6 @@ class Field:
         self.atomic   = atomic
         self.enum     = enum
 
-class ParsedModel:
-    """ParsedModel: result of parsing model definition."""
-    def __init__(self):
-        self.names, self.index = [], []
-        self.fmt = ''
-        self.meta = OrderedDict()
-        self.empty = {}
-        self.schema = {}
-        self.rmap, self.wmap, self.dmap, self.cmap, self.qmap = {}, {}, {}, {}, {}
-
-# Document revisions
-# 1. If the number of revisions is low, keep all of them in the storage,
-#    and mark one of them as active.
-# 2. Otherwise, keep only the active revision in the item storage, and store
-#    backward deltas in a separate storage (use libdiff for text).
 
 class BareItem(dict):
     """
@@ -149,6 +148,15 @@ class BareItem(dict):
         - ctime  datetime  %  Created
         - mtime  datetime  %  Modified
         - active boolean   % _Active
+
+    Todo:
+        * item revisions (add 'rev' attribute)
+
+    Item revisions
+    1. If the number of revisions is low, keep all of them in the storage, and mark the
+    most recent one of them as the active revision.
+    2. Otherwise, keep only the active revision in the item storage, and store
+    backward deltas in a separate storage (use libdiff for text).
     """
     ba = atom_map['boolean']
     sa = atom_map['string']
@@ -207,17 +215,17 @@ class BareItem(dict):
         """
         validate(cls, doc): result
         Validate document and return
-        - {'ok': True, 'error':{} } if validation OK
-        - {'ok': False, 'error':{field1:error1, ...} } if validation not OK
+        - {'status': 'success', 'data':{} } if validation OK
+        - {'status': 'fail', 'error':{field1:error1, ...} } if validation not OK
         Class method: allows validation of search queries and items fresh from the storage.
         """
         validator = cls._validate
         try:
             _ = validator(doc)
-            return {'ok': True, 'error':{} }
+            return {'status': SUCCESS, 'error':{} }
         except MultipleInvalid as e:
             error = '; '.join([str(el) for el in e.errors ])
-            return {'ok': False, 'error':error }
+            return {'status': FAIL, 'error':error }
 
     @classmethod
     def lookup(cls, oid):
@@ -293,6 +301,16 @@ def ref_tuple(ref):
         item = model.lookup(ref.id)
         return str(item), '/{}/{}'.format(ref.collection.lower(), ref.id) # label, url
     
+class ParsedModel:
+    """ParsedModel: result of parsing model definition."""
+    def __init__(self):
+        self.names, self.index = [], []
+        self.fmt = ''
+        self.meta = OrderedDict()
+        self.empty = {}
+        self.schema = {}
+        self.rmap, self.wmap, self.dmap, self.cmap, self.qmap = {}, {}, {}, {}, {}
+
 def parse_model_def(model_def, model_defs):
     """parse definition of one model"""
     pm = ParsedModel() # parsed model definition
