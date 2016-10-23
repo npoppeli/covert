@@ -10,7 +10,9 @@ references to items of class B inside an item of class A ('linking').
 A reference to an item is essentially a 3-tuple (collection name, item id, description).
 The third item is dynamically computed upon using the item reference.
 
-Various mappings take place:
+Transformations are an important part of working with items. Each model has mapping functions for
+reading from/writing to storage, and for converting from/displaying as HTML (see diagram below).
+
 storage   -> [JSON document] -> read    -> [item] -> display -> [item']         -> HTML page
 HTML form -> [item']         -> convert -> [item] -> write   -> [JSON document] -> storage
 
@@ -19,6 +21,15 @@ Todo:
     * embedding and linking in form panels
     * tools for adding, modifying and deleting item references
     * tools for adding, modifying and deleting sub-items
+    * item revisions (add 'rev' attribute)
+    * labels in BareItem should become language-dependent
+    * 'active' attribute in BareItem is not auto, but has a default (True)
+
+Notes on item revisions
+1. If the number of revisions is low, keep all of them in the storage, and mark the
+   most recent one of them as the active revision.
+2. Otherwise, keep only the active revision in the item storage, and store
+   backward deltas in a separate storage (use libdiff for text).
 """
 
 from bisect import bisect_left, bisect_right
@@ -34,16 +45,16 @@ def _flatten(doc, prefix, keys):
     """Generator for flattening an item (document).
 
     The result of flattening an item is a flat dictionary. The keys of this flat dictionary are
-    the paths in the original item, e.g. 'children', 'children.0', 'children.0.firstname'
-    etcetera. This generator is used by Item.flatten().
+    the paths in the original item, e.g. 'children', 'children.0', 'children.0.firstname'.
+    This generator is used by Item.flatten().
 
     Arguments:
-        doc (Item): original document
-        prefix (str): path prefix (for recursion)
-        keys: keys of doc, in model definition order
+        doc (Item): original document.
+        prefix (str): path prefix (for recursion).
+        keys: keys of doc, in model definition order.
 
     Yields:
-        (key, value): key-value pair to build up flat dictionaru
+        (key, value): key-value pair to build up flat dictionary.
     """
     for key in [key for key in keys if key in doc.keys()]:  # keys in model order
         value = doc[key]
@@ -63,18 +74,33 @@ def _flatten(doc, prefix, keys):
             yield prefix + key, value
 
 def unflatten(doc):
-    """unflatten(doc) -> result
-    Unflatten document to (re)create hierarchical structure. A flattened document
-    has keys 'a', 'a.b', 'a.b.c' etcetera. As preparation, the keys are transformed
-    into lists (which makes the algorithm faster than when you keep the keys as strings),
-    and the document is transformed to a list of 2-tuples, sorted on key.
- """
+    """Unflatten item (document).
+
+    Unflatten item to (re)create hierarchical structure. A flattened document has keys 'a',
+    'a.b', 'a.b.c' etcetera. As preparation, the keys are transformed into lists (this speeds up
+    the unflattening), and the document is transformed to a list of 2-tuples, sorted on key.
+
+    Arguments:
+        doc (dict): flattened document.
+
+    Returns/Yields:
+        dict: unflattened item
+    """
     list_rep = [(key.split('.'), doc[key]) for key in sorted(doc.keys())]
     return _unflatten(list_rep)
 
 def _unflatten(list_rep):
-    """_unflatten(doc) -> result
-    _unflatten is a generator to unflatten documents. Used in unflatten()."""
+    """Function for unflattening an item (document).
+
+    This function is called by unflatten() to do the actual unflattening.
+
+    Arguments:
+        list_rep (list): list of (key, value) pairs, sorted on key, where each key is
+        a list derived from path (e.g. 'a', 'a.b' or 'a.b.0.c') by splitting on the '.'.
+
+    Returns:
+        list|dict: complete dict, or component thereof (dict, list).
+    """
     result = {}
     car_list = [elt[0].pop(0) for elt in list_rep]  # take first element (car) from each key
     car_set = set(car_list)  # set of (unique) car's is the set of keys of result
@@ -95,8 +121,17 @@ def _unflatten(list_rep):
         return result
 
 def mapdoc(fnmap, doc):
-    """mapdoc(doc) -> result
-       Map doc using functions in fnmap
+    """Map item (document) by applying functions in function map.
+
+    Map item (dictionary) by applying the functions in the function map 'fnmap'.
+    The keys of this map are the field names for a particular model.
+
+    Arguments:
+        fnmap (dict): dictionary of mapping functions.
+        doc (dict):   item to be mapped (transformed).
+
+    Returns/Yields:
+        dict: transformed item (document).
     """
     result = {}
     for key, value in doc.items():
@@ -119,14 +154,29 @@ def mapdoc(fnmap, doc):
 
 class Field:
     """Meta-data for one field in an item.
-    Atom defines: 'schema', 'convert', 'display', 'formtype', 'control', 'read', 'write', 'enum'
-    schema: used for Item._schema, for validation purposes
-    formtype, control, enum: used for UI metadata, supplemented by label
+
+    The meta-data of a field (component of an item) are derived from the atom and model definitions.
+
+    Attributes:
+        * see constructor method
     """
     __slots__ = ('label', 'schema', 'formtype', 'control', 'optional', 'multiple',
                  'auto', 'atomic',  'control', 'enum')
     def __init__(self, label, schema, formtype, optional=False, multiple=False,
                  control='input', auto=False, atomic=True, enum=None):
+        """Initialize object.
+
+        Arguments:
+            label    (str):   human-readable description of field
+            schema   (class): class of atom, used for item validation
+            formtype (str):   HTML form type
+            control  (str):   HTML input type
+            enum     (list):  range of allowed values for enumerated type
+            optional (bool):  True if field is optional
+            multiple (bool):  True if field is multiple (list)
+            auto     (bool):  True if field is auto(matic)
+            atomic   (bool):  True if field is atomic
+        """
         self.label    = label
         self.schema   = schema
         self.formtype = formtype
@@ -139,30 +189,22 @@ class Field:
 
 
 class BareItem(dict):
-    """
-    BareItem: base class for Item.
-    This class defines common data attributes and storage-independent methods.
-    model (%=auto):
-      BareItem:
-        - id     string    % _Id
-        - ctime  datetime  %  Created
-        - mtime  datetime  %  Modified
-        - active boolean   % _Active
+    """Base class for Item.
 
-    Todo:
-        * item revisions (add 'rev' attribute)
+    The BareItem class defines common data attributes and storage-independent methods.
 
-    Item revisions
-    1. If the number of revisions is low, keep all of them in the storage, and mark the
-    most recent one of them as the active revision.
-    2. Otherwise, keep only the active revision in the item storage, and store
-    backward deltas in a separate storage (use libdiff for text).
+    Attributes:
+        * id     (string):   unique id attribute (unique at least within the collection)
+        * ctime  (datetime): creation time (automatic)
+        * mtime  (datetime): modification time (automatic)
+        * active (boolean):  True if active item, False if inactive (deleted) item
     """
+    # basics
     ba = atom_map['boolean']
     sa = atom_map['string']
     da = atom_map['datetime']
     name = 'BareItem'
-    fields  = ['id', 'ctime', 'mtime', 'active']
+    fields = ['id', 'ctime', 'mtime', 'active']
     # validation
     _schema   = {'id':sa.schema, 'ctime':da.schema, 'mtime':da.schema, 'active': ba.schema}
     _validate = None
@@ -172,19 +214,21 @@ class BareItem(dict):
     dmap  = {'ctime':da.display, 'mtime':da.display, 'active': ba.display}
     rmap = {}
     wmap = {}
-    # meta
+    # metadata
     meta = OrderedDict()
-    # TODO: labels should become language-dependent
-    # TODO: 'active' is not auto, but has a default (True)
     meta['id']     = Field(label='Id',       schema='string',   formtype='hidden',  auto=True)
     meta['ctime']  = Field(label='Created',  schema='datetime', formtype='hidden',  auto=True)
     meta['mtime']  = Field(label='Modified', schema='datetime', formtype='hidden',  auto=True)
     meta['active'] = Field(label='Actief',   schema='boolean',  formtype='boolean', auto=False)
 
     def __init__(self, doc=None):
-        """
-        __init__(self, doc)
-        Create new item, initialize from 'doc' (if available).
+        """Initialize item.
+
+        Initialize item in steps: (1) super-class initialization, (2) set fields to
+        None or [], (3) add fields from 'doc' (if available)*[]:
+
+        Arguments:
+            * doc (dict): item read from storage.
         """
         super().__init__()
         for field in self.fields:
@@ -194,63 +238,82 @@ class BareItem(dict):
 
     @classmethod
     def empty(cls):
-        """
-        empty(cls): item
-        Create new empty item
-        """
+        """Create new empty item."""
         item = cls()
         item.update(cls._empty)
         return item
 
     _format = 'Item {id}'
     def __str__(self):
+        """Informal string representation of item.
+
+        Returns:
+            str: human-readable representation.
+        """
         return self._format.format(**self)
 
     def __repr__(self):
+        """Formal string representation of item.
+
+        Returns:
+            str: representation for Python interpreter.
+        """
         content = ', '.join(["'{}':'{}'".format(key, self.get(key, '')) for key in self.fields])
         return '{}({})'.format(self.__class__.__name__, content)
 
     @classmethod
     def validate(cls, doc):
-        """
-        validate(cls, doc): result
-        Validate document and return
-        - {'status': 'success', 'data':{} } if validation OK
-        - {'status': 'fail', 'error':{field1:error1, ...} } if validation not OK
-        Class method: allows validation of search queries and items fresh from the storage.
+        """Validate item.
+
+        Validate document using class-specific validation function.
+
+        Arguments:
+            * doc (dict): item to be validated.
+
+        Returns:
+            * {'status': 'success', 'data':{} }                   if validation OK
+            * {'status': 'fail',    'data':{field1:error1, ...} } if validation not OK
         """
         validator = cls._validate
         try:
             _ = validator(doc)
-            return {'status': SUCCESS, 'error':{} }
+            return {'status': SUCCESS, 'data':{} }
         except MultipleInvalid as e:
             error = '; '.join([str(el) for el in e.errors ])
-            return {'status': FAIL, 'error':error }
+            return {'status': FAIL, 'data':error }
 
     @classmethod
     def lookup(cls, oid):
-        """
-        lookup(cls, oid): item
-        Return trivial item (method is redefined in Item class)
-        oid: object id (string)
+        """Retrieve item with id=oid from storage.
+
+        This is a trivial implementation, overridden by sub-classes.
+
+        Arguments:
+            * oidd (str): item id.
         """
         item = {'id':oid}
         return cls(item)
 
     @classmethod
     def convert(cls, doc):
-        """
-        convert(cls, doc): item
+        """Convert item from string form to actual, typed form.
+
         Convert item with only string values to item with typed values.
+
+        Arguments:
+            * doc (dict): item read from HTML form.
         """
         item = cls()
         item.update(mapdoc(cls.cmap, doc))
         return item
 
     def display(self):
-        """
-        display(self): newitem
+        """Convert item to string form.
+
         Convert item with typed values to item with only string values.
+
+        Returns:
+            dict: item with only string fields.
         """
         cls = self.__class__
         item = cls()
@@ -258,8 +321,12 @@ class BareItem(dict):
         return item
 
     def flatten(self):
-        """flatten(self) -> dict
-           Flatten item (document with hierarchical structure) to flat dictionary.
+        """Flatten item (document).
+
+        Flatten item (document with hierarchical structure) to flat dictionary.
+
+        Returns:
+            dict: fla item.
         """
         flat_dict = OrderedDict()
         for key, value in _flatten(self, '', self.fields):
@@ -267,9 +334,12 @@ class BareItem(dict):
         return flat_dict
 
     def copy(self):
-        """
-        copy(self): newitem
+        """Make deep copy of item.
+
         Make deep copy of item, erasing the 'auto' fields, so that it looks new.
+
+        Returns:
+            dict: copy of item with 'auto' fields set to 'None'.
         """
         cls = self.__class__
         item = cls()
@@ -281,19 +351,59 @@ class BareItem(dict):
         return item
 
 class ItemRef:
+    """Reference to Item"""
     collection = 'Item'
+
     def __init__(self, objectid):
+        """Initialize item reference.
+
+        Arguments:
+            objectid: id of item.
+        """
         self.id = objectid
         self.str = ''
+
     def __str__(self):
+        """Informal string representation of item reference.
+
+        Returns:
+            str: human-readable representation.
+        """
         return self.__repr__()
+
     def __repr__(self):
+        """Formal string representation of item reference.
+
+        Returns:
+            str: representation for Python interpreter.
+        """
         return "{}({}, {})".format(self.__class__.__name__, self.collection, self.id)
 
 def get_objectid(ref):
+    """Retrieve objectid from item reference.
+
+    This function is used as the write map for an item reference.
+
+    Arguments:
+        ref (itemref): item reference.
+
+    Returns/Yields:
+        str: item reference.
+    """
     return ref.id
 
+# display map for ItemRef
 def ref_tuple(ref):
+    """Generate display form of item reference.
+
+    This function is used as the display map for an item reference.
+
+    Arguments:
+        ref (itemref): item reference.
+
+    Returns/Yields:
+        (str, str): label, URL.
+    """
     if ref.id is None:
         return '', ''
     else:
@@ -302,8 +412,24 @@ def ref_tuple(ref):
         return str(item), '/{}/{}'.format(ref.collection.lower(), ref.id) # label, url
     
 class ParsedModel:
-    """ParsedModel: result of parsing model definition."""
+    """Result of parsing a model definition.
+
+    Attributes:
+        names  (list):        field names
+        index  (list):        indexed fields
+        fmt    (str):         format string for string representation
+        meta   (OrderedDict): meta-data
+        empty  (dict):        empty item
+        schema (dict):        schema for validation
+        rmap   (dict):        read map
+        wmap   (dict):        write map
+        dmap   (dict):        display map
+        cmap   (dict):        convert map
+        qmap   (dict):        query map (variation on 'cmap')
+    """
+
     def __init__(self):
+        """Construct parsed model definition."""
         self.names, self.index = [], []
         self.fmt = ''
         self.meta = OrderedDict()
@@ -312,7 +438,13 @@ class ParsedModel:
         self.rmap, self.wmap, self.dmap, self.cmap, self.qmap = {}, {}, {}, {}, {}
 
 def parse_model_def(model_def, model_defs):
-    """parse definition of one model"""
+    """Parse definition of one model.
+
+    Arguments:
+        model_def (dict):
+        model_defs (list): list of all model definitions
+                           (needed for forward references to inner classes)
+    """
     pm = ParsedModel() # parsed model definition
     label_index = setting.languages.index(setting.language)
     for line in model_def:
@@ -393,14 +525,21 @@ def parse_model_def(model_def, model_defs):
     return pm
 
 def read_models(model_defs):
-    """
-    Read model definitions from 'model' section of configuration file (YAML), and
+    """Read model definitions from 'model' section of configuration file.
+
+     Read model definitions from 'model' section of configuration file (YAML), and
     dynamically create subclasses of the parent class Item. The parent class
     depends on the storage engine, so this is determined by the configuration file.
     The 'model' section is a dict, with key=class name, and value=list of fields
 
     Note: do not set class attributes that shadow a dictionary method, e.g. 'keys'.
     Class attribute 'index' is allowed, since it is a sequence method.
+
+    Arguments:
+        model_defs (list): list of model definitions.
+
+    Returns:
+        None: adds parsed models to global variable' models'.
     """
     if setting.config['dbtype'] == 'mongodb':
         from .engine.mongodb import Item
@@ -418,8 +557,8 @@ def read_models(model_defs):
         ref_class.collection = model_name
         setting.models[ref_name] = ref_class
     for model_name in model_names: # build actual (outer) classes
-        model_def, class_dict = model_defs[model_name], {}
-        class_dict['index'] = [ ('id', 1) ]
+        model_def = model_defs[model_name]
+        class_dict = {'index', [('id', 1)]}
         pm = parse_model_def(model_def, model_defs) # pm: instance of class ParsedModel
         pm.names.extend(Item.fields)
         class_dict['index'].extend(pm.index)
