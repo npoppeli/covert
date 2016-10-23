@@ -8,7 +8,13 @@ from chameleon import PageTemplateFile
 from . import setting
 
 def read_templates():
-    """read templates from layout directory"""
+    """Read templates from layout directory.
+
+    Read templates, compile them and store compiled templates in global variable 'templates'.
+
+    Returns:
+        None
+    """
     template_types = ['.xml', '.pt']
     print('Scanning for templates in {0}'.format(setting.layout))
     for (dirpath, __, filenames) in walk(setting.layout):
