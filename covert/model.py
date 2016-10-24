@@ -558,7 +558,7 @@ def read_models(model_defs):
         setting.models[ref_name] = ref_class
     for model_name in model_names: # build actual (outer) classes
         model_def = model_defs[model_name]
-        class_dict = {'index', [('id', 1)]}
+        class_dict = {'index': [('id', 1)]}
         pm = parse_model_def(model_def, model_defs) # pm: instance of class ParsedModel
         pm.names.extend(Item.fields)
         class_dict['index'].extend(pm.index)
