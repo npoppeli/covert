@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
-"""Objects and functions related to templates.
+"""Objects and functions related to layout.
+
+The layout of HTML pages, and HTML and XML fragments is specified by templates.
+In the current implementation only Chameleon templates are supported.
 """
 
 from os import walk
