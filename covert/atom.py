@@ -69,7 +69,7 @@ true_strings = ('j', 'ja') # TODO: I18N
 # EN: yes/no or y/n, SV: ja/nej
 bool_repr = {True:'ja', False:'nee'}   # TODO: I18N
 
-boolean_convert = lambda x: x.lower() in true_strings,
+boolean_convert = lambda x: x.lower() in true_strings
 define_atom('boolean',
             schema   = bool,
             convert  = boolean_convert,
