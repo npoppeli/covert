@@ -94,7 +94,7 @@ define_atom('date',
             control  = 'input'
             )
 
-datetime_convert =lambda x: datetime.strptime(x, "%Y-%m-%dT%H:%M:%S")
+datetime_convert = lambda x: datetime.strptime(x, "%Y-%m-%dT%H:%M:%S")
 define_atom('datetime',
             schema   = datetime,
             convert  = datetime_convert,
