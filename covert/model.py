@@ -22,7 +22,7 @@ Todo:
     * tools for adding, modifying and deleting item references
     * tools for adding, modifying and deleting sub-items
     * item revisions (add 'rev' attribute)
-    * labels in BareItem should become language-dependent
+    * make labels in BareItem language-dependent (I18N)
     * 'active' attribute in BareItem is not auto, but has a default (True)
 
 Notes on item revisions
@@ -146,6 +146,7 @@ def mapdoc(fnmap, doc):
                 else: # list of scalars
                     result[key] = [fnmap[key](element) for element in value]
             else: # scalar
+                print(">> mapdoc: key={} value={} fn={}".format(key, value, fnmap[key]))
                 result[key] = fnmap[key](value)
         else: # no mapping for this element
             result[key] = value
@@ -210,8 +211,8 @@ class BareItem(dict):
     _validate = None
     _empty    = {'id':'', 'ctime':EMPTY_DATETIME, 'mtime':EMPTY_DATETIME, 'active':True}
     # transformation
-    cmap  = {'ctime':da.convert, 'mtime':da.convert, 'active': ba.convert}
-    dmap  = {'ctime':da.display, 'mtime':da.display, 'active': ba.display}
+    cmap = {'ctime':da.convert, 'mtime':da.convert, 'active': ba.convert}
+    dmap = {'ctime':da.display, 'mtime':da.display, 'active': ba.display}
     rmap = {}
     wmap = {}
     # metadata
@@ -232,7 +233,8 @@ class BareItem(dict):
         """
         super().__init__()
         for field in self.fields:
-            self[field] = [] if self.meta[field].multiple else None
+            if not self.meta[field].optional:
+                self[field] = [] if self.meta[field].multiple else None
         if doc:
             self.update(mapdoc(self.rmap, doc))
 
@@ -289,7 +291,7 @@ class BareItem(dict):
         This is a trivial implementation, overridden by sub-classes.
 
         Arguments:
-            * oidd (str): item id.
+            * oid (str): item id.
         """
         item = {'id':oid}
         return cls(item)
@@ -304,6 +306,7 @@ class BareItem(dict):
             * doc (dict): item read from HTML form.
         """
         item = cls()
+        print(">> convert")
         item.update(mapdoc(cls.cmap, doc))
         return item
 
@@ -317,6 +320,7 @@ class BareItem(dict):
         """
         cls = self.__class__
         item = cls()
+        print(">> display")
         item.update(mapdoc(self.dmap, self))
         return item
 
@@ -473,7 +477,8 @@ def parse_model_def(model_def, model_defs):
         field_label = parts[label_index]
         if field_type[0] == '_': # embedded model (comparable to inner class)
             embedded = parse_model_def(model_defs[field_type], model_defs)
-            pm.empty[field_name] = [] if multiple_field else embedded.empty
+            if not optional_field:
+                pm.empty[field_name] = [] if multiple_field else embedded.empty
             pm.schema[schema_key] = [embedded.schema] if multiple_field else embedded.schema
             pm.meta[field_name] = Field(label=field_label, schema='dict',
                                         formtype='hidden', control='input',
@@ -503,7 +508,8 @@ def parse_model_def(model_def, model_defs):
             pm.wmap[field_name] = get_objectid # write only object id to database
             pm.qmap[field_name] = None
             empty_ref = ref_class(None)
-            pm.empty[field_name] = [] if multiple_field else empty_ref
+            if not optional_field:
+                pm.empty[field_name] = [] if multiple_field else empty_ref
             pm.schema[schema_key] = [ref_class] if multiple_field else ref_class
             pm.meta[field_name] = Field(label=field_label, schema='itemref',
                                         formtype='hidden', control='input',
@@ -516,7 +522,8 @@ def parse_model_def(model_def, model_defs):
             if atom.read:    pm.rmap[field_name] = atom.read
             if atom.write:   pm.wmap[field_name] = atom.write
             if atom.query:   pm.qmap[field_name] = atom.query
-            pm.empty[field_name] = [] if multiple_field else atom.default
+            if not optional_field:
+                pm.empty[field_name] = [] if multiple_field else atom.default
             pm.schema[schema_key] = [atom.schema] if multiple_field else atom.schema
             pm.meta[field_name] = Field(label=field_label, schema=field_type,
                                         formtype=atom.formtype, control=atom.control,
@@ -527,7 +534,7 @@ def parse_model_def(model_def, model_defs):
 def read_models(model_defs):
     """Read model definitions from 'model' section of configuration file.
 
-     Read model definitions from 'model' section of configuration file (YAML), and
+    Read model definitions from 'model' section of configuration file (YAML), and
     dynamically create subclasses of the parent class Item. The parent class
     depends on the storage engine, so this is determined by the configuration file.
     The 'model' section is a dict, with key=class name, and value=list of fields

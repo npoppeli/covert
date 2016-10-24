@@ -404,7 +404,12 @@ class RenderTree:
 
     def flatten_item(self):
         """Flatten the item in the render tree."""
-        self.data = self.data.display().flatten()
+        print('>> flatten_item: item={}'.format(self.data))
+        r1 = self.data.display()
+        print('>> flatten_item: item.display={}'.format(r1))
+        r2 = r1.flatten()
+        print('>> flatten_item: flattened={}'.format(r2))
+        self.data = r2
         return self
 
     def flatten_items(self):
@@ -614,6 +619,7 @@ class ItemView(BareItemView):
             tree.style = 1
             tree.message = 'Modified item {} has validation errors {}'.\
                             format(str(item), validation['data'])
+            print(">>update: item has validation errors", tree.message)
             return tree.add_item(item)\
                        .add_form_buttons('update', 'PUT')\
                        .flatten_item()\
