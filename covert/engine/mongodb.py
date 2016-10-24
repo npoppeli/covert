@@ -1,8 +1,12 @@
 # -*- coding: utf-8 -*-
-"""
-covert.engine.mongodb
------
-Objects and functions related to the MongoDB storage engine.
+"""Objects and functions related to the MongoDB storage engine.
+
+This module defines the Item class and an initialization function for the storage engine.
+The Item class encapsulates the details of the storage engine.
+
+Todo:
+    * make database connection thread-safe
+    * text index via Collection.ensureIndex({'author': 'text', 'content': 'text'})
 """
 
 from datetime import datetime
@@ -19,8 +23,11 @@ query_map = {
 }
 
 def translate_query(query):
-    """translate_query(query) -> result
-       Translate query to a form suitable for this storage engine.
+    """Translate query to form suitable for this storage engine.
+
+    In the view methods, queries are specified as sequences of tuples (op, value) or (op, value1,
+    value2) where 'op' is a 2-character string specifying a search operator, and 'value' is a
+    value used in the search. The translation to MongoDB form is given by 'query_map'.
     """
     result = {}
     for key, value in query.items():
@@ -42,21 +49,23 @@ def translate_query(query):
     return result
 
 def init_storage():
+    """Initialize storage engine."""
     print('Creating MongoDB connection')
-    setting.store_connection = MongoClient() # TODO: make this thread-safe
+    setting.store_connection = MongoClient()
     print('Setting MongoDB database to', setting.store_dbname)
     setting.store_db = setting.store_connection[setting.store_dbname]
 
 class Item(BareItem):
-    """
-    Item: class for reading and writing objects from/to a particular form of storage.
-    This class adds storage-dependent methods to the base class.
+    """Class for reading and writing objects from/to this storage engine.
+
+    This class adds storage-dependent methods to the base class BareItem.
     """
     @classmethod
     def create_collection(cls):
-        """
-        create_collection(cls)
-        Create collection cls.name, unless this is already present.
+        """Create collection cls.name, unless this is already present.
+
+        Returns:
+            return value of Database.create_collection()
         """
         coll_list = setting.store_db.collection_names()
         if cls.name not in coll_list:
@@ -64,74 +73,108 @@ class Item(BareItem):
 
     @classmethod
     def create_index(cls, index_keys):
-        """
-        create_index(cls)
+        """Create index on index_keys.
+
         Create index on index_keys, unless this index is already present.
-        index_keys is a list of 2-tuples (name, direction), where direction is 1 or -1
-        TODO: text index via coll.ensureIndex({'author': 'text', 'content': 'text'})
+
+        Arguments:
+            index_keys (list): list of 2-tuples (name, direction), where direction is 1 or -1
+
+        Returns:
+            return value of Collection.ensure_index()
         """
         collection = setting.store_db[cls.name]
         collection.ensure_index(index_keys, unique=False)
 
     @classmethod
     def query(cls, doc):
-        """
-        query(cls, doc): dict
-        Make query from dictionary doc.
+        """Create query.
+
+        Create query from dictionary doc.
+
+        Arguments:
+            doc (dict): dictionary specifying a search query.
+
+        Returns:
+            dict: query in MongoDB form.
         """
         return translate_query(doc)
 
     @classmethod
     def count(cls, doc):
-        """
-        count(cls, doc): integer
-        Find zero or more documents in collection, and count them.
-        doc: dictionary specifying the query, e.g. {'id': '1234'}
+        """Count items in collection that match a given query.
+
+        Find zero or more items (documents) in collection, and count them.
+        Arguments:
+            doc (dict): dictionary specifying the query, e.g. {'id': '1234'}
+
+        Returns:
+            int: number of matchhing items.
         """
         sequence = setting.store_db[cls.name].find(filter=cls.query(doc))
         return sequence.count()
 
     @classmethod
     def find(cls, doc, skip=0, limit=0, sort=None):
-        """
-        find(cls, doc): list
-        Find zero or more documents in collection, and return these in the
+        """Retrieve items from collection.
+
+        Find zero or more items in collection, and return these in the
         form of a list of 'cls' instances. Assumption: stored documents are valid.
-        doc: dictionary specifying the query, e.g. {'id': '1234'}
+        Arguments:
+            doc   (dict): dictionary specifying the query, e.g. {'id': '1234'}.
+            skip  (int):  number of items to skip.
+            limit (int):  maximum number of items to retrieve.
+            sort  (list): sort specification.
+
+        Returns:
+            list: list of 'cls' instances.
         """
         sequence = setting.store_db[cls.name].find(filter=cls.query(doc),
                                                    skip=skip, limit=limit, sort=sort)
-        result = [cls(item) for item in sequence]
-        return result
+        return [cls(item) for item in sequence]
 
     @classmethod
     def lookup(cls, oid):
-        """
-        lookup(cls, oid): item
-        Return first item in collection matching the given primary key (id),
+        """Retrieve one item from collection.
+
+        Retrieve first item in collection matching the given primary key (id),
         or None if no item matches this key.
-        oid: primary key (string)
+
+        Arguments:
+           oid (str): value of 'id' attribute.
+
+        Returns:
+            'cls' instance
         """
         item = setting.store_db[cls.name].find_one({'id':oid})
         return cls(item)
 
     @classmethod
     def read(cls, doc):
-        """
-        read(cls, doc): item
-        Return first item in collection matching the given query,
-        or None if no item matches this query.
-        doc: dictionary specifying the query, e.g. {'id': 1234}
+        """Retrieve one item from collection.
+
+        Retrieve first item in collection matching the given query (doc),
+        or None if no item matches this key.
+
+        Arguments:
+           doc (dict): search query.
+
+        Returns:
+            'cls' instance.
         """
         item = setting.store_db[cls.name].find_one(cls.query(doc))
         return cls(item)
 
     def write(self, validate=True):
-        """
-        write(self): id
+        """Write document to permanent storage.
+
         Save document contained in this instance.
-        TODO: use JSend specification in write(), set_field(), append_field(), remove()
-        Return value {'status':SUCCESS, 'id':<document id>} or {'status':FAIL, 'id':None}.
+
+        Arguments:
+            validate (bool): if True, validate this document before writing.
+
+        Returns:
+            dict: 'status':SUCCESS, 'id':<document id>} or {'status':FAIL, 'id':None}.
         """
         new = getattr(self, 'id', '') == ''
         self['mtime'] = datetime.now()
@@ -161,21 +204,43 @@ class Item(BareItem):
 
     # methods to set references (update database directly)
     def set_field(self, key, value):
+        """Set one field in item to new value, directly in database.
+
+        Arguments:
+           key   (str):    name of field.
+           value (object): value of field.
+
+        Returns:
+            dict: 'status':SUCCESS, 'id':<document id>} or {'status':FAIL, 'id':None}.
+        """
         oid = self['_id']
         collection = setting.store_db[self.name]
         result = collection.update_one({'id':oid}, {'$set':{key:value}})
         return {'status':SUCCESS if result.modified_count == 1 else FAIL, 'id': self['id']}
 
     def append_field(self, key, value):
+        """Append value to list-valed field in item, directly in database.
+
+        Arguments:
+           key   (str):    name of (list-valued) field.
+           value (object): additional value of field.
+
+        Returns:
+            dict: 'status':SUCCESS, 'id':<document id>} or {'status':FAIL, 'id':None}.
+        """
         oid = self['_id']
         collection = setting.store_db[self.name]
         result = collection.update_one({'_id':oid}, {'$addToSet':{key:value}})
         return {'status':SUCCESS if result.modified_count == 1 else FAIL, 'id': self['id']}
 
     def remove(self):
-        """
-        remove(self): doc
+        """Remove item from collection (permanently).
+
         Remove item from collection.
+
+        Returns:
+        Returns:
+            dict: 'status':SUCCESS, 'id':<document id>} or {'status':FAIL, 'id':None}.
         """
         oid = self['_id']
         collection = setting.store_db[self.name]
