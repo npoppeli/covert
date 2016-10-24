@@ -1,10 +1,20 @@
 # -*- coding: utf-8 -*-
-"""
-covert.view
------
-Objects and functions related to view(s).
-In the present implementation, form validation is performed on the server. In a future version
-it could be delegated to the client, using Parsley.js (jQuery) for example.
+"""Objects and functions related to view(s).
+
+Views are classes consisting of route methods and other methods. The route methods
+are decorated by '@route'. Each route has a URL pattern, one or more HTTP methods,
+and one or more templates.
+
+In the present implementation, form validation is performed on the server. Alternative:
+do form validation in the client, using Parsley.js (jQuery) for example.
+
+Todo:
+    * I18N of setting.labels and messages
+    * authorization determines icon and button states (enabled, disabled)
+    * add 'import' method (form-based file upload, CSV and JSON)
+    * ItemView.sort should not depend on db engine
+    * ItemView.sort: passing to render tree methods is awkward
+    * Use Mirage (JS) for client-side generation of search queries
 """
 
 import re
@@ -17,7 +27,7 @@ from .model import unflatten, mapdoc
 from . import setting
 
 def str2int(s):
-    """convert str to integer, or otherwise 0"""
+    """Convert str to integer, or otherwise 0."""
     try:
         number = int(s)
     except:
@@ -42,7 +52,7 @@ setting.icons = {
 }
 
 def icon_for(name):
-#TODO: authorization determines the state (enabled, disabled)
+    """Return icon for route 'name'."""
     return setting.icons.get(name, 'fa fa-flash')
 
 setting.labels = {
@@ -63,20 +73,40 @@ setting.labels = {
 }
 
 def label_for(name):
+    """Return label for route 'name'."""
     return setting.labels.get(name, 'unknown')
 
 def url_for(view, name, item):
+    """Return URL for route 'name'."""
     url = setting.patterns[view+'_'+name].format(**item)
     return url
 
+# Routes
 class Route:
+    """Route definition.
+
+    The definitions of all routes in all views are stored in the global variable setting.routes.
+    """
     def __init__(self, pattern, method, templates, regex, cls, name):
+        """Constructor method for Route.
+
+        A Route object consists of (1) attributes that uniquely define the route,
+        and (2) attributes that are needed by the controller to call the route.
+
+        Attributes:
+            * pattern   (str):   URL pattern
+            * method    (str):   HTTP method
+            * templates (list):  list of template names (length of list >= 1)
+            * regex     (regex): compiled regular expression
+            * cls       (class): view class
+            * name      (str):   method name
+        """
         self.pattern = pattern
         self.method = method
         self.templates = templates
+        self.regex = regex
         self.cls = cls
         self.name = name
-        self.regex = regex
 
     def __str__(self):
         return("{0} {1} -> {2}:{3}, templates={4}".
@@ -84,15 +114,18 @@ class Route:
                       ', '.join(self.templates)))
 
 class route:
-    """
-    route: decorator for methods in a View class. This adds attributes to methods.
-    Once set, these attributes cannot be changed anymore.
-    @route(pattern, method, template)
-    - pattern: URL pattern, given as a format string
-    - method: string identifying HTTP method (e.g. 'GET' or 'GET, POST')
-    - template: name of template that renders the result of the view
+    """Decorator for methods in a View class.
+
+    This decorator adds attributes to methods. Once set, these attributes cannot be changed anymore.
     """
     def __init__(self, pattern, method='GET', template=''):
+        """Constructor for 'route' decorator.
+
+        Attributes:
+            * pattern  (str): URL pattern, given as a format string
+            * method   (str): string identifying HTTP method (e.g. 'GET' or 'GET, POST')
+            * template (str): name(s) of template(s) that render(s) the result of the view
+        """
         self.pattern  = pattern
         self.method   = method
         self.template = template
@@ -110,14 +143,49 @@ patterns = {
 }
 
 def split_route(pattern):
+    """Split route into components.
+
+    Split route into components: a combined split on '{' and '}' results in a list of lists,
+    and chain.from_iterable transforms this into a flat list.
+    Routing arguments should have this form: '{name:pattern}', where pattern is one of the keys
+    of the 'patterns' dictionary (see above).
+
+    Arguments:
+        pattern (str): URL pattern.
+
+    Returns:
+        list: components of URL pattern.
+    """
     return list(chain.from_iterable([p.split('}') for p in pattern.split('{')]))
 
 def route2pattern(pattern):
+    """Create formatting string from pattern.
+
+    Remove the pattern specifier from all routing arguments in 'pattern', so that
+    we get a pattern acceptable to str.format().
+
+    Arguments:
+        pattern (str): URL pattern.
+
+    Returns:
+        str: string formatting pattern.
+    """
     parts = split_route(pattern)
     parts[1::2] = list(map(lambda p: '{{{0}}}'.format(p.split(':')[0]), parts[1::2]))
     return ''.join(parts)
 
 def route2regex(pattern):
+    """Create regular expression string from pattern.
+
+    Translate the patterns in the routing arguments to regular expression notation, so
+    that we get a regular expression string.
+
+    Arguments:
+        pattern (str): URL pattern.
+
+    Returns:
+        str: regular expression string.
+    """
     def split_lookup(s):
         before, after = s.split(':')
         return before, patterns[after]
@@ -127,7 +195,23 @@ def route2regex(pattern):
     parts.append('$')
     return ''.join(parts)
 
+
+# Views
 def read_views(module):
+    """Read views from module object.
+
+    Read all views from the module object 'module'. A view is a class that is a sub-class of
+    BareItemView and has a name ending in 'View'.
+    In each view, locate the members that are of 'function' type and have a 'pattern'
+    attribute, indicating they have been decorated with '@route'. These members are
+    the routes of the application.
+
+    Arguments:
+        module (object): module object.
+
+    Returns:
+        None
+    """
     for class_name, view_class in getmembers(module, isclass):
         if (class_name in ['BareItemView', 'ItemView'] or
             not issubclass(view_class, BareItemView) or
@@ -136,7 +220,7 @@ def read_views(module):
         view_name = class_name.replace('View', '', 1).lower()
         view_class.view_name = view_name
         for member_name, member in getmembers(view_class, isfunction):
-            if hasattr(member, 'pattern'): # current member (method) is a route
+            if hasattr(member, 'pattern'): # this member (method) is a route
                 full_pattern  = '/' + view_name + member.pattern
                 pattern       = route2pattern(full_pattern)
                 regex         = route2regex(full_pattern)
@@ -159,11 +243,33 @@ def read_views(module):
     setting.routes.sort(key=lambda r: r.pattern, reverse=True)
 
 class Cursor:
+    """Representation of the state of browsing through a collection of items.
+
+    A cursor object represent the state of browsing through a collection of items.
+    In HTML pages the cursor is represented as a form, with several buttons and toggles.
+
+    For a few attributes, default values are defined in the 'default' dictionary.
+    """
     __slots__ = ['skip', 'limit', 'incl', 'incl0', 'dir',
                  'filter', 'query', 'prev', 'next', 'action', 'submit']
     default = {'skip':0, 'limit':10, 'incl':0, 'incl0':0, 'dir':0, 'submit':''}
 
     def __init__(self, request):
+        """Constructor method for Cursor.
+
+        Attributes:
+            * skip      (int):   URL pattern
+            * limit     (int):   HTTP method
+            * incl      (int):   1 if inactive items are included, 0 otherwise
+            * incl0     (int):   previous value of 'incl'
+            * dir       (int):   direction of browsing
+            * filter    (str):   filter to pass to storage engine
+            * query     (str):   query dictionary (saved in form)
+            * prev      (bool):  True if 'previous' button enabled
+            * next      (bool):  True if 'next' button enabled
+            * action    (str):   form action
+            * submit    (str):   value of the form button that was pressed
+        """
         initial = '_incl' not in request.params.keys()
         for key, value in self.default.items():
             setattr(self, key, value)
@@ -186,30 +292,48 @@ class Cursor:
         return dict([(key, getattr(self, key, '')) for key in self.__slots__])
 
 def normal_button(view_name, route_name, item):
-    # TODO: add 'enabled' attribute
+    """Create render-tree element for normal button."""
     return {'label': label_for(route_name), 'icon': icon_for(route_name),
             'action': url_for(view_name, route_name, item), 'method':'GET'}
 
 def form_button(view_name, route_name, item, button_name):
+    """Create render-tree element for form button."""
     return {'label': label_for(button_name), 'icon': icon_for(button_name),
             'name': button_name, 'method':'POST',
             'action': url_for(view_name, route_name, item)}
 
 def delete_button(view_name, route_name, item):
-    # TODO: add enabled; add data-prompt (Bootstrap JS)
+    """Create render-tree element for delete button."""
     return {'label': label_for(route_name), 'icon': icon_for(route_name),
             'action': url_for(view_name, route_name, item), 'method':'DELETE'}
 
 class RenderTree:
-    # elements listed here are included by RenderTree.asdict()
+    """Tree representation of information created by a route.
+
+    The information that is created by a route (view method) is collected in the render tree.
+    This is returned to the controller as a dictionary. The controller serializes this
+    dictionary and returns the result to the web client.
+
+    Some elements of the render tree are temporary (needed for the request handling). The other
+    attributes are specified by the class attribute 'nodes'. These attributes are used by the
+    asdict() method.
+    """
     nodes = ['buttons', 'cursor', 'data', 'message', 'meta', 'method', 'status', 'style']
     def __init__(self, request, model, view_name, route_name):
+        """Constructor method for RenderTree.
+
+        Attributes:
+            * request   (Request): HTTP request (WebOb)
+            * model     (Item):    model class
+            * view_name (str):     name of view class
+            * route_name(str):     name of route (view method)
+        """
+        # attributes for request handling
         self.request = request
         self.model = model
         self.view_name = view_name
         self.route_name = route_name
-        self.form = None
-        # content of render tree
+        # attributes that are used in rendering
         self.buttons = []
         self.cursor = None
         self.data = None
@@ -220,11 +344,13 @@ class RenderTree:
         self.style = 0
 
     def add_cursor(self, route_name):
+        """Add cursor object to render tree."""
         self.cursor = Cursor(self.request)
         self.cursor.action = url_for(self.view_name, route_name, {})
         return self
 
     def transform_query(self):
+        """Transform query given by cursor to actual query."""
         r1 = self.cursor.query
         # print('>> transform_query: cursor.query={}'.format(r1))
         r2 = unflatten(r1)
@@ -235,6 +361,7 @@ class RenderTree:
         return self
 
     def move_cursor(self):
+        """Move cursor to new position."""
         cursor = self.cursor
         # filter = user query + condition depending on 'incl'
         cursor.filter = {} if cursor.incl == 1 else {'active':('==', True)}
@@ -247,6 +374,7 @@ class RenderTree:
         return self
 
     def add_item(self, oid_or_item):
+        """Add item to render tree."""
         if isinstance(oid_or_item, str):
             item = self.model.lookup(oid_or_item)
         else:
@@ -256,10 +384,12 @@ class RenderTree:
         return self
 
     def add_empty_item(self):
+        """Add empty item to render tree."""
         self.data = self.model.empty()
         return self
 
     def add_items(self, buttons, sort):
+        """Add list of items to render tree."""
         items = self.model.find(self.cursor.filter,
                                 limit=self.cursor.limit, skip=self.cursor.skip, sort=sort)
         self.data = []
@@ -273,15 +403,18 @@ class RenderTree:
         return self
 
     def flatten_item(self):
+        """Flatten the item in the render tree."""
         self.data = self.data.display().flatten()
         return self
 
     def flatten_items(self):
+        """Flatten all items in the render tree."""
         for row in self.data:
             row['item'] = row['item'].display().flatten()
         return self
 
     def prune_item(self, depth, erase=False, form=False):
+        """Prune the item in the render tree."""
         item_meta = self.model.meta
         meta, item = OrderedDict(), OrderedDict()
         for key, value in self.data.items():
@@ -300,6 +433,7 @@ class RenderTree:
         return self
 
     def prune_items(self, depth):
+        """Prune all items in the render tree."""
         item_meta = self.model.meta
         meta, ready = OrderedDict(), False
         for row in self.data:
@@ -321,6 +455,7 @@ class RenderTree:
         return self
 
     def add_buttons(self, buttons):
+        """Add buttons (normal and delete) to render tree."""
         if self.data:
             item = self.data[0]['item'] if isinstance(self.data, list) else self.data
             self.buttons = [(delete_button if button == 'delete' else
@@ -328,6 +463,7 @@ class RenderTree:
         return self
 
     def add_form_buttons(self, route_name, method=None):
+        """Add form buttons to render tree."""
         if self.data:
             item = self.data
             self.buttons = [form_button(self.view_name, route_name, item, 'ok')]
@@ -336,25 +472,37 @@ class RenderTree:
         return self
 
     def add_search_button(self, route_name):
+        """Add search button to render tree."""
         if self.data:
             # item = self.data[0]['item']
             self.buttons = [form_button(self.view_name, route_name, {}, 'search')]
         return self
 
     def asdict(self):
+        """Create dictionary representation of render tree."""
         if self.cursor:
             self.cursor = self.cursor.asdict()
         return dict([(key, getattr(self, key)) for key in self.nodes])
 
 
 class BareItemView:
-    """
-    BareItemView: bare view that does not define routes. It serves as superclass for
+    """Bare view class.
+
+    This bare view class does not define routes. It serves as superclass for
     ItemView and for view classes that define their own specific routes.
     """
     model = 'BareItem'
     view_name = ''
+
     def __init__(self, request, matches, model, route_name):
+        """Constructor method for BareItemView.
+
+        Attributes:
+            * request (Request):    HTTP request (WebOb)
+            * params  (MultiDict):  request parameters (WebOb multi-dict)
+            * model   (Item):       model class
+            * tree    (RenderTree): render tree object
+        """
         self.request = request
         self.params = matches
         self.model = model
@@ -362,16 +510,18 @@ class BareItemView:
 
 
 class ItemView(BareItemView):
-    """
-    ItemView: superclass for views that implement the Atom Publishing protocol
-    (create, index, new, update, delete, edit, show) plus extensions.
+    """Base class for views that implement the Atom Publishing protocol.
+
+    ItemView is a base class for views that implement the Atom Publishing protocol:
+    create, index, new, update, delete, edit, show. It defines some extension methods
+    for searching, which is a variation of 'index'.
     """
     model = 'Item'
-    sort = [] # TODO: (1) should not depend on db engine; (2) passing to render tree methods is awkward
+    sort = []
 
     @route('/{id:objectid}', template='show')
     def show(self):
-        """show one item"""
+        """Show one item."""
         # TODO: delete button is enabled iff item.active
         return self.tree.add_item(self.params['id'])\
                         .add_buttons(['index', 'search', 'modify', 'delete'])\
@@ -381,7 +531,7 @@ class ItemView(BareItemView):
 
     @route('/index', method='GET,POST', template='index')
     def index(self):
-        """show multiple items (collection)"""
+        """Show multiple items (collection)."""
         # TODO: delete button is enabled iff item.active
         return self.tree.add_cursor('index')\
                         .move_cursor()\
@@ -393,7 +543,7 @@ class ItemView(BareItemView):
 
     @route('/search', template='form')
     def search(self):
-        """make a search form. Tip for later: Mirage (JS Gmeta for search queries)"""
+        """Make a search form."""
         return self.tree.add_empty_item()\
                         .add_search_button('match')\
                         .flatten_item()\
@@ -402,7 +552,7 @@ class ItemView(BareItemView):
 
     @route('/search', method='POST', template='index')
     def match(self):
-        """show the result list of a search"""
+        """Show the result list of a search."""
         return self.tree.add_cursor('search')\
                         .transform_query()\
                         .move_cursor()\
@@ -414,7 +564,7 @@ class ItemView(BareItemView):
 
     @route('/new', template='form')
     def new(self):
-        """make a form for new/create action"""
+        """Make a form for new/create action."""
         return self.tree.add_empty_item()\
                         .add_form_buttons('create')\
                         .flatten_item()\
@@ -423,7 +573,7 @@ class ItemView(BareItemView):
 
     @route('/{id:objectid}/modify', template='form')
     def modify(self):
-        """make a form for modify/update action"""
+        """Make a form for modify/update action."""
         return self.tree.add_item(self.params['id'])\
                         .add_form_buttons('update', 'PUT')\
                         .flatten_item()\
@@ -431,6 +581,7 @@ class ItemView(BareItemView):
                         .asdict()
 
     def _convert_form(self):
+        """Convert request parameters to form content in model shape."""
         raw_form = {}
         for key, value in self.request.params.items():
             if not key.startswith('_'):
@@ -439,7 +590,7 @@ class ItemView(BareItemView):
 
     @route('/{id:objectid}', method='PUT', template='show;form')
     def update(self):
-        """update an existing item"""
+        """Update an existing item."""
         # fetch item from database and update with converted form contents
         item = self.model.lookup(self.params['id'])
         form = self._convert_form()
@@ -457,12 +608,12 @@ class ItemView(BareItemView):
                            .asdict()
             else: # exception, under normal circumstances this should never occur
                 raise InternalError('Modified item {} could not be stored ({})'.\
-                            format(str(item), result['error']))
+                            format(str(item), result['data']))
         else:
             tree = self.tree
             tree.style = 1
             tree.message = 'Modified item {} has validation errors {}'.\
-                            format(str(item), validation['error'])
+                            format(str(item), validation['data'])
             return tree.add_item(item)\
                        .add_form_buttons('update', 'PUT')\
                        .flatten_item()\
@@ -471,7 +622,7 @@ class ItemView(BareItemView):
 
     @route('', method='POST', template='show;form')
     def create(self):
-        """create a new item"""
+        """Create a new item."""
         # fetch item from database and update with converted form contents
         item = self.model.empty()
         form = self._convert_form()
@@ -492,12 +643,12 @@ class ItemView(BareItemView):
                            .asdict()
             else: # exception, under normal circumstances this should never occur
                 raise InternalError('New item {} could not be stored ({})'.\
-                            format(str(item), result['error']))
+                            format(str(item), result['data']))
         else:
             tree = self.tree
             tree.style = 1
             tree.message = 'New item {} has validation errors {}'.\
-                            format(str(item), validation['error'])
+                            format(str(item), validation['data'])
             return tree.add_item(item)\
                        .add_form_buttons('update', 'PUT')\
                        .flatten_item()\
@@ -506,23 +657,16 @@ class ItemView(BareItemView):
 
     @route('/{id:objectid}', method='DELETE', template='delete')
     def delete(self):
-        """delete one item functionally, i.e. mark as inactive
-        item.remove() is only used for permanent removal, i.e. clean-up"""
-        item = self.model.lookup(self.params['id'])
-        r1 = item.set_field('active', False)
-        if r1['ok']:
-            return {'status': 'success',
-                    'message': 'item {} set to inactive'.format(str(item))}
-        else:
-            return {'status': 'failure',
-                    'message': 'item {} not modified'.format(str(item))}
+        """Delete one item functionally.
 
-    #TODO import: import one or more items
-    # @route('GET,POST', '/import')
-    # def import(cls, filename):
-    #     """
-    #     import(self, filename): n
-    #     Import items from file.
-    #     Return value if number of validated items imported.
-    #     """
-    #     pass # import items of this model from CSV file (form-based file upload)
+        Items are not permanently removed, e.g. item.remove(), but marked as
+        inactive. Permanent removal can be done by a clean-up routine, if necessary.
+        """
+        item = self.model.lookup(self.params['id'])
+        result = item.set_field('active', False)
+        if result['status'] == SUCCESS:
+            return {'status': result['status'],
+                    'data': 'item {} set to inactive'.format(str(item))}
+        else:
+            return {'status': result['status'],
+                    'data': 'item {} not modified'.format(str(item))}
