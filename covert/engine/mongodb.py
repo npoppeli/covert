@@ -31,17 +31,10 @@ def translate_query(query):
     """
     result = {}
     for key, value in query.items():
-        operator =value[0]
+        operator = value[0]
         if operator in query_map:  # apply mapping function
             if isinstance(value, dict):  # embedded document
                 result[key] = mapdoc(query_map, value)
-            elif isinstance(value, list):  # list of scalars or documents
-                if len(value) == 0:  # empty list
-                    result[key] = []
-                elif isinstance(value[0], dict):  # list of documents
-                    result[key] = [mapdoc(query_map, element) for element in value]
-                else:  # list of scalars
-                    result[key] = [query_map[operator](element) for element in value]
             else:  # scalar
                 result[key] = query_map[operator](value)
         else:  # no mapping for this element
@@ -111,6 +104,8 @@ class Item(BareItem):
         Returns:
             int: number of matchhing items.
         """
+        print('>> count: filter before =', doc)
+        print('>> count: filter after  =', cls.query(doc))
         sequence = setting.store_db[cls.name].find(filter=cls.query(doc))
         return sequence.count()
 

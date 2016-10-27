@@ -15,6 +15,8 @@ Todo:
     * ItemView.sort should not depend on db engine
     * ItemView.sort: passing to render tree methods is awkward
     * Use Mirage (JS) for client-side generation of search queries
+    * add boolean vector 'active' to the render tree (add_item, add_items)
+
 """
 
 import re
@@ -22,7 +24,7 @@ from collections import OrderedDict
 from inspect import getmembers, isclass, isfunction
 from itertools import chain
 from .common import InternalError, SUCCESS
-from .common import decode_dict, encode_dict
+from .common import decode_dict, encode_dict, show_dict
 from .model import unflatten, mapdoc
 from . import setting
 
@@ -250,27 +252,28 @@ class Cursor:
 
     For a few attributes, default values are defined in the 'default' dictionary.
     """
-    __slots__ = ['skip', 'limit', 'incl', 'incl0', 'dir',
+    __slots__ = ['skip', 'limit', 'incl', 'dir',
                  'filter', 'query', 'prev', 'next', 'action', 'submit']
-    default = {'skip':0, 'limit':10, 'incl':0, 'incl0':0, 'dir':0, 'submit':''}
+    default = {'skip':0, 'limit':10, 'incl':0, 'dir':0, 'submit':''}
 
-    def __init__(self, request):
+    def __init__(self, request, model):
         """Constructor method for Cursor.
 
         Attributes:
-            * skip      (int):   URL pattern
-            * limit     (int):   HTTP method
-            * incl      (int):   1 if inactive items are included, 0 otherwise
-            * incl0     (int):   previous value of 'incl'
-            * dir       (int):   direction of browsing
-            * filter    (str):   filter to pass to storage engine
-            * query     (str):   query dictionary (saved in form)
-            * prev      (bool):  True if 'previous' button enabled
-            * next      (bool):  True if 'next' button enabled
-            * action    (str):   form action
-            * submit    (str):   value of the form button that was pressed
+            * skip      (int):     URL pattern
+            * limit     (int):     HTTP method
+            * incl      (int):     1 if inactive items are included, 0 otherwise
+            * dir       (int):     direction of browsing
+            * filter    (str):     filter to pass to storage engine
+            * query     (str):     transformed dictionary
+            * query0    (str):     query dictionary (saved in form)
+            * prev      (bool):    True if 'previous' button enabled
+            * next      (bool):    True if 'next' button enabled
+            * action    (str):     form action
+            * submit    (str):     value of the form button that was pressed
         """
-        initial = '_incl' not in request.params.keys()
+        initial = '_skip' not in request.params
+        # print(">> cursor: req.params=", str(request.params))
         for key, value in self.default.items():
             setattr(self, key, value)
         self.query = {}
@@ -278,14 +281,27 @@ class Cursor:
         query = {}
         for key, value in request.params.items():
             if key.startswith('_'):
+                # print(">> cursor: attribute {}={}".format(key[1:], value))
                 setattr(self, key[1:], str2int(value) if key[1:] in self.default else value)
             elif value:
+                # print(">> cursor: query parameter {}={}".format(key, value))
                 query[key] = value
-        self.incl0 = self.incl
         if initial: # initial post
-            self.query = query
+            # transform query given by form to actual query
+            # print('>> transform_query: cursor.query={}'.format(query))
+            r1 = unflatten(query)
+            # print('>> transform_query: unflattened ={}'.format(r1))
+            r2 = mapdoc(model.qmap, r1)
+            print('>> transform_query: qmapped     ={}'.format(r2))
+            self.query = r2
+            # print(">> initial cursor:", str(self))
         else: # follow-up post
             self.query = decode_dict(self.query)
+            # print(">> follow-up cursor ", str(self))
+
+    def __str__(self):
+        d = dict([(key, getattr(self, key, '')) for key in self.__slots__])
+        return show_dict(d)
 
     def asdict(self):
         self.query = encode_dict(self.query)
@@ -345,29 +361,21 @@ class RenderTree:
 
     def add_cursor(self, route_name):
         """Add cursor object to render tree."""
-        self.cursor = Cursor(self.request)
+        self.cursor = Cursor(self.request, self.model)
         self.cursor.action = url_for(self.view_name, route_name, {})
         return self
 
-    def transform_query(self):
-        """Transform query given by cursor to actual query."""
-        r1 = self.cursor.query
-        # print('>> transform_query: cursor.query={}'.format(r1))
-        r2 = unflatten(r1)
-        # print('>> transform_query: unflattened ={}'.format(r2))
-        r3 = mapdoc(self.model.qmap, r2)
-        # print('>> transform_query: qmapped     ={}'.format(r3))
-        self.cursor.query = r3
-        return self
-
     def move_cursor(self):
-        """Move cursor to new position."""
+        """Move cursor to new position.
+
+        The actual filter used in the search is built from the search query specified by the user
+        in the form, and an extra condition depending on the value of cursor.incl.
+        """
         cursor = self.cursor
-        # filter = user query + condition depending on 'incl'
         cursor.filter = {} if cursor.incl == 1 else {'active':('==', True)}
         cursor.filter.update(cursor.query)
         count = self.model.count(cursor.filter)
-        # print('>> move_cursor: {} items with filter={}'.format(count, cursor.filter))
+        print('>> move_cursor: {} items with filter={}'.format(count, cursor.filter))
         cursor.skip = max(0, min(count, cursor.skip+cursor.dir*cursor.limit))
         cursor.prev = cursor.skip>0
         cursor.next = cursor.skip+cursor.limit < count
@@ -380,7 +388,6 @@ class RenderTree:
         else:
             item = oid_or_item
         self.data = item
-        # TODO: add boolean vector 'active' to the render tree
         return self
 
     def add_empty_item(self):
@@ -399,16 +406,15 @@ class RenderTree:
         for item in items:
             self.data.append({'item':item,
                               'buttons':[normal_button(self.view_name, b, item) for b in buttons]})
-        # TODO: add boolean vector 'active' to the render tree
         return self
 
     def flatten_item(self):
         """Flatten the item in the render tree."""
-        print('>> flatten_item: item={}'.format(self.data))
+        # print('>> flatten_item: item={}'.format(self.data))
         r1 = self.data.display()
-        print('>> flatten_item: item.display={}'.format(r1))
+        # print('>> flatten_item: item.display={}'.format(r1))
         r2 = r1.flatten()
-        print('>> flatten_item: flattened={}'.format(r2))
+        # print('>> flatten_item: flattened={}'.format(r2))
         self.data = r2
         return self
 
@@ -559,7 +565,6 @@ class ItemView(BareItemView):
     def match(self):
         """Show the result list of a search."""
         return self.tree.add_cursor('search')\
-                        .transform_query()\
                         .move_cursor()\
                         .add_items(['show', 'modify', 'delete'], self.sort)\
                         .add_buttons(['new'])\

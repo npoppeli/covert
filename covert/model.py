@@ -146,7 +146,7 @@ def mapdoc(fnmap, doc):
                 else: # list of scalars
                     result[key] = [fnmap[key](element) for element in value]
             else: # scalar
-                print(">> mapdoc: key={} value={} fn={}".format(key, value, fnmap[key]))
+                # print(">> mapdoc: key={} value={} fn={}".format(key, value, fnmap[key]))
                 result[key] = fnmap[key](value)
         else: # no mapping for this element
             result[key] = value
@@ -306,7 +306,6 @@ class BareItem(dict):
             * doc (dict): item read from HTML form.
         """
         item = cls()
-        print(">> convert")
         item.update(mapdoc(cls.cmap, doc))
         return item
 
@@ -320,7 +319,6 @@ class BareItem(dict):
         """
         cls = self.__class__
         item = cls()
-        print(">> display")
         item.update(mapdoc(self.dmap, self))
         return item
 
