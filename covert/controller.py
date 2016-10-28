@@ -151,8 +151,8 @@ class MapRouter:
         # interpret request
         request = Request(environ)
         req_method = request.params.get('_method', request.method).upper()
-        print('{0}: {1} {2}'.\
-              format(self.__class__.__name__, req_method, request.path_qs))
+        if setting.debug:
+            print('{0}: {1} {2}'.format(self.__class__.__name__, req_method, request.path_qs))
         req_path = request.path_info
         # find first route that matches request
         view_cls = None
@@ -165,7 +165,8 @@ class MapRouter:
         # run route or send error report
         if view_cls:
             try:
-                view_obj = view_cls(request, match.groupdict(), setting.models[view_cls.model], route_name)
+                view_obj = view_cls(request, match.groupdict(),
+                                    setting.models[view_cls.model], route_name)
                 route_method = getattr(view_obj, route_name)
                 result = route_method()
                 template = route_templates[result.get('style', 0)]
@@ -177,7 +178,8 @@ class MapRouter:
                 if self.content_type != 'text/html': print(result)
                 response.status = 500
         else: # no match with the defined setting.routes
-            print('{0}: {1} {2}'.format(self.__class__.__name__, 'nothing found for', request.path_qs))
+            print('{0}: {1} {2}'.format(self.__class__.__name__,
+                                        'nothing found for', request.path_qs))
             result = 'Nothing found for '+request.path_qs
             response.status = 404
         # encode to UTF8 and return according to WSGI protocol

@@ -11,7 +11,7 @@ Todo:
 
 from datetime import datetime
 from pymongo import MongoClient
-from ..common import SUCCESS, ERROR, FAIL
+from ..common import SUCCESS, ERROR, FAIL, show_dict
 from ..model import BareItem, mapdoc
 from .. import setting
 from bson.objectid import ObjectId
@@ -104,8 +104,6 @@ class Item(BareItem):
         Returns:
             int: number of matchhing items.
         """
-        print('>> count: filter before =', doc)
-        print('>> count: filter after  =', cls.query(doc))
         sequence = setting.store_db[cls.name].find(filter=cls.query(doc))
         return sequence.count()
 
@@ -171,7 +169,8 @@ class Item(BareItem):
         Returns:
             dict: 'status':SUCCESS, 'id':<document id>} or {'status':FAIL, 'id':None}.
         """
-        new = getattr(self, 'id', '') == ''
+        new = self.get('id', '') == ''
+        print(">>Item.write: new={}".format(new))
         self['mtime'] = datetime.now()
         if new:
             self['_id'] = ObjectId()

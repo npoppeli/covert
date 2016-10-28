@@ -11,12 +11,12 @@ do form validation in the client, using Parsley.js (jQuery) for example.
 Todo:
     * I18N of setting.labels and messages
     * authorization determines icon and button states (enabled, disabled)
+    * delete button is enabled iff item.active
     * add 'import' method (form-based file upload, CSV and JSON)
     * ItemView.sort should not depend on db engine
     * ItemView.sort: passing to render tree methods is awkward
     * Use Mirage (JS) for client-side generation of search queries
     * add boolean vector 'active' to the render tree (add_item, add_items)
-
 """
 
 import re
@@ -533,7 +533,6 @@ class ItemView(BareItemView):
     @route('/{id:objectid}', template='show')
     def show(self):
         """Show one item."""
-        # TODO: delete button is enabled iff item.active
         return self.tree.add_item(self.params['id'])\
                         .add_buttons(['index', 'search', 'modify', 'delete'])\
                         .flatten_item()\
@@ -543,7 +542,6 @@ class ItemView(BareItemView):
     @route('/index', method='GET,POST', template='index')
     def index(self):
         """Show multiple items (collection)."""
-        # TODO: delete button is enabled iff item.active
         return self.tree.add_cursor('index')\
                         .move_cursor()\
                         .add_items(['show', 'modify', 'delete'], self.sort)\
@@ -590,7 +588,7 @@ class ItemView(BareItemView):
                         .prune_item(2, form=True)\
                         .asdict()
 
-    def _convert_form(self):
+    def convert_form(self):
         """Convert request parameters to form content in model shape."""
         raw_form = {}
         for key, value in self.request.params.items():
@@ -603,16 +601,19 @@ class ItemView(BareItemView):
         """Update an existing item."""
         # fetch item from database and update with converted form contents
         item = self.model.lookup(self.params['id'])
-        form = self._convert_form()
+        form = self.convert_form()
         item.update(form)
         validation = item.validate(item)
+        print(">> update: item={}".format(show_dict(item)))
         if validation['status'] == SUCCESS:
+            print(">> update: item has been validated")
             result = item.write(validate=False)
             if result['status'] == SUCCESS:
+                print(">> update: item has been written")
                 tree = self.tree
                 tree.message = 'Modified item {}'.format(str(item))
                 return tree.add_item(item) \
-                           .add_buttons(['index', 'update', 'delete']) \
+                           .add_buttons(['index', 'search', 'modify', 'delete']) \
                            .flatten_item() \
                            .prune_item(2) \
                            .asdict()
@@ -624,7 +625,7 @@ class ItemView(BareItemView):
             tree.style = 1
             tree.message = 'Modified item {} has validation errors {}'.\
                             format(str(item), validation['data'])
-            print(">>update: item has validation errors", tree.message)
+            print(">> update: item has validation errors", tree.message)
             return tree.add_item(item)\
                        .add_form_buttons('update', 'PUT')\
                        .flatten_item()\
@@ -636,19 +637,19 @@ class ItemView(BareItemView):
         """Create a new item."""
         # fetch item from database and update with converted form contents
         item = self.model.empty()
-        form = self._convert_form()
+        form = self.convert_form()
         item.update(form)
         validation = item.validate(item)
-        #print('>> create: new item=')
-        #for key, value in item.items():
-        #    print("{:<10}: {}".format(key, value))
+        print(">> create: item={}".format(show_dict(item)))
         if validation['status'] == SUCCESS:
+            print(">> create: item has been validated")
             result = item.write(validate=False)
             if result['status'] == SUCCESS:
+                print(">> create: item has been written")
                 tree = self.tree
                 tree.message = 'New item {}'.format(str(item))
                 return tree.add_item(item) \
-                           .add_buttons(['index', 'update', 'delete']) \
+                           .add_buttons(['index', 'search', 'modify', 'delete']) \
                            .flatten_item() \
                            .prune_item(2) \
                            .asdict()
@@ -660,6 +661,7 @@ class ItemView(BareItemView):
             tree.style = 1
             tree.message = 'New item {} has validation errors {}'.\
                             format(str(item), validation['data'])
+            print(">> create: item has validation errors", tree.message)
             return tree.add_item(item)\
                        .add_form_buttons('update', 'PUT')\
                        .flatten_item()\
