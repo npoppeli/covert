@@ -115,7 +115,7 @@ def _unflatten(list_rep):
             result[key] = [child[1]] if child[0] == ['0'] else child[1]  # scalar
         else:
             result[key] = _unflatten(children)
-    if all([key.isnumeric() for key in car_set]):  # turn dict with numeric keys into list
+    if car_set and all([key.isnumeric() for key in car_set]): # dict with all keys numeric=list
         return [t[1] for t in sorted(result.items(), key=lambda t: int(t[0]))]
     else:
         return result
@@ -301,13 +301,15 @@ class BareItem(dict):
         """Convert item from string form to actual, typed form.
 
         Convert item with only string values to item with typed values.
+        The item can be partially complete.
 
         Arguments:
             * doc (dict): item read from HTML form.
+
+        Returns:
+            dict: item with values according to the model definition
         """
-        item = cls()
-        item.update(mapdoc(cls.cmap, doc))
-        return item
+        return mapdoc(cls.cmap, doc)
 
     def display(self):
         """Convert item to string form.

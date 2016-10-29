@@ -8,6 +8,7 @@ depending on the request parameters.
 import html, sys, traceback, waitress
 from webob import BaseRequest as Request, Response # performance of BaseRequest is better
 from . import setting
+from .common import encode_dict
 from .report import logger
 
 def http_server(app, **kwarg):
@@ -113,16 +114,17 @@ class SwitchRouter:
         else:
             mode = self.PAGE_MODE
         try:
-            #if setting.debug:
-            #    print('mode {0} (before get_response): {1} {2}'.\
-            #        format(self.mode_name[mode], req_method, request.path_qs))
+            if setting.debug:
+                print('{0}: {1} {2}'.\
+                      format(self.mode_name[mode], req_method, request.path_qs))
             response = request.get_response(self._app[mode])
-            #if setting.debug:
-            #    print('mode {0} (after get_response): {1}'.\
-            #        format(self.mode_name[mode], response.status))
+            if setting.debug:
+                print('{0}: status={1} body={2} characters'.\
+                      format(self.mode_name[mode], response.status, len(response.body)))
         except Exception as e:
             response = Response()
             response.text = exception_report(e)
+            print('{0} exception:', exception_report(e, False))
         return response(environ, start_response)
 
 
@@ -148,11 +150,10 @@ class MapRouter:
         return result
 
     def __call__(self, environ, start_response):
+        controller_name = self.__class__.__name__
         # interpret request
         request = Request(environ)
         req_method = request.params.get('_method', request.method).upper()
-        if setting.debug:
-            print('{0}: {1} {2}'.format(self.__class__.__name__, req_method, request.path_qs))
         req_path = request.path_info
         # find first route that matches request
         view_cls = None
@@ -173,13 +174,12 @@ class MapRouter:
                 result = self.serialize(result, template)
             except Exception as e:
                 result = exception_report(e, ashtml=(self.content_type=='text/html'))
-                print('{0} found matching route, and exception occurred'.\
-                      format(self.__class__.__name__))
-                if self.content_type != 'text/html': print(result)
+                print('{}: exception occurred in {}'.format(controller_name, route_name))
+                if self.content_type != 'text/html':
+                    print(result)
                 response.status = 500
-        else: # no match with the defined setting.routes
-            print('{0}: {1} {2}'.format(self.__class__.__name__,
-                                        'nothing found for', request.path_qs))
+        else: # no match in the known routes
+            print('{}: {} {}'.format(controller_name, 'nothing found for', request.path_qs))
             result = 'Nothing found for '+request.path_qs
             response.status = 404
         # encode to UTF8 and return according to WSGI protocol
@@ -205,9 +205,8 @@ class PageRouter(MapRouter):
     def finalize(self, result):
         """remove empty/blank lines and initial whitespace of the other lines"""
         page = setting.templates[self.template].render(content=result)
-        trimmed = '\n'.join([line.lstrip() for line in page.splitlines()
-                             if line and not line.isspace()])
-        return trimmed
+        lines = [line.lstrip() for line in page.splitlines() if line and not line.isspace()]
+        return '\n'.join(lines)
 
 class JSONRouter(MapRouter):
     """"Subclass of MapRouter for generating JSON content.
@@ -221,4 +220,4 @@ class JSONRouter(MapRouter):
         self.content_type = 'application/json'
 
     def serialize(self, result, template):
-        return result
+        return encode_dict(result)

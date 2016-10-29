@@ -93,7 +93,8 @@ def decode_dict(s):
     Returns:
         list|dict: JSON document
     """
-    return json.loads(html.unescape(s)) if s else {}
+    # return json.loads(html.unescape(s)) if s else {}
+    return json.loads(s) if s else {}
 
 def encode_dict(d):
     """Encode JSON document to string.
@@ -104,7 +105,8 @@ def encode_dict(d):
     Returns:
         str: content as one string
     """
-    return html.escape(json.dumps(d, separators=(',',':'), cls=ExtendedEncoder))
+    # return html.escape(json.dumps(d, separators=(',', ':'), cls=ExtendedEncoder))
+    return json.dumps(d, separators=(',', ':'), cls=ExtendedEncoder)
 
 def show_dict(d):
     """Encode JSON document to pretty-printed string.

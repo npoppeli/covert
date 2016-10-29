@@ -170,7 +170,6 @@ class Item(BareItem):
             dict: 'status':SUCCESS, 'id':<document id>} or {'status':FAIL, 'id':None}.
         """
         new = self.get('id', '') == ''
-        print(">>Item.write: new={}".format(new))
         self['mtime'] = datetime.now()
         if new:
             self['_id'] = ObjectId()
@@ -207,7 +206,7 @@ class Item(BareItem):
         Returns:
             dict: 'status':SUCCESS, 'id':<document id>} or {'status':FAIL, 'id':None}.
         """
-        oid = self['_id']
+        oid = self['id']
         collection = setting.store_db[self.name]
         result = collection.update_one({'id':oid}, {'$set':{key:value}})
         return {'status':SUCCESS if result.modified_count == 1 else FAIL, 'id': self['id']}
@@ -222,7 +221,7 @@ class Item(BareItem):
         Returns:
             dict: 'status':SUCCESS, 'id':<document id>} or {'status':FAIL, 'id':None}.
         """
-        oid = self['_id']
+        oid = self['id']
         collection = setting.store_db[self.name]
         result = collection.update_one({'_id':oid}, {'$addToSet':{key:value}})
         return {'status':SUCCESS if result.modified_count == 1 else FAIL, 'id': self['id']}

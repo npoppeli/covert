@@ -46,12 +46,14 @@ def unflatten(doc):
        the document is transformed to a list of 2-tuples, sorted on key.
     """
     lrep = [(key.split('.'), doc[key]) for key in sorted(doc.keys())]
+    print("lrep:", lrep)
     return _unflatten(lrep)
 
 def _unflatten(lrep):
     newdoc = {}
     car_list = [elt[0].pop(0) for elt in lrep]  # take first element (car) from each key
     car_set = set(car_list)  # set of (unique) car's is the set of keys of newdoc
+    print("car_set:", car_set)
     for key in car_set:
         begin = bisect_left(car_list, key)
         end = bisect_right(car_list, key)
@@ -60,7 +62,9 @@ def _unflatten(lrep):
             newdoc[key] = children[0][1]  # scalar
         else:
             newdoc[key] = _unflatten(children)
-    if all([key.isnumeric() for key in car_set]):  # turn dict with numeric keys into list
+    if car_set and all([key.isnumeric() for key in car_set]):  # turn dict with numeric keys into list
+        print("turn dict into list")
         return [t[1] for t in sorted(newdoc.items(), key=lambda t: int(t[0]))]
     else:
+        print("return dict, newdoc:", newdoc)
         return newdoc

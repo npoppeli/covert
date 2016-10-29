@@ -59,13 +59,13 @@ def icon_for(name):
 
 setting.labels = {
      'show'   : 'Show|Toon|Show',
-     'index'  : 'Index|Index|..',
+     'index'  : 'Browse|Blader|Bläddra',
      'search' : 'Search|Zoek|Sök',
      'match'  : 'Match|Resultaat|Resultat',
      'modify' : 'Modify|Wijzig|Ändra',
      'update' : 'Update|Wijzig|Ändra',
      'new'    : 'New|Nieuw|Ny',
-     'create' : 'Create|Creeer|Skapa',
+     'create' : 'Create|Maak|Skapa',
      'delete' : 'Delete|Verwijder|Radera',
      'home'   : 'Home|Begin|Hem',
      'info'   : 'Info|Info|Info',
@@ -273,7 +273,6 @@ class Cursor:
             * submit    (str):     value of the form button that was pressed
         """
         initial = '_skip' not in request.params
-        # print(">> cursor: req.params=", str(request.params))
         for key, value in self.default.items():
             setattr(self, key, value)
         self.query = {}
@@ -281,23 +280,19 @@ class Cursor:
         query = {}
         for key, value in request.params.items():
             if key.startswith('_'):
-                # print(">> cursor: attribute {}={}".format(key[1:], value))
                 setattr(self, key[1:], str2int(value) if key[1:] in self.default else value)
             elif value:
-                # print(">> cursor: query parameter {}={}".format(key, value))
                 query[key] = value
         if initial: # initial post
             # transform query given by form to actual query
-            # print('>> transform_query: cursor.query={}'.format(query))
+            # print('>> cursor_init: cursor.query={}'.format(query))
             r1 = unflatten(query)
-            # print('>> transform_query: unflattened ={}'.format(r1))
+            # print('>> cursor_init: unflattened ={}'.format(r1))
             r2 = mapdoc(model.qmap, r1)
-            print('>> transform_query: qmapped     ={}'.format(r2))
+            # print('>> cursor_init: qmapped     ={}'.format(r2))
             self.query = r2
-            # print(">> initial cursor:", str(self))
         else: # follow-up post
             self.query = decode_dict(self.query)
-            # print(">> follow-up cursor ", str(self))
 
     def __str__(self):
         d = dict([(key, getattr(self, key, '')) for key in self.__slots__])
@@ -375,7 +370,7 @@ class RenderTree:
         cursor.filter = {} if cursor.incl == 1 else {'active':('==', True)}
         cursor.filter.update(cursor.query)
         count = self.model.count(cursor.filter)
-        print('>> move_cursor: {} items with filter={}'.format(count, cursor.filter))
+        # print('>> move_cursor: {} items with filter={}'.format(count, cursor.filter))
         cursor.skip = max(0, min(count, cursor.skip+cursor.dir*cursor.limit))
         cursor.prev = cursor.skip>0
         cursor.next = cursor.skip+cursor.limit < count
@@ -404,8 +399,9 @@ class RenderTree:
             self.message += 'Nothing found for query {}'.format(self.cursor.query)
             return self
         for item in items:
-            self.data.append({'item':item,
-                              'buttons':[normal_button(self.view_name, b, item) for b in buttons]})
+            button_list = [(delete_button if button == 'delete' else
+                            normal_button)(self.view_name, button, item) for button in buttons]
+            self.data.append({'item': item, 'buttons': button_list})
         return self
 
     def flatten_item(self):
@@ -545,7 +541,7 @@ class ItemView(BareItemView):
         return self.tree.add_cursor('index')\
                         .move_cursor()\
                         .add_items(['show', 'modify', 'delete'], self.sort)\
-                        .add_buttons(['new'])\
+                        .add_buttons(['index', 'search', 'new'])\
                         .flatten_items()\
                         .prune_items(1)\
                         .asdict()
@@ -565,7 +561,7 @@ class ItemView(BareItemView):
         return self.tree.add_cursor('search')\
                         .move_cursor()\
                         .add_items(['show', 'modify', 'delete'], self.sort)\
-                        .add_buttons(['new'])\
+                        .add_buttons(['index', 'search', 'new'])\
                         .flatten_items()\
                         .prune_items(1)\
                         .asdict()
@@ -603,13 +599,12 @@ class ItemView(BareItemView):
         item = self.model.lookup(self.params['id'])
         form = self.convert_form()
         item.update(form)
+        if setting.debug:
+            print(">> update: updated item\n{}".format(show_dict(item)))
         validation = item.validate(item)
-        print(">> update: item={}".format(show_dict(item)))
         if validation['status'] == SUCCESS:
-            print(">> update: item has been validated")
             result = item.write(validate=False)
             if result['status'] == SUCCESS:
-                print(">> update: item has been written")
                 tree = self.tree
                 tree.message = 'Modified item {}'.format(str(item))
                 return tree.add_item(item) \
@@ -617,7 +612,7 @@ class ItemView(BareItemView):
                            .flatten_item() \
                            .prune_item(2) \
                            .asdict()
-            else: # exception, under normal circumstances this should never occur
+            else: # exception, in theory this should never occur
                 raise InternalError('Modified item {} could not be stored ({})'.\
                             format(str(item), result['data']))
         else:
@@ -625,7 +620,8 @@ class ItemView(BareItemView):
             tree.style = 1
             tree.message = 'Modified item {} has validation errors {}'.\
                             format(str(item), validation['data'])
-            print(">> update: item has validation errors", tree.message)
+            print(">> update: item\n{}\nhas validation errors\n{}".\
+                  format(show_dict(item), validation['data']))
             return tree.add_item(item)\
                        .add_form_buttons('update', 'PUT')\
                        .flatten_item()\
@@ -640,7 +636,8 @@ class ItemView(BareItemView):
         form = self.convert_form()
         item.update(form)
         validation = item.validate(item)
-        print(">> create: item={}".format(show_dict(item)))
+        if setting.debug:
+            print(">> create: new item\n{}".format(show_dict(item)))
         if validation['status'] == SUCCESS:
             print(">> create: item has been validated")
             result = item.write(validate=False)
@@ -653,7 +650,7 @@ class ItemView(BareItemView):
                            .flatten_item() \
                            .prune_item(2) \
                            .asdict()
-            else: # exception, under normal circumstances this should never occur
+            else: # exception, in theory this should never occur
                 raise InternalError('New item {} could not be stored ({})'.\
                             format(str(item), result['data']))
         else:
@@ -670,7 +667,7 @@ class ItemView(BareItemView):
 
     @route('/{id:objectid}', method='DELETE', template='delete')
     def delete(self):
-        """Delete one item functionally.
+        """Delete one item in functional sense.
 
         Items are not permanently removed, e.g. item.remove(), but marked as
         inactive. Permanent removal can be done by a clean-up routine, if necessary.
@@ -678,8 +675,7 @@ class ItemView(BareItemView):
         item = self.model.lookup(self.params['id'])
         result = item.set_field('active', False)
         if result['status'] == SUCCESS:
-            return {'status': result['status'],
-                    'data': 'item {} set to inactive'.format(str(item))}
+            result['data'] = 'item {} set to inactive'.format(str(item))
         else:
-            return {'status': result['status'],
-                    'data': 'item {} not modified'.format(str(item))}
+            result['data'] = 'item {} not modified'.format(str(item))
+        return result
