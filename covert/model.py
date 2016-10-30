@@ -383,6 +383,13 @@ class ItemRef:
         """
         return "{}({}, {})".format(self.__class__.__name__, self.collection, self.id)
 
+    def display(self):
+        return ref_tuple(self)
+
+    def lookup(self):
+        model = setting.models[self.collection]
+        return model.lookup(self.id)
+
 def get_objectid(ref):
     """Retrieve objectid from item reference.
 
