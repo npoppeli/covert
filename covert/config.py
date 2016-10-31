@@ -114,8 +114,8 @@ def kernel_init():
     # print debugging information
     if setting.debug:
         print('Application has {0} routes'.format(len(setting.routes)))
-        #for route in setting.routes:
-        #    print(str(route))
+        for route in setting.routes:
+            print(str(route))
         print('Application has {0} models'.format(len(setting.models)))
         for name in sorted(setting.models.keys()):
             if name.endswith('Ref'):

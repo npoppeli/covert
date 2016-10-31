@@ -169,6 +169,9 @@ class MapRouter:
                 view_obj = view_cls(request, match.groupdict(),
                                     setting.models[view_cls.model], route_name)
                 route_method = getattr(view_obj, route_name)
+                if setting.debug:
+                    print("{}: route={} templates={}".\
+                          format(controller_name, route_name, route_templates))
                 result = route_method()
                 template = route_templates[result.get('style', 0)]
                 result = self.serialize(result, template)
