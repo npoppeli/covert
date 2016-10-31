@@ -19,6 +19,7 @@ HTML form -> [item']         -> convert -> [item] -> write   -> [JSON document] 
 Todo:
     * embedding in show panels
     * embedding and linking in form panels
+    * ref_tuple uses View.url_for()
     * tools for adding, modifying and deleting item references
     * tools for adding, modifying and deleting sub-items
     * item revisions (add 'rev' attribute)
@@ -354,6 +355,38 @@ class BareItem(dict):
         item.update(clone)
         return item
 
+# Item reference
+def get_objectid(ref):
+    """Retrieve objectid from item reference.
+
+    This function is used as the write map for an item reference.
+
+    Arguments:
+        ref (itemref): item reference.
+
+    Returns/Yields:
+        str: item reference.
+    """
+    return ref.id
+
+def ref_tuple(ref):
+    """Generate display form of item reference.
+
+    This function is used as the display map for an item reference.
+
+    Arguments:
+        ref (itemref): item reference.
+
+    Returns/Yields:
+        (str, str): label, URL.
+    """
+    if ref.id is None:
+        return '', ''
+    else:
+        model = setting.models[ref.collection]
+        item = model.lookup(ref.id)
+        return str(item), '/{}/{}'.format(ref.collection.lower(), ref.id)  # label, url
+
 class ItemRef:
     """Reference to Item"""
     collection = 'Item'
@@ -384,44 +417,23 @@ class ItemRef:
         return "{}({}, {})".format(self.__class__.__name__, self.collection, self.id)
 
     def display(self):
+        """Display form of item reference.
+
+        Returns:
+            str: string to be inserted into render tree.
+        """
         return ref_tuple(self)
 
     def lookup(self):
+        """Retrieve item referenced by itemref object from storage.
+
+        Returns:
+            Item: item retrieved from storage.
+        """
         model = setting.models[self.collection]
         return model.lookup(self.id)
 
-def get_objectid(ref):
-    """Retrieve objectid from item reference.
 
-    This function is used as the write map for an item reference.
-
-    Arguments:
-        ref (itemref): item reference.
-
-    Returns/Yields:
-        str: item reference.
-    """
-    return ref.id
-
-# display map for ItemRef
-def ref_tuple(ref):
-    """Generate display form of item reference.
-
-    This function is used as the display map for an item reference.
-
-    Arguments:
-        ref (itemref): item reference.
-
-    Returns/Yields:
-        (str, str): label, URL.
-    """
-    if ref.id is None:
-        return '', ''
-    else:
-        model = setting.models[ref.collection]
-        item = model.lookup(ref.id)
-        return str(item), '/{}/{}'.format(ref.collection.lower(), ref.id) # label, url
-    
 class ParsedModel:
     """Result of parsing a model definition.
 
