@@ -13,8 +13,9 @@ Todo:
     * authorization determines icon and button states (enabled, disabled)
     * delete button is enabled iff item.active
     * add 'import' method (form-based file upload, CSV and JSON)
-    * ItemView.sort should not depend on db engine
-    * ItemView.sort: passing to render tree methods is awkward
+    * make ItemView.sort independent from db engine
+    * pass ItemView.sort to render tree methods in a more elegant way
+    * define icon and label for custom methods
     * Use Mirage (JS) for client-side generation of search queries
     * add boolean vector 'active' to the render tree (add_item, add_items)
 """
@@ -38,6 +39,7 @@ def str2int(s):
 
 setting.icons = {
    'show'   : 'fa fa-eye',
+   'diagram': 'fa fa-tree',
    'index'  : 'fa fa-list-alt',
    'search' : 'fa fa-search',
    'match'  : 'fa fa-search',
@@ -59,6 +61,7 @@ def icon_for(name):
 
 setting.labels = {
      'show'   : 'Show|Toon|Show',
+     'diagram': 'Tree|Boom|Träd',
      'index'  : 'Browse|Blader|Bläddra',
      'search' : 'Search|Zoek|Sök',
      'match'  : 'Match|Resultaat|Resultat',
@@ -196,7 +199,6 @@ def route2regex(pattern):
     parts.insert(0, '^')
     parts.append('$')
     return ''.join(parts)
-
 
 # Views
 def read_views(module):
@@ -504,6 +506,8 @@ class BareItemView:
     def __init__(self, request, matches, model, route_name):
         """Constructor method for BareItemView.
 
+        Forbidden method names: request, params, model, tree.
+
         Attributes:
             * request (Request):    HTTP request (WebOb)
             * params  (MultiDict):  request parameters (WebOb multi-dict)
@@ -525,12 +529,14 @@ class ItemView(BareItemView):
     """
     model = 'Item'
     sort = []
+    item_buttons = ['index', 'search', 'modify', 'delete']
+    item_buttons_extra = []
 
     @route('/{id:objectid}', template='show')
     def show(self):
         """Show one item."""
         return self.tree.add_item(self.params['id'])\
-                        .add_buttons(['index', 'search', 'modify', 'delete'])\
+                        .add_buttons(self.item_buttons+self.item_buttons_extra)\
                         .flatten_item()\
                         .prune_item(2)\
                         .asdict()
