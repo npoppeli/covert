@@ -18,6 +18,7 @@ Todo:
     * define icon and label for custom methods
     * Use Mirage (JS) for client-side generation of search queries
     * add boolean vector 'active' to the render tree (add_item, add_items)
+    * add 'title' attribute to render tree, let routes fill this; apply in templates
 """
 
 import re
@@ -331,7 +332,7 @@ class RenderTree:
     attributes are specified by the class attribute 'nodes'. These attributes are used by the
     asdict() method.
     """
-    nodes = ['buttons', 'cursor', 'data', 'message', 'meta', 'method', 'status', 'style']
+    nodes = ['buttons', 'cursor', 'data', 'message', 'meta', 'method', 'status', 'style', 'title']
     def __init__(self, request, model, view_name, route_name):
         """Constructor method for RenderTree.
 
@@ -355,12 +356,12 @@ class RenderTree:
         self.method = ''
         self.status = '' # success, fail, error
         self.style = 0
+        self.title = ''
 
     def add_cursor(self, route_name):
         """Add cursor object to render tree."""
         self.cursor = Cursor(self.request, self.model)
         self.cursor.action = url_for(self.view_name, route_name, {})
-        return self
 
     def move_cursor(self):
         """Move cursor to new position.
@@ -376,7 +377,6 @@ class RenderTree:
         cursor.skip = max(0, min(count, cursor.skip+cursor.dir*cursor.limit))
         cursor.prev = cursor.skip>0
         cursor.next = cursor.skip+cursor.limit < count
-        return self
 
     def add_item(self, oid_or_item):
         """Add item to render tree."""
@@ -385,12 +385,10 @@ class RenderTree:
         else:
             item = oid_or_item
         self.data = item
-        return self
 
     def add_empty_item(self):
         """Add empty item to render tree."""
         self.data = self.model.empty()
-        return self
 
     def add_items(self, buttons, sort):
         """Add list of items to render tree."""
@@ -404,23 +402,15 @@ class RenderTree:
             button_list = [(delete_button if button == 'delete' else
                             normal_button)(self.view_name, button, item) for button in buttons]
             self.data.append({'item': item, 'buttons': button_list})
-        return self
 
     def flatten_item(self):
         """Flatten the item in the render tree."""
-        # print('>> flatten_item: item={}'.format(self.data))
-        r1 = self.data.display()
-        # print('>> flatten_item: item.display={}'.format(r1))
-        r2 = r1.flatten()
-        # print('>> flatten_item: flattened={}'.format(r2))
-        self.data = r2
-        return self
+        self.data = self.data.display().flatten()
 
     def flatten_items(self):
         """Flatten all items in the render tree."""
         for row in self.data:
             row['item'] = row['item'].display().flatten()
-        return self
 
     def prune_item(self, depth, erase=False, form=False):
         """Prune the item in the render tree."""
@@ -439,7 +429,6 @@ class RenderTree:
                              'auto'    : field_meta.auto,
                              'control' : field_meta.control}
         self.data, self.meta = item, meta
-        return self
 
     def prune_items(self, depth):
         """Prune all items in the render tree."""
@@ -461,7 +450,6 @@ class RenderTree:
                                      'control' : field_meta.control}
             row['item'] = item
             self.meta, ready = meta, True
-        return self
 
     def add_buttons(self, buttons):
         """Add buttons (normal and delete) to render tree."""
@@ -469,7 +457,6 @@ class RenderTree:
             item = self.data[0]['item'] if isinstance(self.data, list) else self.data
             self.buttons = [(delete_button if button == 'delete' else
                              normal_button)(self.view_name, button, item) for button in buttons]
-        return self
 
     def add_form_buttons(self, route_name, method=None):
         """Add form buttons to render tree."""
@@ -478,14 +465,12 @@ class RenderTree:
             self.buttons = [form_button(self.view_name, route_name, item, 'ok')]
             if method: # hide method (e.g. PUT) inside the form
                 self.method = method
-        return self
 
     def add_search_button(self, route_name):
         """Add search button to render tree."""
         if self.data:
             # item = self.data[0]['item']
             self.buttons = [form_button(self.view_name, route_name, {}, 'search')]
-        return self
 
     def asdict(self):
         """Create dictionary representation of render tree."""
@@ -531,64 +516,72 @@ class ItemView(BareItemView):
     sort = []
     item_buttons = ['index', 'search', 'modify', 'delete']
     item_buttons_extra = []
+    collection_buttons = ['index', 'search', 'new']
+    collection_buttons_extra = []
 
     @route('/{id:objectid}', template='show')
     def show(self):
         """Show one item."""
-        return self.tree.add_item(self.params['id'])\
-                        .add_buttons(self.item_buttons+self.item_buttons_extra)\
-                        .flatten_item()\
-                        .prune_item(2)\
-                        .asdict()
+        tree = self.tree
+        tree.add_item(self.params['id'])
+        tree.add_buttons(self.item_buttons+self.item_buttons_extra)
+        tree.flatten_item()
+        tree.prune_item(2)
+        return tree.asdict()
 
     @route('/index', method='GET,POST', template='index')
     def index(self):
         """Show multiple items (collection)."""
-        return self.tree.add_cursor('index')\
-                        .move_cursor()\
-                        .add_items(['show', 'modify', 'delete'], self.sort)\
-                        .add_buttons(['index', 'search', 'new'])\
-                        .flatten_items()\
-                        .prune_items(1)\
-                        .asdict()
+        tree = self.tree
+        tree.add_cursor('index')
+        tree.move_cursor()
+        tree.add_items(['show', 'modify', 'delete']+self.item_buttons_extra, self.sort)
+        tree.add_buttons(self.collection_buttons+self.collection_buttons_extra)
+        tree.flatten_items()
+        tree.prune_items(1)
+        return tree.asdict()
 
     @route('/search', template='form')
     def search(self):
         """Make a search form."""
-        return self.tree.add_empty_item()\
-                        .add_search_button('match')\
-                        .flatten_item()\
-                        .prune_item(1, erase=True, form=True)\
-                        .asdict()
+        tree = self.tree
+        tree.add_empty_item()
+        tree.add_search_button('match')
+        tree.flatten_item()
+        tree.prune_item(1, erase=True, form=True)
+        return tree.asdict()
 
     @route('/search', method='POST', template='index')
     def match(self):
         """Show the result list of a search."""
-        return self.tree.add_cursor('search')\
-                        .move_cursor()\
-                        .add_items(['show', 'modify', 'delete'], self.sort)\
-                        .add_buttons(['index', 'search', 'new'])\
-                        .flatten_items()\
-                        .prune_items(1)\
-                        .asdict()
+        tree = self.tree
+        tree.add_cursor('search')
+        tree.move_cursor()
+        tree.add_items(['show', 'modify', 'delete']+self.item_buttons_extra, self.sort)
+        tree.add_buttons(self.collection_buttons+self.collection_buttons_extra)
+        tree.flatten_items()
+        tree.prune_items(1)
+        return tree.asdict()
 
     @route('/new', template='form')
     def new(self):
         """Make a form for new/create action."""
-        return self.tree.add_empty_item()\
-                        .add_form_buttons('create')\
-                        .flatten_item()\
-                        .prune_item(2, erase=True, form=True)\
-                        .asdict()
+        tree = self.tree
+        tree.add_empty_item()
+        tree.add_form_buttons('create')
+        tree.flatten_item()
+        tree.prune_item(2, erase=True, form=True)
+        return tree.asdict()
 
     @route('/{id:objectid}/modify', template='form')
     def modify(self):
         """Make a form for modify/update action."""
-        return self.tree.add_item(self.params['id'])\
-                        .add_form_buttons('update', 'PUT')\
-                        .flatten_item()\
-                        .prune_item(2, form=True)\
-                        .asdict()
+        tree = self.tree
+        tree.add_item(self.params['id'])
+        tree.add_form_buttons('update', 'PUT')
+        tree.flatten_item()
+        tree.prune_item(2, form=True)
+        return tree.asdict()
 
     def convert_form(self):
         """Convert request parameters to form content in model shape."""
@@ -608,31 +601,29 @@ class ItemView(BareItemView):
         if setting.debug:
             print(">> update: updated item\n{}".format(show_dict(item)))
         validation = item.validate(item)
+        tree = self.tree
         if validation['status'] == SUCCESS:
             result = item.write(validate=False)
             if result['status'] == SUCCESS:
-                tree = self.tree
                 tree.message = 'Modified item {}'.format(str(item))
-                return tree.add_item(item) \
-                           .add_buttons(['index', 'search', 'modify', 'delete']) \
-                           .flatten_item() \
-                           .prune_item(2) \
-                           .asdict()
+                tree.add_item(item)
+                tree.add_buttons(self.item_buttons+self.item_buttons_extra)
+                tree.flatten_item()
+                tree.prune_item(2)
             else: # exception, in theory this should never occur
                 raise InternalError('Modified item {} could not be stored ({})'.\
                             format(str(item), result['data']))
         else:
-            tree = self.tree
             tree.style = 1
             tree.message = 'Modified item {} has validation errors {}'.\
                             format(str(item), validation['data'])
             print(">> update: item\n{}\nhas validation errors\n{}".\
                   format(show_dict(item), validation['data']))
-            return tree.add_item(item)\
-                       .add_form_buttons('update', 'PUT')\
-                       .flatten_item()\
-                       .prune_item(2, form=True)\
-                       .asdict()
+            tree.add_item(item)
+            tree.add_form_buttons('update', 'PUT')
+            tree.flatten_item()
+            tree.prune_item(2, form=True)
+        return tree.asdict()
 
     @route('', method='POST', template='show;form')
     def create(self):
@@ -644,18 +635,17 @@ class ItemView(BareItemView):
         validation = item.validate(item)
         if setting.debug:
             print(">> create: new item\n{}".format(show_dict(item)))
+        tree = self.tree
         if validation['status'] == SUCCESS:
             print(">> create: item has been validated")
             result = item.write(validate=False)
             if result['status'] == SUCCESS:
                 print(">> create: item has been written")
-                tree = self.tree
                 tree.message = 'New item {}'.format(str(item))
-                return tree.add_item(item) \
-                           .add_buttons(['index', 'search', 'modify', 'delete']) \
-                           .flatten_item() \
-                           .prune_item(2) \
-                           .asdict()
+                tree.add_item(item)
+                tree.add_buttons(self.item_buttons+self.item_buttons_extra)
+                tree.flatten_item()
+                tree.prune_item(2)
             else: # exception, in theory this should never occur
                 raise InternalError('New item {} could not be stored ({})'.\
                             format(str(item), result['data']))
@@ -665,11 +655,11 @@ class ItemView(BareItemView):
             tree.message = 'New item {} has validation errors {}'.\
                             format(str(item), validation['data'])
             print(">> create: item has validation errors", tree.message)
-            return tree.add_item(item)\
-                       .add_form_buttons('update', 'PUT')\
-                       .flatten_item()\
-                       .prune_item(2, form=True, erase=True)\
-                       .asdict()
+            tree.add_item(item)
+            tree.add_form_buttons('update', 'PUT')
+            tree.flatten_item()
+            tree.prune_item(2, form=True, erase=True)
+        return tree.asdict()
 
     @route('/{id:objectid}', method='DELETE', template='delete')
     def delete(self):
