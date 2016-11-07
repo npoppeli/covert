@@ -2,7 +2,7 @@
 """Objects and functions common to two or more modules in the package.
 """
 
-import html, json
+import json
 from yaml import load, load_all
 try:
     from yaml import CLoader as Loader
