@@ -13,6 +13,7 @@ Functions:
     * kernel_init:   initialize kernel
     * http_server:   development server based on Waitress
     * url_for:       create URL for route
+    * show_dict:     pretty-print dictionary
 
 Classes:
     * SwitchRouter:  WSGI front-end application that dispatches to WSGI applications for
@@ -28,4 +29,4 @@ Classes:
 from .           import setting
 from .config     import read_config, parse_cmdline, kernel_init
 from .controller import http_server, SwitchRouter, MapRouter, PageRouter, JSONRouter
-from .view       import route, BareItemView, ItemView, url_for
+from .view       import route, BareItemView, ItemView, url_for, show_dict, encode_dict
