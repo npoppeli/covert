@@ -43,9 +43,11 @@ def translate_query(query):
 
 def init_storage():
     """Initialize storage engine."""
-    print('Creating MongoDB connection')
+    if setting.debug:
+        print('Creating MongoDB connection')
     setting.store_connection = MongoClient()
-    print('Setting MongoDB database to', setting.store_dbname)
+    if setting.debug:
+        print('Setting MongoDB database to', setting.store_dbname)
     setting.store_db = setting.store_connection[setting.store_dbname]
 
 class Item(BareItem):
