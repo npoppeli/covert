@@ -3,6 +3,12 @@
 
 Attributes:
     config_default (dict): default values for configuration options
+
+Todo:
+    * I18N the right way
+    - http://inventwithpython.com/blog/2014/12/20/translate-your-python-3-program-with-the-gettext-module/
+    - https://flufli18n.readthedocs.io/en/latest/docs/using.html
+    - http://pylonsbook.com/en/1.1/internationalization-and-localization.html
 """
 
 import argparse, sys
@@ -28,7 +34,7 @@ def parse_cmdline():
     parser = argparse.ArgumentParser()
     parser.add_argument('-d', '--debug',  help='debug',  action='store_true', default=False)
     args = parser.parse_args()
-    setting.debug  = args.debug
+    setting.debug = args.debug
     return args
 
 config_default = dict(content='content', layout='layout',
@@ -42,7 +48,6 @@ def read_config():
     Returns:
         None
     """
-
     setting.site = getcwd() # assumption: cwd == site directory
     sys.path.insert(0, setting.site)
     config_file = join(setting.site, 'config')
@@ -57,11 +62,8 @@ def read_config():
     setting.language = config['language'] if config['language'] in setting.languages\
                        else config_default['language']
     label_index = setting.languages.index(setting.language)
-    print("Config: language is '{}'".format(setting.language))
-    # TODO: I18N the right way
-    # http://inventwithpython.com/blog/2014/12/20/translate-your-python-3-program-with-the-gettext-module/
-    # https://flufli18n.readthedocs.io/en/latest/docs/using.html
-    # http://pylonsbook.com/en/1.1/internationalization-and-localization.html
+    if setting.debug:
+        print("Config: language is '{}'".format(setting.language))
     for name in setting.labels.keys():
         parts = setting.labels[name].split('|')
         setting.labels[name] = parts[label_index]
@@ -113,9 +115,16 @@ def kernel_init():
 
     # print debugging information
     if setting.debug:
+        # print all routes (tabular)
         print('Application has {0} routes'.format(len(setting.routes)))
+        fmt = "{:<25}: {:<10} {:<15} {:<10} {:<30}"
+        print(fmt.format('pattern', 'method', 'view', 'route', 'templates'))
+        print('-' * 90)
         for route in setting.routes:
-            print(str(route))
+            print(fmt.format(route.pattern, route.method, route.cls.__name__, route.name,
+                           ', '.join(route.templates)))
+        print('')
+        # print all models (tabular)
         print('Application has {0} models'.format(len(setting.models)))
         for name in sorted(setting.models.keys()):
             if name.endswith('Ref'):
@@ -126,7 +135,7 @@ def kernel_init():
                 fmt = "{:<15}: {:<15} {:<10} {!s:<10} {!s:<10} {!s:<10} {!s:<10}"
                 print(fmt.format('name', 'label', 'schema', 'optional',
                                  'multiple', 'auto', 'formtype'))
-                print('-'*95)
+                print('-'*90)
                 for field_name in model.fields:
                     meta = model.meta[field_name]
                     print(fmt.format(field_name, meta.label, meta.schema, meta.optional,
