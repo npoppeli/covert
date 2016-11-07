@@ -39,11 +39,6 @@ class InternalError(Exception):
 #         target = default
 #     raise HTTPSeeOther(location=target)
 
-# JSend
-SUCCESS = 'success'
-FAIL    = 'fail'
-ERROR   = 'error'
-
 # YAML-related functions
 def read_file(filename):
     """Read entire text file.
@@ -76,6 +71,11 @@ def read_yaml_file(path, multi=False):
     return result
 
 # JSON-related functions
+# JSend
+SUCCESS = 'success'
+FAIL    = 'fail'
+ERROR   = 'error'
+
 class ExtendedEncoder(json.JSONEncoder):
     """JSON encoder that can handle all atom types"""
     def default(self, obj):
