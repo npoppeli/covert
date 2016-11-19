@@ -391,14 +391,22 @@ class ItemRef:
     """Reference to Item"""
     collection = 'Item'
 
-    def __init__(self, objectid):
+    def __init__(self, refid):
         """Initialize item reference.
 
         Arguments:
-            objectid: id of item.
+            refid (str): id of item.
         """
-        self.id = objectid
+        self.refid = refid
         self.str = ''
+
+    def __eq__(self, other):
+        """Determine equality of item references."""
+        return self.__class__.__name__ == other.__class__.__name__ and self.refid == other.refid
+
+    def __ne__(self, other):
+        """Determine inequality of item references."""
+        return self.__class__.__name__ != other.__class__.__name__ or self.refid != other.refid
 
     def __str__(self):
         """Informal string representation of item reference.
