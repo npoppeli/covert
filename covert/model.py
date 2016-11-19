@@ -367,7 +367,7 @@ def get_objectid(ref):
     Returns/Yields:
         str: item reference.
     """
-    return ref.id
+    return ref.refid
 
 def ref_tuple(ref):
     """Generate display form of item reference.
@@ -380,12 +380,12 @@ def ref_tuple(ref):
     Returns/Yields:
         (str, str): label, URL.
     """
-    if ref.id is None:
+    if ref.refid is None:
         return '', ''
     else:
         model = setting.models[ref.collection]
-        item = model.lookup(ref.id)
-        return str(item), '/{}/{}'.format(ref.collection.lower(), ref.id)  # label, url
+        item = model.lookup(ref.refid)
+        return str(item), '/{}/{}'.format(ref.collection.lower(), ref.refid)  # label, url
 
 class ItemRef:
     """Reference to Item"""
@@ -414,7 +414,7 @@ class ItemRef:
         Returns:
             str: human-readable representation.
         """
-        return self.__repr__()
+        return "{},{}".format(self.collection[0], self.refid[18:] if self.refid else '000000')
 
     def __repr__(self):
         """Formal string representation of item reference.
@@ -422,7 +422,7 @@ class ItemRef:
         Returns:
             str: representation for Python interpreter.
         """
-        return "{}({}, {})".format(self.__class__.__name__, self.collection, self.id)
+        return "{}({}, {})".format(self.__class__.__name__, self.collection, self.refid)
 
     def display(self):
         """Display form of item reference.
@@ -439,7 +439,7 @@ class ItemRef:
             Item: item retrieved from storage.
         """
         model = setting.models[self.collection]
-        return model.lookup(self.id)
+        return model.lookup(self.refid)
 
 
 class ParsedModel:
