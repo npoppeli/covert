@@ -24,9 +24,11 @@ Classes:
     * route:         decorator for methods in an ItemView class
     * BareItemView:  view that does not define routes
     * ItemView:      view with routes for the Atom Publishing protocol
+    * ItemRef:       base class for item references
 """
 
 from .           import setting
 from .config     import read_config, parse_cmdline, kernel_init
 from .controller import http_server, SwitchRouter, MapRouter, PageRouter, JSONRouter
+from .model      import ItemRef
 from .view       import route, BareItemView, ItemView, url_for, show_dict, encode_dict
