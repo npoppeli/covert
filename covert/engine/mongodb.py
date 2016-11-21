@@ -19,7 +19,9 @@ from bson.objectid import ObjectId
 query_map = {
     '==': lambda t: t[1],
     '=~': lambda t: {'$regex':t[1]},
-    '[]': lambda t: {'$gte':t[1], '$lte':t[2]}
+    '[]': lambda t: {'$gte': t[1], '$lte': t[2]},
+    '<=': lambda t: {'$lte': t[1]},
+    '>=': lambda t: {'$gte': t[1]}
 }
 
 def translate_query(query):
@@ -169,7 +171,8 @@ class Item(BareItem):
             validate (bool): if True, validate this document before writing.
 
         Returns:
-            dict: 'status':SUCCESS, 'id':<document id>} or {'status':FAIL, 'id':None}.
+            dict: {'status':SUCCESS, 'data':<document id>} or
+                  {'status':FAIL, 'data':None}.
         """
         new = self.get('id', '') == ''
         self['mtime'] = datetime.now()
@@ -184,18 +187,18 @@ class Item(BareItem):
                 message = "document {}\ndoes not validate because of error\n{}\n".\
                     format(self, validate_result['data'])
                 return {'status':FAIL, 'data':message}
+        doc = mapdoc(self.wmap, self)
+        collection = setting.store_db[self.name]
         try:
-            doc = mapdoc(self.wmap, self)
-            collection = setting.store_db[self.name]
             if new:
                 result = collection.insert_one(doc)
-                return {'status':SUCCESS, 'id':str(result.inserted_id)}
+                return {'status':SUCCESS, 'data':str(result.inserted_id)}
             else:
                 result = collection.replace_one({'_id':self['_id']}, doc)
-                return {'status':SUCCESS, 'id':str(result.upserted_id)}
+                return {'status':SUCCESS, 'data':str(result.upserted_id)}
         except Exception as e:
             message = 'document {}\nnot written because of error\n{}\n'.format(doc, str(e))
-            return {'status':ERROR, 'id':None, 'message':message}
+            return {'status':ERROR, 'data':None, 'message':message}
 
     # methods to set references (update database directly)
     def set_field(self, key, value):
@@ -206,12 +209,13 @@ class Item(BareItem):
            value (object): value of field.
 
         Returns:
-            dict: 'status':SUCCESS, 'id':<document id>} or {'status':FAIL, 'id':None}.
+            dict: {'status':SUCCESS, 'data':<document id>} or
+                  {'status':FAIL, 'data':None}.
         """
         oid = self['id']
         collection = setting.store_db[self.name]
         result = collection.update_one({'id':oid}, {'$set':{key:value}})
-        return {'status':SUCCESS if result.modified_count == 1 else FAIL, 'id': self['id']}
+        return {'status':SUCCESS if result.modified_count == 1 else FAIL, 'data': self['id']}
 
     def append_field(self, key, value):
         """Append value to list-valed field in item, directly in database.
@@ -221,12 +225,13 @@ class Item(BareItem):
            value (object): additional value of field.
 
         Returns:
-            dict: 'status':SUCCESS, 'id':<document id>} or {'status':FAIL, 'id':None}.
+            dict: {'status':SUCCESS, 'data':<document id>} or
+                  {'status':FAIL, 'data':None}.
         """
         oid = self['id']
         collection = setting.store_db[self.name]
         result = collection.update_one({'_id':oid}, {'$addToSet':{key:value}})
-        return {'status':SUCCESS if result.modified_count == 1 else FAIL, 'id': self['id']}
+        return {'status':SUCCESS if result.modified_count == 1 else FAIL, 'data': self['id']}
 
     def remove(self):
         """Remove item from collection (permanently).
@@ -234,10 +239,10 @@ class Item(BareItem):
         Remove item from collection.
 
         Returns:
-        Returns:
-            dict: 'status':SUCCESS, 'id':<document id>} or {'status':FAIL, 'id':None}.
+            dict: {'status':SUCCESS, 'data':<document id>} or
+                  {'status':FAIL, 'data':None}.
         """
         oid = self['_id']
         collection = setting.store_db[self.name]
         result = collection.delete_one({'_id':oid})
-        return {'status':SUCCESS if result.deleted_count == 1 else FAIL, 'id': self['id']}
+        return {'status':SUCCESS if result.deleted_count == 1 else FAIL, 'data': self['id']}
