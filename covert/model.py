@@ -19,7 +19,7 @@ HTML form -> [item']         -> convert -> [item] -> write   -> [JSON document] 
 Todo:
     * embedding in show panels
     * embedding and linking in form panels
-    * ref_tuple uses View.url_for()
+    * display_reference uses View.url_for()
     * tools for adding, modifying and deleting item references
     * tools for adding, modifying and deleting sub-items
     * item revisions (add 'rev' attribute)
@@ -369,7 +369,7 @@ def get_objectid(ref):
     """
     return ref.refid
 
-def ref_tuple(ref):
+def display_reference(ref):
     """Generate display form of item reference.
 
     This function is used as the display map for an item reference.
@@ -378,14 +378,12 @@ def ref_tuple(ref):
         ref (itemref): item reference.
 
     Returns/Yields:
-        (str, str): label, URL.
+        (str, str, str): label, URL, post-label.
     """
     if ref.refid is None:
-        return '', ''
+        return '', '', ''
     else:
-        model = setting.models[ref.collection]
-        item = model.lookup(ref.refid)
-        return str(item), '/{}/{}'.format(ref.collection.lower(), ref.refid)  # label, url
+        return ref.display()
 
 class ItemRef:
     """Reference to Item"""
@@ -408,13 +406,17 @@ class ItemRef:
         """Determine inequality of item references."""
         return self.__class__.__name__ != other.__class__.__name__ or self.refid != other.refid
 
+    def __bool__(self):
+        """Determine truth value of item reference."""
+        return bool(self.refid)
+
     def __str__(self):
         """Informal string representation of item reference.
 
         Returns:
             str: human-readable representation.
         """
-        return "{},{}".format(self.collection[0], self.refid[18:] if self.refid else '000000')
+        return "{},{}".format(self.collection[0], self.refid[18:] if self.refid else 'null')
 
     def __repr__(self):
         """Formal string representation of item reference.
@@ -430,7 +432,9 @@ class ItemRef:
         Returns:
             str: string to be inserted into render tree.
         """
-        return ref_tuple(self)
+        model = setting.models[self.collection]
+        item = model.lookup(self.refid)
+        return str(item), '/{}/{}'.format(self.collection.lower(), self.refid), ''
 
     def lookup(self):
         """Retrieve item referenced by itemref object from storage.
@@ -530,7 +534,7 @@ def parse_model_def(model_def, model_defs):
             if ref_name not in setting.models:
                 raise InternalError("reference to unknown model '{0}' in {1}".format(ref_name, line))
             # don not extend pm.cmap, since model reference needs no conversion
-            pm.dmap[field_name] = ref_tuple # create tuple (label, url)
+            pm.dmap[field_name] = display_reference
             pm.rmap[field_name] = ref_class # create ItemRef instance with argument 'objectid'
             pm.wmap[field_name] = get_objectid # write only object id to database
             pm.qmap[field_name] = None
