@@ -399,15 +399,27 @@ class ItemRef:
         self.str = ''
 
     def __eq__(self, other):
-        """Determine equality of item references."""
+        """Determine equality of item references.
+
+        Returns:
+            bool: self == other.
+        """
         return self.__class__.__name__ == other.__class__.__name__ and self.refid == other.refid
 
     def __ne__(self, other):
-        """Determine inequality of item references."""
+        """Determine inequality of item references.
+
+        Returns:
+        bool: self != other.
+        """
         return self.__class__.__name__ != other.__class__.__name__ or self.refid != other.refid
 
     def __bool__(self):
-        """Determine truth value of item reference."""
+        """Determine truth value of item reference.
+
+        Returns:
+            bool: self.id is not-empty (True)
+        """
         return bool(self.refid)
 
     def __str__(self):
@@ -508,8 +520,10 @@ def parse_model_def(model_def, model_defs):
         field_label = parts[label_index]
         if field_type[0] == '_': # embedded model (comparable to inner class)
             embedded = parse_model_def(model_defs[field_type], model_defs)
-            if not optional_field:
-                pm.empty[field_name] = [] if multiple_field else embedded.empty
+            if multiple_field:
+                pm.empty[field_name] = [] if optional_field else [embedded.empty]
+            elif not optional_field:
+                pm.empty[field_name] = embedded.empty
             pm.schema[schema_key] = [embedded.schema] if multiple_field else embedded.schema
             pm.meta[field_name] = Field(label=field_label, schema='dict',
                                         formtype='hidden', control='input',
@@ -539,8 +553,10 @@ def parse_model_def(model_def, model_defs):
             pm.wmap[field_name] = get_objectid # write only object id to database
             pm.qmap[field_name] = None
             empty_ref = ref_class(None)
-            if not optional_field:
-                pm.empty[field_name] = [] if multiple_field else empty_ref
+            if multiple_field:
+                pm.empty[field_name] = [] if optional_field else [empty_ref]
+            elif not optional_field:
+                pm.empty[field_name] = empty_ref
             pm.schema[schema_key] = [ref_class] if multiple_field else ref_class
             pm.meta[field_name] = Field(label=field_label, schema='itemref',
                                         formtype='hidden', control='input',
@@ -553,6 +569,10 @@ def parse_model_def(model_def, model_defs):
             if atom.read:    pm.rmap[field_name] = atom.read
             if atom.write:   pm.wmap[field_name] = atom.write
             if atom.query:   pm.qmap[field_name] = atom.query
+            if multiple_field:
+                pm.empty[field_name] = [] if optional_field else [atom.default]
+            elif not optional_field:
+                pm.empty[field_name] = atom.default
             if not optional_field:
                 pm.empty[field_name] = [] if multiple_field else atom.default
             pm.schema[schema_key] = [atom.schema] if multiple_field else atom.schema
