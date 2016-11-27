@@ -196,15 +196,17 @@ class Item(BareItem):
         try:
             if new:
                 result = collection.insert_one(doc)
-                return {'status':SUCCESS, 'data':str(result.matched_count)}
+                reply= {'status':SUCCESS, 'data':str(result.matched_count)}
             else:
                 result = collection.replace_one({'_id':self['_id']}, doc)
-                return {'status':SUCCESS, 'data':str(result.matched_count)}
-            report_db_action(result)
+                reply = {'status':SUCCESS, 'data':str(result.matched_count)}
+            report_db_action(reply)
+            return reply
         except Exception as e:
             message = 'document {}\nnot written because of error\n{}\n'.format(doc, str(e))
-            report_db_action(result)
-            return {'status':ERROR, 'data':None, 'message':message}
+            reply = {'status':ERROR, 'data':None, 'message':message}
+            report_db_action(reply)
+            return reply
 
     # methods to set references (update database directly)
     def set_field(self, key, value):
@@ -221,8 +223,9 @@ class Item(BareItem):
         oid = self['id']
         collection = setting.store_db[self.name]
         result = collection.update_one({'id':oid}, {'$set':{key:value}})
-        report_db_action(result)
-        return {'status':SUCCESS if result.modified_count == 1 else FAIL, 'data': self['id']}
+        reply = {'status':SUCCESS if result.modified_count == 1 else FAIL, 'data': self['id']}
+        report_db_action(reply)
+        return reply
 
     def append_field(self, key, value):
         """Append value to list-valed field in item, directly in database.
@@ -238,8 +241,9 @@ class Item(BareItem):
         oid = self['id']
         collection = setting.store_db[self.name]
         result = collection.update_one({'_id':oid}, {'$addToSet':{key:value}})
-        report_db_action(result)
-        return {'status':SUCCESS if result.modified_count == 1 else FAIL, 'data': self['id']}
+        reply = {'status':SUCCESS if result.modified_count == 1 else FAIL, 'data': self['id']}
+        report_db_action(reply)
+        return reply
 
     def remove(self):
         """Remove item from collection (permanently).
@@ -253,5 +257,6 @@ class Item(BareItem):
         oid = self['_id']
         collection = setting.store_db[self.name]
         result = collection.delete_one({'_id':oid})
-        report_db_action(result)
-        return {'status':SUCCESS if result.deleted_count == 1 else FAIL, 'data': self['id']}
+        reply = {'status':SUCCESS if result.deleted_count == 1 else FAIL, 'data': self['id']}
+        report_db_action(reply)
+        return reply
