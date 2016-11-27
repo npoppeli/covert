@@ -19,7 +19,7 @@ def read_templates():
         None
     """
     template_types = ['.xml', '.pt']
-    if setting.debug:
+    if setting.verbose:
         print('Scanning for templates in {0}'.format(setting.layout))
     for (dirpath, __, filenames) in walk(setting.layout):
         prefix = relpath(dirpath, setting.layout)

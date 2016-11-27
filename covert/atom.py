@@ -65,9 +65,9 @@ EMPTY_TIME     = time(0, 0, 0)
 EMPTY_DATE     = date(MINYEAR, 1, 1)
 MIDNIGHT       = time(0, 0, 0, 0)
 
-true_strings = ('j', 'ja') # TODO: I18N
+true_strings = ('j', 'ja')
 # EN: yes/no or y/n, SV: ja/nej
-bool_repr = {True:'ja', False:'nee'}   # TODO: I18N
+bool_repr = {True:'ja', False:'nee'}
 
 boolean_convert = lambda x: x.lower() in true_strings
 define_atom('boolean',
@@ -115,8 +115,8 @@ define_atom('float',
             control  = 'input'
             )
 
-genders = ['?', 'v', 'm'] # TODO: I18N
-define_atom('gender',  # TODO: add possibility to define this in application
+genders = ['?', 'v', 'm']
+define_atom('gender',
     schema   = int,
             convert  = int,
             display  = lambda x: genders[x],

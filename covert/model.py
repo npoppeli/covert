@@ -15,22 +15,6 @@ reading from/writing to storage, and for converting from/displaying as HTML (see
 
 storage   -> [JSON document] -> read    -> [item] -> display -> [item']         -> HTML page
 HTML form -> [item']         -> convert -> [item] -> write   -> [JSON document] -> storage
-
-Todo:
-    * embedding in show panels
-    * embedding and linking in form panels
-    * display_reference uses View.url_for()
-    * tools for adding, modifying and deleting item references
-    * tools for adding, modifying and deleting sub-items
-    * item revisions (add 'rev' attribute)
-    * make labels in BareItem language-dependent (I18N)
-    * 'active' attribute in BareItem is not auto, but has a default (True)
-
-Notes on item revisions
-1. If the number of revisions is low, keep all of them in the storage, and mark the
-   most recent one of them as the active revision.
-2. Otherwise, keep only the active revision in the item storage, and store
-   backward deltas in a separate storage (use libdiff for text).
 """
 
 from bisect import bisect_left, bisect_right

@@ -7,18 +7,6 @@ and one or more templates.
 
 In the present implementation, form validation is performed on the server. Alternative:
 do form validation in the client, using Parsley.js (jQuery) for example.
-
-Todo:
-    * I18N of setting.labels and messages
-    * authorization determines icon and button states (enabled, disabled)
-    * delete button is enabled iff item.active
-    * add 'import' method (form-based file upload, CSV and JSON)
-    * make ItemView.sort independent from db engine
-    * pass ItemView.sort to render tree methods in a more elegant way
-    * define icon and label for custom methods
-    * Use Mirage (JS) for client-side generation of search queries
-    * add boolean vector 'active' to the render tree (add_item, add_items)
-    * add 'title' attribute to render tree, let routes fill this; apply in templates
 """
 
 import re

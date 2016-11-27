@@ -3,15 +3,11 @@
 
 This module defines the Item class and an initialization function for the storage engine.
 The Item class encapsulates the details of the storage engine.
-
-Todo:
-    * make database connection thread-safe
-    * text index via Collection.ensureIndex({'author': 'text', 'content': 'text'})
 """
 
 from datetime import datetime
 from pymongo import MongoClient
-from ..common import SUCCESS, ERROR, FAIL, show_dict
+from ..common import SUCCESS, ERROR, FAIL
 from ..model import BareItem, mapdoc
 from .. import setting
 from bson.objectid import ObjectId
@@ -23,6 +19,12 @@ query_map = {
     '<=': lambda t: {'$lte': t[1]},
     '>=': lambda t: {'$gte': t[1]}
 }
+
+def report_db_action(r):
+    if setting.debug:
+        print("{}: status={} data={}".format(datetime.now(), r['status'], r['data']))
+        if 'message' in r:
+            print(r['message'])
 
 def translate_query(query):
     """Translate query to form suitable for this storage engine.
@@ -45,10 +47,10 @@ def translate_query(query):
 
 def init_storage():
     """Initialize storage engine."""
-    if setting.debug:
+    if setting.verbose:
         print('Creating MongoDB connection')
     setting.store_connection = MongoClient()
-    if setting.debug:
+    if setting.verbose:
         print('Setting MongoDB database to', setting.store_dbname)
     setting.store_db = setting.store_connection[setting.store_dbname]
 
@@ -186,18 +188,22 @@ class Item(BareItem):
             if validate_result['status'] != SUCCESS:
                 message = "document {}\ndoes not validate because of error\n{}\n".\
                     format(self, validate_result['data'])
-                return {'status':FAIL, 'data':message}
+                result = {'status':FAIL, 'data':message}
+                report_db_action(result)
+                return result
         doc = mapdoc(self.wmap, self)
         collection = setting.store_db[self.name]
         try:
             if new:
                 result = collection.insert_one(doc)
-                return {'status':SUCCESS, 'data':str(result.inserted_id)}
+                return {'status':SUCCESS, 'data':str(result.matched_count)}
             else:
                 result = collection.replace_one({'_id':self['_id']}, doc)
-                return {'status':SUCCESS, 'data':str(result.upserted_id)}
+                return {'status':SUCCESS, 'data':str(result.matched_count)}
+            report_db_action(result)
         except Exception as e:
             message = 'document {}\nnot written because of error\n{}\n'.format(doc, str(e))
+            report_db_action(result)
             return {'status':ERROR, 'data':None, 'message':message}
 
     # methods to set references (update database directly)
@@ -215,6 +221,7 @@ class Item(BareItem):
         oid = self['id']
         collection = setting.store_db[self.name]
         result = collection.update_one({'id':oid}, {'$set':{key:value}})
+        report_db_action(result)
         return {'status':SUCCESS if result.modified_count == 1 else FAIL, 'data': self['id']}
 
     def append_field(self, key, value):
@@ -231,6 +238,7 @@ class Item(BareItem):
         oid = self['id']
         collection = setting.store_db[self.name]
         result = collection.update_one({'_id':oid}, {'$addToSet':{key:value}})
+        report_db_action(result)
         return {'status':SUCCESS if result.modified_count == 1 else FAIL, 'data': self['id']}
 
     def remove(self):
@@ -245,4 +253,5 @@ class Item(BareItem):
         oid = self['_id']
         collection = setting.store_db[self.name]
         result = collection.delete_one({'_id':oid})
+        report_db_action(result)
         return {'status':SUCCESS if result.deleted_count == 1 else FAIL, 'data': self['id']}

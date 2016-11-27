@@ -3,12 +3,6 @@
 
 Attributes:
     config_default (dict): default values for configuration options
-
-Todo:
-    * I18N the right way
-    - http://inventwithpython.com/blog/2014/12/20/translate-your-python-3-program-with-the-gettext-module/
-    - https://flufli18n.readthedocs.io/en/latest/docs/using.html
-    - http://pylonsbook.com/en/1.1/internationalization-and-localization.html
 """
 
 import argparse, sys
@@ -32,9 +26,11 @@ def parse_cmdline():
         Namespace object: return value of parser.parse_args()
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument('-d', '--debug',  help='debug',  action='store_true', default=False)
+    parser.add_argument('-d', '--debug',   help='debug',   action='store_true', default=False)
+    parser.add_argument('-v', '--verbose', help='verbose', action='store_true', default=False)
     args = parser.parse_args()
     setting.debug = args.debug
+    setting.verbose = args.verbose
     return args
 
 config_default = dict(content='content', layout='layout',
@@ -62,7 +58,7 @@ def read_config():
     setting.language = config['language'] if config['language'] in setting.languages\
                        else config_default['language']
     label_index = setting.languages.index(setting.language)
-    if setting.debug:
+    if setting.verbose:
         print("Config: language is '{}'".format(setting.language))
     for name in setting.labels.keys():
         parts = setting.labels[name].split('|')
@@ -113,8 +109,8 @@ def kernel_init():
     module = import_module(name)
     read_views(module)
 
-    # print debugging information
-    if setting.debug:
+    # print information about models and views
+    if setting.verbose:
         # print all routes (tabular)
         print('Application has {0} routes'.format(len(setting.routes)))
         fmt = "{:<25}: {:<10} {:<15} {:<10} {:<30}"
