@@ -9,10 +9,6 @@ Only in cases where performance matters, save one dictionary lookup with:
     from covert.setting import routes
     for route in routes:
     ....
-
-Todo:
-    * make database connections thread-safe
-    * use Python's 'locale' functionality for I18N
 """
 
 # version number of package
@@ -28,6 +24,7 @@ language  = ''
 languages = ['en', 'nl', 'sv']
 config    = {} # configuration dictionary
 debug     = False
+verbose   = False
 
 # storage
 store_connection = None # connection for database
