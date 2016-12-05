@@ -412,7 +412,7 @@ class ItemRef:
         Returns:
             str: human-readable representation.
         """
-        return "{},{}".format(self.collection[0], self.refid[18:] if self.refid else 'null')
+        return "{}.{}".format(self.collection[0], self.refid[18:] if self.refid else 'null')
 
     def __repr__(self):
         """Formal string representation of item reference.
@@ -420,7 +420,7 @@ class ItemRef:
         Returns:
             str: representation for Python interpreter.
         """
-        return "{}({}, {})".format(self.__class__.__name__, self.collection, self.refid)
+        return "{}({},{})".format(self.__class__.__name__, self.collection, self.refid)
 
     def display(self):
         """Display form of item reference.
@@ -441,6 +441,18 @@ class ItemRef:
         model = setting.models[self.collection]
         return model.lookup(self.refid)
 
+    def lookup_field(self, field):
+        """Retrieve one field from item referenced by itemref object from storage.
+
+        Returns:
+            Any: field in item retrieved from storage, None if not available.
+        """
+        model = setting.models[self.collection]
+        item = model.lookup(self.refid)
+        if item and field in item:
+            return item[field]
+        else:
+            return None
 
 class ParsedModel:
     """Result of parsing a model definition.
