@@ -406,12 +406,19 @@ class RenderTree:
         meta, item = OrderedDict(), OrderedDict()
         for key, value in self.data.items():
             path = key.split('.')
-            field = path[-2] if path[-1].isnumeric() else path[-1]
-            field_meta = item_meta[field]
+            if path[-1].isnumeric():
+                field = path[-2]
+                field_meta = item_meta[field]
+                pos = int(path[-1])+1
+                label = field_meta.label if pos==1 else str(pos)
+            else:
+                field = path[-1]
+                field_meta = item_meta[field]
+                label  = field_meta.label
             if (key.count('.') < depth) and not\
-                    (field_meta.schema=='itemref' and form):
+               (field_meta.schema=='itemref' and form):
                 item[key] = '' if erase else value
-                meta[key] = {'label'   : field_meta.label,
+                meta[key] = {'label'   : label,
                              'enum'    : field_meta.enum,
                              'formtype': 'hidden' if field_meta.auto else field_meta.formtype,
                              'auto'    : field_meta.auto,
@@ -429,8 +436,8 @@ class RenderTree:
                 field = path[-2] if path[-1].isnumeric() else path[-1]
                 field_meta = item_meta[field]
                 if (key.count('.') < depth) and not\
-                        (field_meta.multiple or field_meta.auto or\
-                         field_meta.schema in ('text', 'memo', 'itemref')):
+                   (field_meta.multiple or field_meta.auto or\
+                    field_meta.schema in ('text', 'memo', 'itemref')):
                     item[key] = value
                     if not ready:
                         meta[key] = {'label'   : field_meta.label,
