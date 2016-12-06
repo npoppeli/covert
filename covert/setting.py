@@ -25,6 +25,7 @@ languages = ['en', 'nl', 'sv']
 config    = {} # configuration dictionary
 debug     = False
 verbose   = False
+nostore   = False # for 'dry runs'
 
 # storage
 store_connection = None # connection for database
