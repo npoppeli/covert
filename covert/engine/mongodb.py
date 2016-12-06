@@ -21,7 +21,7 @@ query_map = {
 }
 
 def report_db_action(r):
-    if setting.debug:
+    if setting.verbose:
         print("{}: status={} data={}".format(datetime.now(), r['status'], r['data']))
         if 'message' in r:
             print(r['message'])
@@ -193,10 +193,14 @@ class Item(BareItem):
                 return result
         doc = mapdoc(self.wmap, self)
         collection = setting.store_db[self.name]
+        if setting.nostore: # don't write to the database
+            reply = {'status':SUCCESS, 'data':'simulate '+('insert' if new else 'update')}
+            report_db_action(reply)
+            return reply
         try:
             if new:
                 result = collection.insert_one(doc)
-                reply= {'status':SUCCESS, 'data':str(result.matched_count)}
+                reply= {'status':SUCCESS, 'data':str(result.inserted_id)}
             else:
                 result = collection.replace_one({'_id':self['_id']}, doc)
                 reply = {'status':SUCCESS, 'data':str(result.matched_count)}
