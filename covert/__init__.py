@@ -6,6 +6,7 @@ License: ...
 
 Attributes:
     * setting:        module object with global settings
+    * patterns:       abbreviations for regular expressions in routes
 
 Functions:
     * read_config:    read configuration file
@@ -15,6 +16,10 @@ Functions:
     * http_server:    development server based on Waitress
     * url_for:        create URL for route
     * show_dict:      pretty-print dictionary
+    * split_route:    split route into components
+    * route2regex:    create regular expression from route specifier
+    * route2pattern:  create formatting string from route specifier
+
 
 Classes:
     * SwitchRouter:   WSGI front-end application that dispatches to WSGI applications for
@@ -34,3 +39,4 @@ from .config     import read_config, parse_cmdline, kernel_init
 from .controller import http_server, SwitchRouter, MapRouter, PageRouter, JSONRouter
 from .model      import ItemRef
 from .view       import route, BareItemView, ItemView, url_for, show_dict, encode_dict
+from .view       import patterns, split_route, route2pattern, route2regex
