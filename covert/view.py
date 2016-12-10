@@ -153,7 +153,7 @@ def split_route(pattern):
     return list(chain.from_iterable([p.split('}') for p in pattern.split('{')]))
 
 def route2pattern(pattern):
-    """Create formatting string from pattern.
+    """Create formatting string from route specifier.
 
     Remove the pattern specifier from all routing arguments in 'pattern', so that
     we get a pattern acceptable to str.format().
@@ -169,7 +169,7 @@ def route2pattern(pattern):
     return ''.join(parts)
 
 def route2regex(pattern):
-    """Create regular expression string from pattern.
+    """Create regular expression string from route specifier.
 
     Translate the patterns in the routing arguments to regular expression notation, so
     that we get a regular expression string.
