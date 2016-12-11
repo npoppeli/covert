@@ -110,8 +110,8 @@ class Item(BareItem):
         Returns:
             int: number of matchhing items.
         """
-        sequence = setting.store_db[cls.name].find(filter=cls.query(doc))
-        return sequence.count()
+        cursor = setting.store_db[cls.name].find(filter=cls.query(doc))
+        return cursor.count()
 
     @classmethod
     def find(cls, doc, skip=0, limit=0, sort=None):
@@ -128,9 +128,9 @@ class Item(BareItem):
         Returns:
             list: list of 'cls' instances.
         """
-        sequence = setting.store_db[cls.name].find(filter=cls.query(doc),
+        cursor = setting.store_db[cls.name].find(filter=cls.query(doc),
                                                    skip=skip, limit=limit, sort=sort)
-        return [cls(item) for item in sequence]
+        return [cls(item) for item in cursor]
 
     @classmethod
     def lookup(cls, oid):
@@ -145,8 +145,11 @@ class Item(BareItem):
         Returns:
             'cls' instance
         """
-        item = setting.store_db[cls.name].find_one({'id':oid})
-        return cls(item)
+        cursor = setting.store_db[cls.name].find_one({'id':oid})
+        if cursor.count() == 0:
+            return None
+        else:
+            return cls(item)
 
     @classmethod
     def read(cls, doc):
