@@ -145,9 +145,9 @@ class Item(BareItem):
         Returns:
             'cls' instance
         """
-        cursor = setting.store_db[cls.name].find_one({'id':oid})
-        if cursor.count() == 0:
-            return None
+        item = setting.store_db[cls.name].find_one({'id':oid})
+        if item is None:
+            return item
         else:
             return cls(item)
 
