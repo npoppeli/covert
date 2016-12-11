@@ -490,7 +490,7 @@ class BareItemView:
 
         Attributes:
             * request (Request):    HTTP request (WebOb)
-            * params  (MultiDict):  request parameters (WebOb multi-dict)
+            * params  (MultiDict):  route parameters (match.groupdict)
             * model   (Item):       model class
             * tree    (RenderTree): render tree object
         """
