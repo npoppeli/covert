@@ -23,6 +23,7 @@ model.py
 * item revisions (add 'rev' attribute)
 * make labels in BareItem language-dependent (I18N)
 * 'active' attribute in BareItem is not auto, but has a default (True)
+* query translation must include mapping of values as well (wmap)
 
 Notes on item revisions
 1. If the number of revisions is low, keep all of them in the storage, and mark the
