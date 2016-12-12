@@ -235,7 +235,7 @@ class Item(BareItem):
         return reply
 
     def append_field(self, key, value):
-        """Append value to list-valed field in item, directly in database.
+        """Append value to list-valued field in item, directly in database.
 
         Arguments:
            key   (str):    name of (list-valued) field.

@@ -114,17 +114,16 @@ class SwitchRouter:
         else:
             mode = self.PAGE_MODE
         try:
-            if setting.debug:
-                print('{0}: {1} {2}'.\
-                      format(self.mode_name[mode], req_method, request.path_qs))
             response = request.get_response(self._app[mode])
             if setting.debug:
-                print('{0}: status={1} body={2} characters'.\
-                      format(self.mode_name[mode], response.status, len(response.body)))
+                print('{0}: {1} {2} status={3} body={4} characters'.\
+                      format(self.mode_name[mode], req_method, request.path_qs,
+                             response.status, len(response.body)))
         except Exception as e:
             response = Response()
             response.text = exception_report(e)
-            print('{0} exception:', exception_report(e, False))
+            print('{0}: {1} {2} results in exception {3}\n'.\
+                  format(self.mode_name[mode], req_method, request.path_qs, exception_report(e, False)))
         return response(environ, start_response)
 
 
