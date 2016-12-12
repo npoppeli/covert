@@ -58,7 +58,7 @@ def read_config():
     setting.language = config['language'] if config['language'] in setting.languages\
                        else config_default['language']
     label_index = setting.languages.index(setting.language)
-    if setting.verbose:
+    if setting.debug:
         print("Config: language is '{}'".format(setting.language))
     for name in setting.labels.keys():
         parts = setting.labels[name].split('|')
@@ -110,7 +110,7 @@ def kernel_init():
     read_views(module)
 
     # print information about models and views
-    if setting.verbose:
+    if setting.debug:
         # print all routes (tabular)
         print('Application has {0} routes'.format(len(setting.routes)))
         fmt = "{:<25}: {:<10} {:<15} {:<10} {:<30}"

@@ -21,7 +21,7 @@ query_map = {
 }
 
 def report_db_action(r):
-    if setting.verbose:
+    if setting.debug:
         print("{}: status={} data={}".format(datetime.now(), r['status'], r['data']))
         if 'message' in r:
             print(r['message'])
@@ -51,7 +51,7 @@ def init_storage():
         print('Creating MongoDB connection')
     setting.store_connection = MongoClient()
     if setting.verbose:
-        print('Setting MongoDB database to', setting.store_dbname)
+        print("Setting MongoDB database to '{}'".format(setting.store_dbname))
     setting.store_db = setting.store_connection[setting.store_dbname]
 
 class Item(BareItem):
