@@ -75,6 +75,7 @@ define_atom('boolean',
             convert  = boolean_convert,
             query    = lambda x: ('==', boolean_convert(x)),
             display  = lambda x: bool_repr[x],
+            default  = False,
             formtype = 'boolean',
             enum     = ['nee', 'ja'],
             control  = 'radio'
@@ -111,6 +112,7 @@ define_atom('float',
             convert  = float,
             display  = lambda x: '{0:.2}'.format(x),
             query    = lambda x: ('==', float(x)),
+            default  = 0.0,
             formtype = 'number',
             control  = 'input'
             )
@@ -132,6 +134,7 @@ define_atom('integer',
             convert  = int,
             display  = str,
             query    = lambda x: ('==', int(x)),
+            default  = 0,
             formtype = 'number',
             control  = 'input'
             )
@@ -141,6 +144,7 @@ define_atom('memo',
             convert  = identity,
             display  = identity,
             query    = lambda x: ('=~', x),
+            default  = '',
             formtype = 'memo',
             control  = 'textarea'
             )
@@ -150,6 +154,7 @@ define_atom('string',
             convert  = identity,
             display  = identity,
             query    = lambda x: ('=~', x),
+            default  = '',
             formtype = 'text',
             control  = 'input'
             )
@@ -159,6 +164,7 @@ define_atom('text',
             convert  = identity,
             display  = identity,
             query    = lambda x: ('=~', x),
+            default  = '',
             formtype = 'text',
             control  = 'textarea'
             )
@@ -179,6 +185,7 @@ define_atom('url',
             convert  = identity,
             display  = identity,
             query    = lambda x: ('=~', x),
+            default  = '',
             formtype = 'url',
             control  = 'input'
             )
