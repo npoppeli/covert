@@ -15,17 +15,18 @@ Only in cases where performance matters, save one dictionary lookup with:
 __version__ = '0.7'
 
 # configuration
-content   = None # (static) content directory
-layout    = None # layout (template) directory
-site      = None # site directory
-models    = {}
-views     = {}
-language  = ''
-languages = ['en', 'nl', 'sv']
-config    = {} # configuration dictionary
-debug     = False
-verbose   = False
-nostore   = False # for 'dry runs'
+content     = None # (static) content directory
+layout      = None # layout (template) directory
+site        = None # site directory
+models      = {}
+views       = {}
+language    = ''
+languages   = ['en', 'nl', 'sv']
+config      = {} # configuration dictionary
+config_file = '' # name of configuration file
+debug       = False
+verbose     = False
+nostore     = False # for 'dry runs'
 
 # storage
 store_connection = None # connection for database

@@ -26,9 +26,11 @@ def parse_cmdline():
         Namespace object: return value of parser.parse_args()
     """
     parser = argparse.ArgumentParser()
+    parser.add_argument('-c', '--config',  help='configuration file', action='store', default='config')
     parser.add_argument('-d', '--debug',   help='debug',   action='store_true', default=False)
     parser.add_argument('-v', '--verbose', help='verbose', action='store_true', default=False)
     args = parser.parse_args()
+    setting.config_file = args.config
     setting.debug = args.debug
     setting.verbose = args.verbose
     return args
@@ -46,12 +48,14 @@ def read_config():
     """
     setting.site = getcwd() # assumption: cwd == site directory
     sys.path.insert(0, setting.site)
-    config_file = join(setting.site, 'config')
+    config_file = join(setting.site, setting.config_file)
     config = config_default.copy()
     if exists(config_file) and isfile(config_file):
         doc0 = read_yaml_file(config_file)
         config.update(doc0)
     setting.content = join(setting.site, config['content'])
+    if setting.debug:
+        print('Static content is in {0}'.format(setting.content))
     setting.layout  = join(setting.site, config['layout'])
     setting.store_dbname  = config['dbname']
     setting.dbtype  = config['dbtype']
