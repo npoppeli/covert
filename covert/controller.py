@@ -7,6 +7,7 @@ depending on the request parameters.
 
 import html, sys, traceback, waitress
 from webob import BaseRequest as Request, Response # performance of BaseRequest is better
+
 from . import setting
 from .common import encode_dict
 from .report import logger
@@ -119,6 +120,7 @@ class SwitchRouter:
                 print('{0}: {1} {2} status={3} body={4} characters'.\
                       format(self.mode_name[mode], req_method, request.path_qs,
                              response.status, len(response.body)))
+                print('referred from: {0}'.format(request.referer))
         except Exception as e:
             response = Response()
             response.text = exception_report(e)

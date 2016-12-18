@@ -3,6 +3,8 @@
 """
 
 import json
+from urllib.parse import urlparse, urljoin
+from webob.exc import HTTPTemporaryRedirect
 from yaml import load, load_all
 try:
     from yaml import CLoader as Loader
@@ -22,22 +24,22 @@ class InternalError(Exception):
         return repr(self.message)
 
 # HTTP-related functions
-# def is_safe_url(target, req):
-#     host_url = urlparse(req.host_url)
-#     test_url = urlparse(urljoin(req.host_url, target))
-#     return test_url.scheme in ('http', 'https') and (host_url.netloc == test_url.netloc)
+def is_safe_url(target, request):
+    host_url = urlparse(request.host_url)
+    test_url = urlparse(urljoin(request.host_url, target))
+    return test_url.scheme in ('http', 'https') and (host_url.netloc == test_url.netloc)
 
-# def redirect_location(req):
-#     if req.referrer and is_safe_url(req.referrer, req):
-#         return req.referrer
-#     else:
-#         return ''
+def redirect_location(request):
+    if request.referrer and is_safe_url(request.referrer, request):
+        return request.referrer
+    else:
+        return ''
 
-# def redirect_back(req, default):
-#     target = req.params['_next']
-#     if not target or not is_safe_url(target):
-#         target = default
-#     raise HTTPSeeOther(location=target)
+def redirect_back(request, default):
+    target = request.params['_next']
+    if not target or not is_safe_url(target):
+        target = default
+    raise HTTPTemporaryRedirect(location=target)
 
 # YAML-related functions
 def read_file(filename):
