@@ -373,11 +373,11 @@ class ItemRef:
     """Reference to Item"""
     collection = 'Item'
 
-    def __init__(self, refid):
+    def __init__(self, refid=None):
         """Initialize item reference.
 
         Arguments:
-            refid (str): id of item.
+            refid (str): id of item (default: None, for an empty reference).
         """
         self.refid = refid
         self.str = ''

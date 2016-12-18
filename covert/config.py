@@ -53,24 +53,29 @@ def read_config():
     if exists(config_file) and isfile(config_file):
         doc0 = read_yaml_file(config_file)
         config.update(doc0)
+    if 'debug'   in config: setting.debug   = config['debug']
+    if 'nostore' in config: setting.nostore = config['nostore']
+    if 'verbose' in config: setting.verbose = config['verbose']
     setting.content = join(setting.site, config['content'])
-    if setting.debug:
-        print("Debug level is {0}".format(setting.debug))
-        print("Verbosity level is {0}".format(setting.verbose))
-        print("Static content is in {0}".format(setting.content))
     setting.layout  = join(setting.site, config['layout'])
     setting.store_dbname  = config['dbname']
     setting.dbtype  = config['dbtype']
     setting.language = config['language'] if config['language'] in setting.languages\
                        else config_default['language']
     label_index = setting.languages.index(setting.language)
-    if setting.debug:
-        print("User interface is in the '{}' language".format(setting.language))
     for name in setting.labels.keys():
         parts = setting.labels[name].split('|')
         setting.labels[name] = parts[label_index]
     # save original configuration
     setting.config  = config
+    # in debugging mode, print some configuration parameters
+    if setting.debug:
+        print("Debug level is {}".format(setting.debug))
+        print("Verbosity level is {}".format(setting.verbose))
+        print("Changes are{}written to the database".\
+              format(' *not* ' if setting.nostore else ' '))
+        print("Static content is in directory {}".format(setting.content))
+        print("User interface is in the '{}' language".format(setting.language))
 
 def kernel_init():
     """Initialize kernel.
