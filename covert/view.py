@@ -384,7 +384,8 @@ class RenderTree:
                                 limit=self.cursor.limit, skip=self.cursor.skip, sort=sort)
         self.data = []
         if not items:
-            self.message += 'Nothing found for query {}'.format(self.cursor.query)
+            qs = ', '.join(["{}{}{}".format(k, v[0], v[1]) for k, v in self.cursor.query.items()])
+            self.message += 'Nothing found for query {}'.format(qs)
             return self
         for item in items:
             button_list = [(delete_button if button == 'delete' else

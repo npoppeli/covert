@@ -23,9 +23,10 @@ views       = {}
 language    = ''
 languages   = ['en', 'nl', 'sv']
 config      = {} # configuration dictionary
-config_file = '' # name of configuration file
-debug       = False
-verbose     = False
+config_file = 'config' # name of configuration file
+dbtype      = 'mongodb'
+debug       = 0
+verbose     = 0
 nostore     = False # for 'dry runs'
 
 # storage

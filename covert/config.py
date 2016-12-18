@@ -27,8 +27,8 @@ def parse_cmdline():
     """
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--config',  help='configuration file', action='store', default='config')
-    parser.add_argument('-d', '--debug',   help='debug',   action='store_true', default=False)
-    parser.add_argument('-v', '--verbose', help='verbose', action='store_true', default=False)
+    parser.add_argument('-d', '--debug',   help='debug',   action='count', default=0)
+    parser.add_argument('-v', '--verbose', help='verbose', action='count', default=0)
     args = parser.parse_args()
     setting.config_file = args.config
     setting.debug = args.debug
@@ -55,7 +55,9 @@ def read_config():
         config.update(doc0)
     setting.content = join(setting.site, config['content'])
     if setting.debug:
-        print('Static content is in {0}'.format(setting.content))
+        print("Debug level is {0}".format(setting.debug))
+        print("Verbosity level is {0}".format(setting.verbose))
+        print("Static content is in {0}".format(setting.content))
     setting.layout  = join(setting.site, config['layout'])
     setting.store_dbname  = config['dbname']
     setting.dbtype  = config['dbtype']
@@ -63,7 +65,7 @@ def read_config():
                        else config_default['language']
     label_index = setting.languages.index(setting.language)
     if setting.debug:
-        print("Config: language is '{}'".format(setting.language))
+        print("User interface is in the '{}' language".format(setting.language))
     for name in setting.labels.keys():
         parts = setting.labels[name].split('|')
         setting.labels[name] = parts[label_index]
@@ -114,7 +116,7 @@ def kernel_init():
     read_views(module)
 
     # print information about models and views
-    if setting.debug:
+    if setting.debug > 1: # debug level 2
         # print all routes (tabular)
         print('Application has {0} routes'.format(len(setting.routes)))
         fmt = "{:<25}: {:<10} {:<15} {:<10} {:<30}"
