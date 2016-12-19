@@ -10,19 +10,18 @@ config.py
   - http://inventwithpython.com/blog/2014/12/20/translate-your-python-3-program-with-the-gettext-module/
   - https://flufli18n.readthedocs.io/en/latest/docs/using.html
   -  http://pylonsbook.com/en/1.1/internationalization-and-localization.html
-* make argument list in parse_cmdline configurable
 
 model.py
 --------
 * embedding in show panels
 * embedding and linking in form panels
 * display_reference uses View.url_for()
-* tools for adding, modifying and deleting items with multiple=True
+* tools for adding, modifying and deleting list-valued items (multiple=True)
 * tools for adding, modifying and deleting item references
 * tools for adding, modifying and deleting sub-items
 * item revisions (add 'rev' attribute)
 * make labels in BareItem language-dependent (I18N)
-* 'active' attribute in BareItem is not auto, but has a default (True)
+* 'active' attribute in BareItem is not 'auto', but has a default (True)
 * query translation must include mapping of values as well (wmap)
 
 Notes on item revisions
@@ -53,7 +52,6 @@ view.py
 
 engine/mongodb.py
 -----------------
-
 * make database connection thread-safe
 * text index via Collection.ensureIndex({'author': 'text', 'content': 'text'})
 

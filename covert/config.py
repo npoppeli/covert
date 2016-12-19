@@ -16,6 +16,11 @@ from .view import read_views
 from .layout import read_templates
 from .common import read_yaml_file, InternalError
 
+extra_arguments = {}
+
+def add_argument(name, **options):
+    extra_arguments[name] = options
+
 def parse_cmdline():
     """Parse command line
 
@@ -28,10 +33,14 @@ def parse_cmdline():
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--config',  help='configuration file', action='store', default='config')
     parser.add_argument('-d', '--debug',   help='debug',   action='count', default=0)
+    parser.add_argument('-n', '--nostore', help='dry run', action='store_true', default=False)
     parser.add_argument('-v', '--verbose', help='verbose', action='count', default=0)
+    for name, options in extra_arguments.items():
+        parser.add_argument(name[1:3], name, **options)
     args = parser.parse_args()
     setting.config_file = args.config
     setting.debug = args.debug
+    setting.nostore = args.nostore
     setting.verbose = args.verbose
     return args
 
