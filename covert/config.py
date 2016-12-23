@@ -130,7 +130,7 @@ def kernel_init():
     read_views(module)
 
     # print information about models and views
-    if setting.debug > 1: # debug level 2
+    if setting.debug > 2: # debug level 3
         # print all routes (tabular)
         print('Application has {0} routes'.format(len(setting.routes)))
         fmt = "{:<25}: {:<10} {:<15} {:<10} {:<30}"

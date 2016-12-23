@@ -118,7 +118,7 @@ class Item(BareItem):
         """Retrieve items from collection.
 
         Find zero or more items in collection, and return these in the
-        form of a list of 'cls' instances. Assumption: stored documents are valid.
+        form of a list of 'cls' instances. Assumption: stored items are valid.
         Arguments:
             doc   (dict): dictionary specifying the query, e.g. {'id': '1234'}.
             skip  (int):  number of items to skip.
@@ -168,15 +168,15 @@ class Item(BareItem):
         return cls(item)
 
     def write(self, validate=True):
-        """Write document to permanent storage.
+        """Write item to permanent storage.
 
-        Save document contained in this instance.
+        Save item (document) contained in this instance.
 
         Arguments:
-            validate (bool): if True, validate this document before writing.
+            validate (bool): if True, validate this item before writing.
 
         Returns:
-            dict: {'status':SUCCESS, 'data':<document id>} or
+            dict: {'status':SUCCESS, 'data':<item id>} or
                   {'status':FAIL, 'data':None}.
         """
         new = self.get('id', '') == ''
@@ -189,7 +189,7 @@ class Item(BareItem):
         if validate:
             validate_result = self.validate(self)
             if validate_result['status'] != SUCCESS:
-                message = "document {}\ndoes not validate because of error\n{}\n".\
+                message = "item {}\ndoes not validate because of error\n{}\n".\
                     format(self, validate_result['data'])
                 result = {'status':FAIL, 'data':message}
                 report_db_action(result)
@@ -210,7 +210,7 @@ class Item(BareItem):
             report_db_action(reply)
             return reply
         except Exception as e:
-            message = 'document {}\nnot written because of error\n{}\n'.format(doc, str(e))
+            message = 'item {}\nnot written because of error\n{}\n'.format(doc, str(e))
             reply = {'status':ERROR, 'data':None, 'message':message}
             report_db_action(reply)
             return reply
@@ -224,15 +224,26 @@ class Item(BareItem):
            value (object): value of field.
 
         Returns:
-            dict: {'status':SUCCESS, 'data':<document id>} or
+            dict: {'status':SUCCESS, 'data':<item id>} or
                   {'status':FAIL, 'data':None}.
         """
         oid = self['id']
         collection = setting.store_db[self.name]
-        result = collection.update_one({'id':oid}, {'$set':{key:value}})
-        reply = {'status':SUCCESS if result.modified_count == 1 else FAIL, 'data': self['id']}
-        report_db_action(reply)
-        return reply
+        if setting.nostore: # don't write to the database
+            reply = {'status': SUCCESS, 'data': 'simulate update'}
+            report_db_action(reply)
+            return reply
+        doc = mapdoc(self.wmap, {key:value})
+        try:
+            result = collection.update_one({'id':oid}, {'$set':{key:doc[key]}})
+            reply = {'status':SUCCESS if result.modified_count == 1 else FAIL, 'data': self['id']}
+            report_db_action(reply)
+            return reply
+        except Exception as e:
+            message = 'item {}\nnot updated because of error\n{}\n'.format(self, str(e))
+            reply = {'status':ERROR, 'data':None, 'message':message}
+            report_db_action(reply)
+            return reply
 
     def append_field(self, key, value):
         """Append value to list-valued field in item, directly in database.
@@ -242,15 +253,26 @@ class Item(BareItem):
            value (object): additional value of field.
 
         Returns:
-            dict: {'status':SUCCESS, 'data':<document id>} or
+            dict: {'status':SUCCESS, 'data':<ment id>} or
                   {'status':FAIL, 'data':None}.
         """
         oid = self['id']
         collection = setting.store_db[self.name]
-        result = collection.update_one({'_id':oid}, {'$addToSet':{key:value}})
-        reply = {'status':SUCCESS if result.modified_count == 1 else FAIL, 'data': self['id']}
-        report_db_action(reply)
-        return reply
+        if setting.nostore: # don't write to the database
+            reply = {'status': SUCCESS, 'data': 'simulate update'}
+            report_db_action(reply)
+            return reply
+        doc = mapdoc(self.wmap, {key:value})
+        try:
+            result = collection.update_one({'_id':oid}, {'$addToSet':{key:doc[key]}})
+            reply = {'status':SUCCESS if result.modified_count == 1 else FAIL, 'data': self['id']}
+            report_db_action(reply)
+            return reply
+        except Exception as e:
+            message = 'item {}\nnot written because of error\n{}\n'.format(self, str(e))
+            reply = {'status':ERROR, 'data':None, 'message':message}
+            report_db_action(reply)
+            return reply
 
     def remove(self):
         """Remove item from collection (permanently).
@@ -258,7 +280,7 @@ class Item(BareItem):
         Remove item from collection.
 
         Returns:
-            dict: {'status':SUCCESS, 'data':<document id>} or
+            dict: {'status':SUCCESS, 'data':<item id>} or
                   {'status':FAIL, 'data':None}.
         """
         oid = self['_id']
