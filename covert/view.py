@@ -300,9 +300,12 @@ def normal_button(view_name, route_name, item):
 
 def form_button(view_name, route_name, item, button_name):
     """Create render-tree element for form button."""
+    action = url_for(view_name, route_name, item)
+    if setting.debug:
+        print('form_button: route={} action={}'.format(route_name, action))
     return {'label': label_for(button_name), 'icon': icon_for(button_name),
             'name': button_name, 'method':'POST',
-            'action': url_for(view_name, route_name, item)}
+            'action': action}
 
 def delete_button(view_name, route_name, item):
     """Create render-tree element for delete button."""
@@ -466,7 +469,10 @@ class RenderTree:
         """Add search button to render tree."""
         if self.data:
             # item = self.data[0]['item']
-            self.buttons = [form_button(self.view_name, route_name, {}, 'search')]
+            button = form_button(self.view_name, route_name, {}, 'search')
+            if setting.debug:
+                print('add_search_button: route={} button={}'.format(route_name, button))
+            self.buttons = [button]
 
     def asdict(self):
         """Create dictionary representation of render tree."""
@@ -547,7 +553,7 @@ class ItemView(BareItemView):
         tree.prune_item(1, erase=True, form=True)
         return tree.asdict()
 
-    @route('/search', method='POST', template='index')
+    @route('/match', method='GET,POST', template='index')
     def match(self):
         """Show the result list of a search."""
         tree = self.tree
@@ -659,7 +665,7 @@ class ItemView(BareItemView):
 
     @route('/{id:objectid}', method='DELETE', template='delete')
     def delete(self):
-        """Delete one item in functional sense.
+        """Delete one item in the functional sense.
 
         Items are not permanently removed, e.g. item.remove(), but marked as
         inactive. Permanent removal can be done by a clean-up routine, if necessary.
