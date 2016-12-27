@@ -5,7 +5,7 @@ The atomic constituents of items should be a common subset of MongoDB, RethinkDB
 Otherwise, atoms have a partial dependence on the storage engine, via the read and write maps.
 """
 
-from datetime import datetime, date, time, MINYEAR
+from datetime import datetime, date, time
 from .common import InternalError
 
 class Atom:
@@ -60,6 +60,7 @@ def define_atom(name, **kwarg):
 
 identity = None # since we use sparse transformation maps
 
+MINYEAR        = 1401 # restriction in RethinkDB
 EMPTY_DATETIME = datetime(MINYEAR, 1, 1, 0, 0, 0)
 EMPTY_TIME     = time(0, 0, 0)
 EMPTY_DATE     = date(MINYEAR, 1, 1)
