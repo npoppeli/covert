@@ -1,177 +1,182 @@
 # -*- coding: utf-8 -*-
-"""
-covert.engine.rethinkdb
------
-Objects and functions related to the RethinkDB storage engine.
+"""Objects and functions related to the RethinkDB storage engine.
+
+This module defines the Item class and an initialization function for the storage engine.
+The Item class encapsulates the details of the storage engine.
 """
 
+from datetime import datetime
 import rethinkdb as r
-from ..model import BareItem
+from ..common import SUCCESS, ERROR, FAIL
+from ..model import BareItem, mapdoc
+from .. import setting
+from bson.objectid import ObjectId
 
-store_name = ''
-store_conn, store_db = None, None
+def report_db_action(result):
+    if setting.debug >1 : # debug level 2
+        print("{}: status={} data={}".format(datetime.now(), result['status'], result['data']))
+        if 'message' in result:
+            print(result['message'])
 
 def init_storage():
-    global store_name, store_conn, store_db
-    store_name = 'develop'
-    store_conn = r.connect(db=store_name)
-    store_db = store_conn.db(store_name)
+    """Initialize storage engine."""
+    if setting.debug:
+        print('Creating RethinkDB connection')
+    setting.store_connection = r.connect(db=setting.store_dbname).repl()
+    if setting.debug:
+        print("Setting RethinkDB database to '{}'".format(setting.store_dbname))
+    setting.store_db = r.db(setting.store_dbname)
 
 class Item(BareItem):
+    """Class for reading and writing objects from/to this storage engine.
+
+    This class adds storage-dependent methods to the base class BareItem.
     """
-    Item: class for reading and writing objects from/to a particular form of storage.
-    This class adds methods to the data attributes of the base class.
-    """
-    def __init__(self, doc={}):
+    @classmethod
+    def create_collection(cls):
+        """Create collection cls.name, unless this is already present.
+
+        Returns:
+            None
         """
-        __init__(self, doc)
-        Initialize instance from dictionary doc.
-        """
-        for (key, value) in doc.items():
-            self[key] = value
+        coll_list = r.table_list().run(setting.store_connection)
+        if cls.name not in coll_list:
+            r.table_create(cls.name).run(setting.store_connection)
 
     @classmethod
-    def create_table(cls):
-        """
-        create_table(cls)
-        Create table (collection) cls._name, unless this is already present.
-        A useful feature of MongoDB is automatic creation of databases and
-        collections, so this is not strictly necessary.
-        """
-        table_list = store_db.tableList().run(store_conn)
-        if cls._name not in table_list:
-            store_db.tableCreate(cls._name).run(store_conn)
+    def create_index(cls, index_keys):
+        """Create index on index_keys.
 
-    @classmethod
-    def create_index(cls, key):
-        """
-        create_index(cls)
-        Create index on cls._key, unless this index is already present.
-        This is a no-op if the key == 'id', since in RethinkDB this is
-        the primary key, which is indexed by default.
-        """
-        if cls._key != 'id':
-            table = store_db.table(cls._name)
-            index_list = table.indexList().run(store_conn)
-            if cls._key not in index_list:
-                table.indexCreate(cls._key).run(store_conn)
+        Create index on index_keys, unless this index is already present.
 
-    @classmethod
-    def convert(cls, doc):
-        """
-        convert(cls, doc): item
-        Convert string representation of item to item with typed fields.
-        """
-        result = {}
-        for name, value in doc.items():
-            convert = cls._skeleton[name].convert:
-            if cls._skeleton[name].multiple:
-                result[name] = [ convert(e) for e in value ]
-            else:
-                result[name] = convert(value)
-        return cls(result)
+        Arguments:
+            index_keys (list): list of 2-tuples (name, direction), where direction is 1 or -1
 
-    def display(self):
+        Returns:
+            None
         """
-        display(self): pnode
-        Create pnode (rendering structure).
-        {'@family': 'item', '@genus': '',
-         content: [
-            {'@family': 'field', '@genus': '', 'label': LABEL, 'children': [...] },
-            {'@family': 'field', '@genus': '', 'label': LABEL, 'children': [...] },
-            ...
-          ]
-        }
-        """
-        result = []
-        for name, field in self._skeleton.items():
-            field_value = self[name]
-            if field.multiple:
-                childlist =  [ node('show', field.schema, value=e) for e in field_value  ]
-            else:
-                childlist = [ node('show', field.schema, value=field_value) ]
-            result.append(node('field', '',
-                               label=field.label, children=childlist,
-                               hidden=field.hidden, multiple=field.multiple))
-        return node('item', '', label=self._name, content=result)
+        for el in index_keys:
+            if el[0] != 'id':
+                table = r.table(cls.name)
+                index_list = table.index_list().run(setting.store_connection)
+                if el[0] not in index_list:
+                    table.index_create(el[0]).run(setting.store_connection)
 
     @classmethod
     def query(cls, doc):
+        """Create query.
+
+        Create query from dictionary doc.
+
+        Arguments:
+            doc (dict): dictionary specifying a search query.
+
+        Returns:
+            query: query in RethinkDB form.
         """
-        query(cls, doc): dict
-        Make query (dictionary) from dictionary doc, using only known fields and
-        non-null values.
-        """
-        qdoc = dict((name, value) for name, value in doc.items()
-                     if name in cls._fields and value)
-        return qdoc
+        query = r.table(cls.name)
+        for key, value in doc.items():
+            operator = value[0]
+            if operator == '==':
+                query = query.filter(r.row[key] == value[1])
+            elif operator == '=~':
+                query = query.filter(r.row[key].match(value[1]))
+            elif operator == '[]':
+                query = query.filter((r.row[key] >= value[1]) & (r.row[key] <= value[2]))
+            elif operator == '<=':
+                query = query.filter(r.row[key] <= value[1])
+            elif operator == '>=':
+                query = query.filter(r.row[key] >= value[1])
+        return query
 
     @classmethod
-    def find(cls, qdoc={}, skip=0, limit=0, fields=None, sort=None):
-        """
-        find(cls, qdoc): list
-        Find zero or more documents in collection, and return these in the
-        form of a list of instances of 'cls'.
-        qdoc: dictionary specifying the query, e.g. {'id': '1234'}
+    def count(cls, doc):
+        """Count items in collection that match a given query.
 
-        Regular expressions:
-            db.collection.find({'family':{'$regex':'^Fel'}}), or
-            rx = re.compile(r'^Fel')
-            db.collection.find({'family':rx})
+        Find zero or more items (documents) in collection, and count them.
+        Arguments:
+            doc (dict): dictionary specifying the query, e.g. {'id': ('==', '1234')}
 
-        r.table('table').filter(lambda item: item['author'].match('^A'))
+        Returns:
+            int: number of matching items.
         """
-        table = store_db.table(cls._name)
-        cursor = table.indexList().run(store_conn)
-        result = [cls(cls._validate(doc)) for doc in
-                  cls._collection.find(spec=cls.query(qdoc), skip=skip, limit=limit,
-                                       fields=fields, sort=sort)]
-        return result
+        cursor = cls.query(doc)
+        return cursor.count().run(setting.store_connection)
 
     @classmethod
-    def get(cls, key):
+    def find(cls, doc, skip=0, limit=0, sort=None):
+        """Retrieve items from collection.
+
+        Find zero or more items in collection, and return these in the
+        form of a list of 'cls' instances. Assumption: stored items are valid.
+
+        Arguments:
+            doc   (dict): dictionary specifying the query, e.g. {'id': ('==', '1234')}.
+            skip  (int):  number of items to skip.
+            limit (int):  maximum number of items to retrieve.
+            sort  (list): sort specification.
+
+        Returns:
+            list: list of 'cls' instances.
         """
-        lookup(cls, key): doc
-        Return first document in collection matching the given key,
-        or None if no document matches this key.
-        key: primary or secondary key (string)
+        cursor = cls.query(doc)
+        if skip:  cursor = cursor.skip(skip)
+        if limit: cursor = cursor.limit(limit)
+        if sort:
+            sort_spec = [r.asc(el[0]) if el[1] == 1 else r.desc(el[0]) for el in sort]
+            cursor = cursor.order_by(*sort_spec)
+        result = cursor.run(setting.store_connection)
+        return [cls(item) for item in result]
+
+    @classmethod
+    def lookup(cls, oid):
+        """Retrieve one item from collection.
+
+        Retrieve first item in collection matching the given primary key (id),
+        or None if no item matches this key.
+
+        Arguments:
+           oid (str): value of 'id' attribute.
+
+        Returns:
+            'cls' instance
         """
-        result = cls._collection.find_one({cls._key:key})
-        if result:
-            return cls(cls._validate(result))
+        item = r.table(cls.name).get(oid).run(setting.store_connection)
+        if item is None:
+            return item
         else:
-            return None
+            return cls(item)
 
     @classmethod
-    def read(cls, qdoc):
+    def read(cls, doc):
+        """Retrieve one item from collection.
+
+        Retrieve first item in collection matching the given query (doc),
+        or None if no item matches this key.
+
+        Arguments:
+           doc (dict): search query.
+
+        Returns:
+            'cls' instance.
         """
-        read(cls, qdoc): doc
-        Return first document in collection matching the given query,
-        or None if no document matches this query.
-        qdoc: dictionary specifying the query, e.g. {'id': 1234}
-        """
-        result = cls._collection.find_one(cls.query(qdoc))
-        if result:
-            return cls(cls._validate(result))
-        else:
+        result = list(r.table(cls.name).filter(cls.query(doc)).run(setting.store_connection))
+        if len(result) == 0:
             return None
+        else:
+            return cls(result[0])
 
-    def remove(self):
-        """
-        remove(self): doc
-        Remove document from collection.
-        Returns document:
-        { 'unchanged':0, 'skipped':0, 'replaced':1,
-          'inserted':0,
-          'errors':0, 'deleted':1 }
-        TODO return engine-independent return value
-        """
-        return self._collection.remove()
+    def write(self, validate=True):
+        """Write item to permanent storage.
 
-    def write(self):
-        """
-        write(self): doc
-        Write (or update) document contained in this instance.
+        Save item (document) contained in this instance.
+
+        Arguments:
+            validate (bool): if True, validate this item before writing.
+
+        Returns:
+            dict: {'status':SUCCESS, 'data':<item id>} or
+                  {'status':FAIL, 'data':None}.
         Returns document:
         { 'unchanged':0, 'skipped':0, 'replaced':0,
           'inserted':1, 'generated_keys':['key'],
@@ -181,5 +186,117 @@ class Item(BareItem):
           'errors':0, 'deleted':0 }
         TODO engine-independent return value
         """
-        doc = self._validate(self)
-        return self._collection.save(doc)
+        new = self.get('id', '') == ''
+        self['mtime'] = datetime.now()
+        if new:
+            self['id'] = str(ObjectId())
+            self['active'] = True
+            self['ctime'] = self['mtime']
+        if validate:
+            validate_result = self.validate(self)
+            if validate_result['status'] != SUCCESS:
+                message = "item {}\ndoes not validate because of error\n{}\n".\
+                    format(self, validate_result['data'])
+                result = {'status':FAIL, 'data':message}
+                report_db_action(result)
+                return result
+        doc = mapdoc(self.wmap, self)
+        collection = r.table(self.name)
+        if setting.nostore: # don't write to the database
+            reply = {'status':SUCCESS, 'data':'simulate '+('insert' if new else 'update')}
+            report_db_action(reply)
+            return reply
+        try:
+            if new:
+                result = collection.insert(doc).run(setting.store_connection)
+                reply= {'status':SUCCESS, 'data':str(result.inserted)}
+            else:
+                result = collection.get(self['_id']).replace(doc).run(setting.store_connection)
+                reply = {'status':SUCCESS, 'data':str(result.replaced)}
+            report_db_action(reply)
+            return reply
+        except Exception as e:
+            message = 'item {}\nnot written because of error\n{}\n'.format(doc, str(e))
+            reply = {'status':ERROR, 'data':None, 'message':message}
+            report_db_action(reply)
+            return reply
+
+    # methods to set references (update database directly)
+    def set_field(self, key, value):
+        """Set one field in item to new value, directly in database.
+
+        Arguments:
+           key   (str):    name of field.
+           value (object): value of field.
+
+        Returns:
+            dict: {'status':SUCCESS, 'data':<item id>} or
+                  {'status':FAIL, 'data':None}.
+        """
+        oid = self['id']
+        collection = r.table(self.name)
+        if setting.nostore: # don't write to the database
+            reply = {'status': SUCCESS, 'data': 'simulate update'}
+            report_db_action(reply)
+            return reply
+        doc = mapdoc(self.wmap, {key:value})
+        try:
+            result = collection.get(oid).update({key:doc[key]}).run(setting.store_connection)
+            reply = {'status':SUCCESS if result.changes == 1 else FAIL, 'data': self['id']}
+            report_db_action(reply)
+            return reply
+        except Exception as e:
+            message = 'item {}\nnot updated because of error\n{}\n'.format(self, str(e))
+            reply = {'status':ERROR, 'data':None, 'message':message}
+            report_db_action(reply)
+            return reply
+
+    def append_field(self, key, value):
+        """Append value to list-valued field in item, directly in database.
+
+        Arguments:
+           key   (str):    name of (list-valued) field.
+           value (object): additional value of field.
+
+        Returns:
+            dict: {'status':SUCCESS, 'data':<item id>} or
+                  {'status':FAIL, 'data':None}.
+        """
+        oid = self['id']
+        collection = r.table(self.name)
+        if setting.nostore: # don't write to the database
+            reply = {'status': SUCCESS, 'data': 'simulate update'}
+            report_db_action(reply)
+            return reply
+        doc = mapdoc(self.wmap, {key:value})
+        try:
+            result = collection.get(oid).update({key:r.row[key].append(doc[key])}).run(setting.store_connection)
+            reply = {'status':SUCCESS if result.changes == 1 else FAIL, 'data': self['id']}
+            report_db_action(reply)
+            return reply
+        except Exception as e:
+            message = 'item {}\nnot written because of error\n{}\n'.format(self, str(e))
+            reply = {'status':ERROR, 'data':None, 'message':message}
+            report_db_action(reply)
+            return reply
+
+    def remove(self):
+        """Remove item from collection (permanently).
+
+        Remove item from collection.
+        Returns document:
+        { 'unchanged':0, 'skipped':0, 'replaced':1,
+          'inserted':0,
+          'errors':0, 'deleted':1 }
+        TODO return engine-independent return value
+
+        Returns:
+            dict: {'status':SUCCESS, 'data':<item id>} or
+                  {'status':FAIL, 'data':None}.
+        """
+        oid = self['_id']
+        collection = r.table(self.name)
+        result = collection.get(oid).delete().run(setting.store_connection)
+        reply = {'status':SUCCESS if result.deleted == 1 else FAIL, 'data': self['id']}
+        report_db_action(reply)
+        return reply

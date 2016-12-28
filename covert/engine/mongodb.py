@@ -20,11 +20,11 @@ query_map = {
     '>=': lambda t: {'$gte': t[1]}
 }
 
-def report_db_action(r):
+def report_db_action(result):
     if setting.debug >1 : # debug level 2
-        print("{}: status={} data={}".format(datetime.now(), r['status'], r['data']))
-        if 'message' in r:
-            print(r['message'])
+        print("{}: status={} data={}".format(datetime.now(), result['status'], result['data']))
+        if 'message' in result:
+            print(result['message'])
 
 def translate_query(query):
     """Translate query to form suitable for this storage engine.
@@ -64,7 +64,7 @@ class Item(BareItem):
         """Create collection cls.name, unless this is already present.
 
         Returns:
-            return value of Database.create_collection()
+            None
         """
         coll_list = setting.store_db.collection_names()
         if cls.name not in coll_list:
@@ -80,7 +80,7 @@ class Item(BareItem):
             index_keys (list): list of 2-tuples (name, direction), where direction is 1 or -1
 
         Returns:
-            return value of Collection.ensure_index()
+            None
         """
         collection = setting.store_db[cls.name]
         collection.ensure_index(index_keys, unique=False)
@@ -105,10 +105,10 @@ class Item(BareItem):
 
         Find zero or more items (documents) in collection, and count them.
         Arguments:
-            doc (dict): dictionary specifying the query, e.g. {'id': '1234'}
+            doc (dict): dictionary specifying the query, e.g. {'id': ('==', '1234')}
 
         Returns:
-            int: number of matchhing items.
+            int: number of matching items.
         """
         cursor = setting.store_db[cls.name].find(filter=cls.query(doc))
         return cursor.count()
@@ -120,7 +120,7 @@ class Item(BareItem):
         Find zero or more items in collection, and return these in the
         form of a list of 'cls' instances. Assumption: stored items are valid.
         Arguments:
-            doc   (dict): dictionary specifying the query, e.g. {'id': '1234'}.
+            doc   (dict): dictionary specifying the query, e.g. {'id': ('==', '1234')}.
             skip  (int):  number of items to skip.
             limit (int):  maximum number of items to retrieve.
             sort  (list): sort specification.
@@ -129,7 +129,7 @@ class Item(BareItem):
             list: list of 'cls' instances.
         """
         cursor = setting.store_db[cls.name].find(filter=cls.query(doc),
-                                                   skip=skip, limit=limit, sort=sort)
+                                                 skip=skip, limit=limit, sort=sort)
         return [cls(item) for item in cursor]
 
     @classmethod
