@@ -33,7 +33,7 @@ Classes:
 """
 
 from .           import setting
-from .common     import read_yaml_file
+from .common     import read_yaml_file, logger
 from .config     import read_config, parse_cmdline, kernel_init, add_argument
 from .controller import http_server, SwitchRouter, MapRouter, PageRouter, JSONRouter
 from .model      import ItemRef

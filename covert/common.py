@@ -1,7 +1,13 @@
 # -*- coding: utf-8 -*-
 """Objects and functions common to two or more modules in the package.
+This includes reporting and logging. For logging we use the 'logging' module.
+
+Logging levels are DEBUG, INFO, WARNING, ERROR, CRITICAL. Covert uses logging level INFO by
+default, and DEBUG if called with --debug. Since the Waitress package is one of the dependencies,
+we can re-use the logger object of that package.
 """
 
+import logging
 import json
 from urllib.parse import urlparse, urljoin
 from webob.exc import HTTPTemporaryRedirect
@@ -10,6 +16,10 @@ try:
     from yaml import CLoader as Loader
 except ImportError:
     from yaml import Loader
+
+# logging
+logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
+logger = logging.getLogger('waitress')
 
 # exceptions
 class InternalError(Exception):
