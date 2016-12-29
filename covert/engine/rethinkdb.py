@@ -177,14 +177,6 @@ class Item(BareItem):
         Returns:
             dict: {'status':SUCCESS, 'data':<item id>} or
                   {'status':FAIL, 'data':None}.
-        Returns document:
-        { 'unchanged':0, 'skipped':0, 'replaced':0,
-          'inserted':1, 'generated_keys':['key'],
-          'errors':0, 'deleted':0 }
-        { 'unchanged':0, 'skipped':0, 'replaced':1,
-          'inserted':1,
-          'errors':0, 'deleted':0 }
-        TODO engine-independent return value
         """
         new = self.get('id', '') == ''
         self['mtime'] = datetime.now()
@@ -284,11 +276,6 @@ class Item(BareItem):
         """Remove item from collection (permanently).
 
         Remove item from collection.
-        Returns document:
-        { 'unchanged':0, 'skipped':0, 'replaced':1,
-          'inserted':0,
-          'errors':0, 'deleted':1 }
-        TODO return engine-independent return value
 
         Returns:
             dict: {'status':SUCCESS, 'data':<item id>} or
