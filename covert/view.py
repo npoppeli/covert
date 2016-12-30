@@ -13,7 +13,7 @@ import re
 from collections import OrderedDict
 from inspect import getmembers, isclass, isfunction
 from itertools import chain
-from .common import InternalError, SUCCESS
+from .common import InternalError, SUCCESS, logger
 from .common import decode_dict, encode_dict, show_dict
 from .model import unflatten, mapdoc
 from . import setting
@@ -276,11 +276,11 @@ class Cursor:
                 query[key] = value
         if initial: # initial post
             # transform query given by form to actual query
-            # print('>> cursor_init: cursor.query={}'.format(query))
+            # logger.debug('>> cursor_init: cursor.query={}'.format(query))
             r1 = unflatten(query)
-            # print('>> cursor_init: unflattened ={}'.format(r1))
+            # logger.debug('>> cursor_init: unflattened ={}'.format(r1))
             r2 = mapdoc(model.qmap, r1)
-            # print('>> cursor_init: qmapped     ={}'.format(r2))
+            # logger.debug('>> cursor_init: qmapped     ={}'.format(r2))
             self.query = r2
         else: # follow-up post
             self.query = decode_dict(self.query)
@@ -301,8 +301,6 @@ def normal_button(view_name, route_name, item):
 def form_button(view_name, route_name, item, button_name):
     """Create render-tree element for form button."""
     action = url_for(view_name, route_name, item)
-    if setting.debug:
-        print('form_button: route={} action={}'.format(route_name, action))
     return {'label': label_for(button_name), 'icon': icon_for(button_name),
             'name': button_name, 'method':'POST',
             'action': action}
@@ -364,7 +362,7 @@ class RenderTree:
         cursor.filter = {} if cursor.incl == 1 else {'active':('==', True)}
         cursor.filter.update(cursor.query)
         count = self.model.count(cursor.filter)
-        # print('>> move_cursor: {} items with filter={}'.format(count, cursor.filter))
+        # logger.debug('>> move_cursor: {} items with filter={}'.format(count, cursor.filter))
         cursor.skip = max(0, min(count, cursor.skip+cursor.dir*cursor.limit))
         cursor.prev = cursor.skip>0
         cursor.next = cursor.skip+cursor.limit < count
@@ -470,8 +468,6 @@ class RenderTree:
         if self.data:
             # item = self.data[0]['item']
             button = form_button(self.view_name, route_name, {}, 'search')
-            if setting.debug:
-                print('add_search_button: route={} button={}'.format(route_name, button))
             self.buttons = [button]
 
     def asdict(self):
@@ -557,7 +553,7 @@ class ItemView(BareItemView):
     def match(self):
         """Show the result list of a search."""
         tree = self.tree
-        tree.add_cursor('search')
+        tree.add_cursor('match')
         tree.move_cursor()
         tree.add_items(['show', 'modify', 'delete']+self.item_buttons_extra, self.sort)
         tree.add_buttons(self.collection_buttons+self.collection_buttons_extra)
@@ -570,6 +566,9 @@ class ItemView(BareItemView):
         """Make a form for new/create action."""
         tree = self.tree
         tree.add_empty_item()
+        # data = [{'item': item1, 'buttons': buttons1}, {'item': item2, 'buttons': buttons2}, ...]
+        # where buttons is usually []
+        # for repeatable fields, there are buttons Add and Remove
         tree.add_form_buttons('create')
         tree.flatten_item()
         tree.prune_item(2, erase=True, form=True)
@@ -585,11 +584,11 @@ class ItemView(BareItemView):
         tree.prune_item(2, form=True)
         return tree.asdict()
 
-    def convert_form(self):
+    def convert_form(self, keep_empty=False):
         """Convert request parameters to form content in model shape."""
         raw_form = {}
         for key, value in self.request.params.items():
-            if not key.startswith('_'):
+            if (value or keep_empty) and not key.startswith('_'):
                 raw_form[key] = value
         return self.model.convert(unflatten(raw_form))
 
@@ -598,10 +597,9 @@ class ItemView(BareItemView):
         """Update an existing item."""
         # fetch item from database and update with converted form contents
         item = self.model.lookup(self.params['id'])
-        form = self.convert_form()
+        form = self.convert_form(keep_empty=True)
         item.update(form)
-        if setting.debug:
-            print(">> update: updated item\n{}".format(show_dict(item)))
+        logger.debug(">> update: updated item\n{}".format(show_dict(item)))
         validation = item.validate(item)
         tree = self.tree
         if validation['status'] == SUCCESS:
@@ -619,8 +617,8 @@ class ItemView(BareItemView):
             tree.style = 1
             tree.message = 'Modified item {} has validation errors {}'.\
                             format(str(item), validation['data'])
-            print(">> update: item\n{}\nhas validation errors\n{}".\
-                  format(show_dict(item), validation['data']))
+            logger.error("Modified item\n{}\nhas validation errors\n{}".\
+                         format(show_dict(item), validation['data']))
             tree.add_item(item)
             tree.add_form_buttons('update', 'PUT')
             tree.flatten_item()
@@ -635,14 +633,11 @@ class ItemView(BareItemView):
         form = self.convert_form()
         item.update(form)
         validation = item.validate(item)
-        if setting.debug:
-            print(">> create: new item\n{}".format(show_dict(item)))
+        logger.debug(">> create: new item\n{}".format(show_dict(item)))
         tree = self.tree
         if validation['status'] == SUCCESS:
-            print(">> create: item has been validated")
             result = item.write(validate=False)
             if result['status'] == SUCCESS:
-                print(">> create: item has been written")
                 tree.message = 'New item {}'.format(str(item))
                 tree.add_item(item)
                 tree.add_buttons(self.item_buttons+self.item_buttons_extra)
@@ -656,16 +651,16 @@ class ItemView(BareItemView):
             tree.style = 1
             tree.message = 'New item {} has validation errors {}'.\
                             format(str(item), validation['data'])
-            print(">> create: item has validation errors", tree.message)
+            logger.debug("New item has validation errors", tree.message)
             tree.add_item(item)
-            tree.add_form_buttons('update', 'PUT')
+            tree.add_form_buttons('create', 'POST')
             tree.flatten_item()
             tree.prune_item(2, form=True, erase=True)
         return tree.asdict()
 
     @route('/{id:objectid}', method='DELETE', template='delete')
     def delete(self):
-        """Delete one item in the functional sense.
+        """Delete one item in a functional sense.
 
         Items are not permanently removed, e.g. item.remove(), but marked as
         inactive. Permanent removal can be done by a clean-up routine, if necessary.

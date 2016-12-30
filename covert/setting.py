@@ -26,8 +26,9 @@ config      = {} # configuration dictionary
 config_file = 'config' # name of configuration file
 dbtype      = 'mongodb'
 debug       = 0
-verbose     = 0
 nostore     = False # for 'dry runs'
+tables      = False
+verbose     = 0
 
 # storage
 store_connection = None # connection for database

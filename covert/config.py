@@ -5,7 +5,7 @@ Attributes:
     config_default (dict): default values for configuration options
 """
 
-import argparse, sys
+import argparse, logging, sys
 from importlib import import_module
 from inspect import getmembers, isclass
 from os import getcwd
@@ -14,7 +14,7 @@ from . import setting
 from .model import read_models
 from .view import read_views
 from .layout import read_templates
-from .common import read_yaml_file, InternalError
+from .common import read_yaml_file, InternalError, logger
 
 extra_arguments = {}
 
@@ -31,20 +31,23 @@ def parse_cmdline():
         Namespace object: return value of parser.parse_args()
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--config',  help='configuration file', action='store', default='config')
-    parser.add_argument('-d', '--debug',   help='debug',   action='count', default=0)
-    parser.add_argument('-n', '--nostore', help='dry run', action='store_true', default=False)
-    parser.add_argument('-v', '--verbose', help='verbose', action='count', default=0)
+    parser.add_argument('-c', '--config',  help='configuration', action='store',      default='config')
+    parser.add_argument('-d', '--debug',   help='debug',         action='store_true', default=False)
+    parser.add_argument('-n', '--nostore', help='dry run',       action='store_true', default=False)
+    parser.add_argument('-t', '--tables',  help='tables',        action='store_true', default=False)
+    parser.add_argument('-v', '--verbose', help='verbose',       action='store_true', default=False)
     for name, options in extra_arguments.items():
         parser.add_argument(name[1:3], name, **options)
     args = parser.parse_args()
     setting.config_file = args.config
     setting.debug = args.debug
     setting.nostore = args.nostore
+    setting.tables  = args.tables
     setting.verbose = args.verbose
     return args
 
 config_default = dict(content='content', layout='layout',
+                      dbname='test', dbtype='mongodb',
                       models='models', views='views', language='en')
 
 def read_config():
@@ -79,12 +82,13 @@ def read_config():
     setting.config  = config
     # in debugging mode, print some configuration parameters
     if setting.debug:
-        print("Debug level is {}".format(setting.debug))
-        print("Verbosity level is {}".format(setting.verbose))
-        print("Changes are{}written to the database".\
-              format(' *not* ' if setting.nostore else ' '))
-        print("Static content is in directory {}".format(setting.content))
-        print("User interface is in the '{}' language".format(setting.language))
+        logger.setLevel(logging.DEBUG)
+    logger.debug("Debug option is {}".format(setting.debug))
+    logger.debug("Verbose option is {}".format(setting.verbose))
+    logger.debug("Changes are{}written to the database".\
+                 format(' *not* ' if setting.nostore else ' '))
+    logger.debug("Static content is in directory {}".format(setting.content))
+    logger.debug("User interface is in the '{}' language".format(setting.language))
 
 def kernel_init():
     """Initialize kernel.
@@ -122,7 +126,7 @@ def kernel_init():
             models = read_yaml_file(item)
             read_models(models)
         else:
-            print('{} not a valid option for models'.format(item))
+            logger.info('{} not a valid option for models'.format(item))
 
     # import views (Python)
     name, extension = splitext(setting.config['views'])
@@ -130,7 +134,7 @@ def kernel_init():
     read_views(module)
 
     # print information about models and views
-    if setting.debug > 2: # debug level 3
+    if setting.tables:
         # print all routes (tabular)
         print('Application has {0} routes'.format(len(setting.routes)))
         fmt = "{:<25}: {:<10} {:<15} {:<10} {:<30}"

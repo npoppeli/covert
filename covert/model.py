@@ -94,8 +94,8 @@ def _unflatten(list_rep):
         end = bisect_right(car_list, key)
         children = list_rep[begin:end]
         if len(children) == 1:
-            # We can distinguish 3 cases: 1. cdr is ['0']; 2. cdr is empty;
-            # 3. cdr is [a] where a is some string, but this is unrealistic.
+            # We can distinguish 3 cases: 1. cdr = ['0']; 2. cdr is empty;
+            # 3. cdr = [a] where a != '0', but this is unrealistic.
             child = children[0]
             result[key] = [child[1]] if child[0] == ['0'] else child[1]  # scalar
         else:

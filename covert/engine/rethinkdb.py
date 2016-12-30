@@ -7,24 +7,21 @@ The Item class encapsulates the details of the storage engine.
 
 from datetime import datetime
 import rethinkdb as r
-from ..common import SUCCESS, ERROR, FAIL
+from ..common import SUCCESS, ERROR, FAIL, logger
 from ..model import BareItem, mapdoc
 from .. import setting
 from bson.objectid import ObjectId
 
 def report_db_action(result):
-    if setting.debug >1 : # debug level 2
-        print("{}: status={} data={}".format(datetime.now(), result['status'], result['data']))
-        if 'message' in result:
-            print(result['message'])
+    logger.debug("{}: status={} data={}".format(datetime.now(), result['status'], result['data']))
+    if 'message' in result:
+        logger.debug(result['message'])
 
 def init_storage():
     """Initialize storage engine."""
-    if setting.debug:
-        print('Creating RethinkDB connection')
+    logger.debug('Creating RethinkDB connection')
     setting.store_connection = r.connect(db=setting.store_dbname).repl()
-    if setting.debug:
-        print("Setting RethinkDB database to '{}'".format(setting.store_dbname))
+    logger.debug("Setting RethinkDB database to '{}'".format(setting.store_dbname))
     setting.store_db = r.db(setting.store_dbname)
 
 class Item(BareItem):

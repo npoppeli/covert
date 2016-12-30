@@ -7,7 +7,7 @@ The Item class encapsulates the details of the storage engine.
 
 from datetime import datetime
 from pymongo import MongoClient
-from ..common import SUCCESS, ERROR, FAIL
+from ..common import SUCCESS, ERROR, FAIL, logger
 from ..model import BareItem, mapdoc
 from .. import setting
 from bson.objectid import ObjectId
@@ -21,10 +21,9 @@ query_map = {
 }
 
 def report_db_action(result):
-    if setting.debug >1 : # debug level 2
-        print("{}: status={} data={}".format(datetime.now(), result['status'], result['data']))
-        if 'message' in result:
-            print(result['message'])
+    logger.debug("{}: status={} data={}".format(datetime.now(), result['status'], result['data']))
+    if 'message' in result:
+        logger.debug(result['message'])
 
 def translate_query(query):
     """Translate query to form suitable for this storage engine.
@@ -47,11 +46,9 @@ def translate_query(query):
 
 def init_storage():
     """Initialize storage engine."""
-    if setting.debug:
-        print('Creating MongoDB connection')
+    logger.debug('Creating MongoDB connection')
     setting.store_connection = MongoClient()
-    if setting.debug:
-        print("Setting MongoDB database to '{}'".format(setting.store_dbname))
+    logger.debug("Setting MongoDB database to '{}'".format(setting.store_dbname))
     setting.store_db = setting.store_connection[setting.store_dbname]
 
 class Item(BareItem):

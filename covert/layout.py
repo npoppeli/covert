@@ -9,6 +9,7 @@ from os import walk
 from os.path import join, splitext, relpath
 from chameleon import PageTemplateFile
 from . import setting
+from .common import logger
 
 def read_templates():
     """Read templates from layout directory.
@@ -19,8 +20,7 @@ def read_templates():
         None
     """
     template_types = ['.xml', '.pt']
-    if setting.debug:
-        print('Scanning for templates in {0}'.format(setting.layout))
+    logger.debug('Scanning for templates in {0}'.format(setting.layout))
     for (dirpath, __, filenames) in walk(setting.layout):
         prefix = relpath(dirpath, setting.layout)
         for filename in filenames:
@@ -34,5 +34,5 @@ def read_templates():
                 try:
                     setting.templates[template_name] = PageTemplateFile(file_path)
                 except Exception as e:
-                    print("Error in template '{0}' in file {1}".format(template_name, file_path))
-                    print(str(e))
+                    logger.error("Error in template '{0}' in file {1}".format(template_name, file_path))
+                    logger.error(str(e))
