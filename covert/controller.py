@@ -3,14 +3,15 @@
 
 The switching router creates a response object with full HTML, partial HTML or JSON,
 depending on the request parameters.
+The mapping router creates a response object based on route patterns.
 """
 
 import html, sys, traceback, waitress
+from datetime import datetime
 from webob import BaseRequest as Request, Response # performance of BaseRequest is better
-
+from collections import deque
 from . import setting
-from .common import encode_dict
-from .report import logger
+from .common import encode_dict, logger
 
 def http_server(app, **kwarg):
     """HTTP server for development purposes"""
@@ -116,16 +117,16 @@ class SwitchRouter:
             mode = self.PAGE_MODE
         try:
             response = request.get_response(self._app[mode])
-            if setting.debug:
-                print('{0}: {1} {2} status={3} body={4} characters'.\
-                      format(self.mode_name[mode], req_method, request.path_qs,
-                             response.status, len(response.body)))
-                print('referred from: {0}'.format(request.referer))
+            dt = datetime.strftime(datetime.now(), "%Y-%m-%d %H:%M:%S")
+            logger.info('{} "{} {}" {} {} [{}]'.\
+                        format(dt, request.method, request.path_info,
+                               response.status, response.content_length, self.mode_name[mode]))
         except Exception as e:
             response = Response()
             response.text = exception_report(e)
-            print('{0}: {1} {2} results in exception {3}\n'.\
-                  format(self.mode_name[mode], req_method, request.path_qs, exception_report(e, False)))
+            logger.error('{}: {} {} results in exception {}\n'.\
+                         format(self.mode_name[mode], req_method, request.path_qs,
+                                exception_report(e, False)))
         return response(environ, start_response)
 
 
@@ -143,6 +144,9 @@ class MapRouter:
 
     def __init__(self):
         self.content_type = 'text/html'
+        # keep history inside the router, so that we can perform an internal redirect
+        # external redirect (HTTP "307 Redirect") does not have the POST parameters
+        self.history = deque(maxlen=5)
 
     def serialize(self, result, template):
         return setting.templates[template].render(this=result)
@@ -173,6 +177,7 @@ class MapRouter:
                 result = route_method()
                 template = route_templates[result.get('style', 0)]
                 result = self.serialize(result, template)
+                response.cache_control.max_age = 0
             except Exception as e:
                 result = exception_report(e, ashtml=(self.content_type=='text/html'))
                 print('{}: exception occurred in {}'.format(controller_name, route_name))
@@ -205,7 +210,7 @@ class PageRouter(MapRouter):
 
     def finalize(self, result):
         """remove empty/blank lines and initial whitespace of the other lines"""
-        page = setting.templates[self.template].render(content=result)
+        page = setting.templates[self.template].render(content=result, config=setting.config)
         lines = [line.lstrip() for line in page.splitlines() if line and not line.isspace()]
         return '\n'.join(lines)
 
