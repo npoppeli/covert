@@ -163,6 +163,21 @@ class Item(BareItem):
         else:
             return cls(result[0])
 
+    def finalize(self):
+        """Finalize item before writing to permanent storage.
+
+        Finalization includes setting of auto fields.
+
+        Returns:
+            None
+        """
+        new = self.get('id', '') == ''
+        self['mtime'] = datetime.now()
+        if new:
+            self['id'] = str(ObjectId())
+            self['active'] = True
+            self['ctime'] = self['mtime']
+
     def write(self, validate=True):
         """Write item to permanent storage.
 
@@ -175,12 +190,8 @@ class Item(BareItem):
             dict: {'status':SUCCESS, 'data':<item id>} or
                   {'status':FAIL, 'data':None}.
         """
-        new = self.get('id', '') == ''
-        self['mtime'] = datetime.now()
-        if new:
-            self['id'] = str(ObjectId())
-            self['active'] = True
-            self['ctime'] = self['mtime']
+        self.finalize()
+        new = self['mtime'] == self['ctime']
         if validate:
             validate_result = self.validate(self)
             if validate_result['status'] != SUCCESS:
@@ -222,7 +233,7 @@ class Item(BareItem):
             dict: {'status':SUCCESS, 'data':<item id>} or
                   {'status':FAIL, 'data':None}.
         """
-        oid = self['id']
+        item_id = self['id']
         collection = r.table(self.name)
         if setting.nostore: # don't write to the database
             reply = {'status': SUCCESS, 'data': 'simulate update'}
@@ -230,8 +241,8 @@ class Item(BareItem):
             return reply
         doc = mapdoc(self.wmap, {key:value})
         try:
-            result = collection.get(oid).update({key:doc[key]}).run(setting.store_connection)
-            reply = {'status':SUCCESS if result.changes == 1 else FAIL, 'data': self['id']}
+            result = collection.get(item_id).update({key:doc[key]}).run(setting.store_connection)
+            reply = {'status':SUCCESS if result.changes == 1 else FAIL, 'data': item_id}
             report_db_action(reply)
             return reply
         except Exception as e:
@@ -251,7 +262,7 @@ class Item(BareItem):
             dict: {'status':SUCCESS, 'data':<item id>} or
                   {'status':FAIL, 'data':None}.
         """
-        oid = self['id']
+        item_id = self['id']
         collection = r.table(self.name)
         if setting.nostore: # don't write to the database
             reply = {'status': SUCCESS, 'data': 'simulate update'}
@@ -259,8 +270,8 @@ class Item(BareItem):
             return reply
         doc = mapdoc(self.wmap, {key:value})
         try:
-            result = collection.get(oid).update({key:r.row[key].append(doc[key])}).run(setting.store_connection)
-            reply = {'status':SUCCESS if result.changes == 1 else FAIL, 'data': self['id']}
+            result = collection.get(item_id).update({key:r.row[key].append(doc[key])}).run(setting.store_connection)
+            reply = {'status':SUCCESS if result.changes == 1 else FAIL, 'data': item_id}
             report_db_action(reply)
             return reply
         except Exception as e:
@@ -278,9 +289,9 @@ class Item(BareItem):
             dict: {'status':SUCCESS, 'data':<item id>} or
                   {'status':FAIL, 'data':None}.
         """
-        oid = self['_id']
+        item_id = self['_id']
         collection = r.table(self.name)
-        result = collection.get(oid).delete().run(setting.store_connection)
-        reply = {'status':SUCCESS if result.deleted == 1 else FAIL, 'data': self['id']}
+        result = collection.get(item_id).delete().run(setting.store_connection)
+        reply = {'status':SUCCESS if result.deleted == 1 else FAIL, 'data': item_id}
         report_db_action(reply)
         return reply
