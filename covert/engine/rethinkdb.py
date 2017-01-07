@@ -209,10 +209,10 @@ class Item(BareItem):
         try:
             if new:
                 result = collection.insert(doc).run(setting.store_connection)
-                reply= {'status':SUCCESS, 'data':str(result.inserted)}
+                reply= {'status':SUCCESS, 'data':self['id'], 'message':str(result.inserted)}
             else:
                 result = collection.get(self['_id']).replace(doc).run(setting.store_connection)
-                reply = {'status':SUCCESS, 'data':str(result.replaced)}
+                reply = {'status':SUCCESS, 'data':self['id'], 'message':str(result.replaced)}
             report_db_action(reply)
             return reply
         except Exception as e:
@@ -242,7 +242,8 @@ class Item(BareItem):
         doc = mapdoc(self.wmap, {key:value})
         try:
             result = collection.get(item_id).update({key:doc[key]}).run(setting.store_connection)
-            reply = {'status':SUCCESS if result.changes == 1 else FAIL, 'data': item_id}
+            reply = {'status':SUCCESS if result.changes == 1 else FAIL,
+                     'data': item_id, 'message':str(result.replaced)}
             report_db_action(reply)
             return reply
         except Exception as e:
@@ -271,7 +272,8 @@ class Item(BareItem):
         doc = mapdoc(self.wmap, {key:value})
         try:
             result = collection.get(item_id).update({key:r.row[key].append(doc[key])}).run(setting.store_connection)
-            reply = {'status':SUCCESS if result.changes == 1 else FAIL, 'data': item_id}
+            reply = {'status':SUCCESS if result.changes == 1 else FAIL,
+                     'data': item_id, 'message':str(result.replaced)}
             report_db_action(reply)
             return reply
         except Exception as e:
@@ -289,7 +291,7 @@ class Item(BareItem):
             dict: {'status':SUCCESS, 'data':<item id>} or
                   {'status':FAIL, 'data':None}.
         """
-        item_id = self['_id']
+        item_id = self['id']
         collection = r.table(self.name)
         result = collection.get(item_id).delete().run(setting.store_connection)
         reply = {'status':SUCCESS if result.deleted == 1 else FAIL, 'data': item_id}

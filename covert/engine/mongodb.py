@@ -162,7 +162,10 @@ class Item(BareItem):
             'cls' instance.
         """
         item = setting.store_db[cls.name].find_one(cls.query(doc))
-        return cls(item)
+        if item is None:
+            return item
+        else:
+            return cls(item)
 
     def finalize(self):
         """Finalize item before writing to permanent storage.
@@ -197,8 +200,8 @@ class Item(BareItem):
         if validate:
             validate_result = self.validate(self)
             if validate_result['status'] != SUCCESS:
-                message = "item {}\ndoes not validate because of error\n{}\n".\
-                    format(self, validate_result['data'])
+                message = "{} {}\ndoes not validate because of error\n{}\n".\
+                    format(self.name, self, validate_result['data'])
                 result = {'status':FAIL, 'data':message}
                 report_db_action(result)
                 return result
@@ -214,7 +217,7 @@ class Item(BareItem):
                 reply= {'status':SUCCESS, 'data':str(result.inserted_id)}
             else:
                 result = collection.replace_one({'_id':self['_id']}, doc)
-                reply = {'status':SUCCESS, 'data':str(result.matched_count)}
+                reply = {'status':SUCCESS, 'data':self['id'], 'message':str(result.raw_result)}
             report_db_action(reply)
             return reply
         except Exception as e:
@@ -235,7 +238,7 @@ class Item(BareItem):
             dict: {'status':SUCCESS, 'data':<item id>} or
                   {'status':FAIL, 'data':None}.
         """
-        item_id = self['id']
+        item_id = self['_id']
         collection = setting.store_db[self.name]
         if setting.nostore: # don't write to the database
             reply = {'status': SUCCESS, 'data': 'simulate update'}
@@ -243,8 +246,9 @@ class Item(BareItem):
             return reply
         doc = mapdoc(self.wmap, {key:value})
         try:
-            result = collection.update_one({'id':item_id}, {'$set':{key:doc[key]}})
-            reply = {'status':SUCCESS if result.modified_count == 1 else FAIL, 'data': item_id}
+            result = collection.update_one({'_id':item_id}, {'$set':{key:doc[key]}})
+            reply = {'status':SUCCESS if result.matched_count == 1 else FAIL,
+                     'data': item_id, 'message':str(result.raw_result)}
             report_db_action(reply)
             return reply
         except Exception as e:
@@ -264,7 +268,7 @@ class Item(BareItem):
             dict: {'status':SUCCESS, 'data':<item id>} or
                   {'status':FAIL, 'data':None}.
         """
-        item_id = self['id']
+        item_id = self['_id']
         collection = setting.store_db[self.name]
         if setting.nostore: # don't write to the database
             reply = {'status': SUCCESS, 'data': 'simulate update'}
@@ -273,7 +277,8 @@ class Item(BareItem):
         doc = mapdoc(self.wmap, {key:value})
         try:
             result = collection.update_one({'_id':item_id}, {'$addToSet':{key:doc[key]}})
-            reply = {'status':SUCCESS if result.modified_count == 1 else FAIL, 'data': item_id}
+            reply = {'status':SUCCESS if result.matched_count == 1 else FAIL,
+                     'data': item_id, 'message':str(result.raw_result)}
             report_db_action(reply)
             return reply
         except Exception as e:
