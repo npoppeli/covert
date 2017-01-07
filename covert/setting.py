@@ -23,6 +23,7 @@ views       = {}
 language    = ''
 languages   = ['en', 'nl', 'sv']
 config      = {} # configuration dictionary
+port        = 8000
 config_file = 'config' # name of configuration file
 dbtype      = 'mongodb'
 debug       = 0
