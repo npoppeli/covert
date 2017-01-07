@@ -276,12 +276,7 @@ class Cursor:
                 query[key] = value
         if initial: # initial post
             # transform query given by form to actual query
-            # logger.debug('>> cursor_init: cursor.query={}'.format(query))
-            r1 = unflatten(query)
-            # logger.debug('>> cursor_init: unflattened ={}'.format(r1))
-            r2 = mapdoc(model.qmap, r1)
-            # logger.debug('>> cursor_init: qmapped     ={}'.format(r2))
-            self.query = r2
+            self.query = mapdoc(model.qmap, unflatten(query))
         else: # follow-up post
             self.query = decode_dict(self.query)
 
@@ -362,7 +357,6 @@ class RenderTree:
         cursor.filter = {} if cursor.incl == 1 else {'active':('==', True)}
         cursor.filter.update(cursor.query)
         count = self.model.count(cursor.filter)
-        # logger.debug('>> move_cursor: {} items with filter={}'.format(count, cursor.filter))
         cursor.skip = max(0, min(count, cursor.skip+cursor.dir*cursor.limit))
         cursor.prev = cursor.skip>0
         cursor.next = cursor.skip+cursor.limit < count
