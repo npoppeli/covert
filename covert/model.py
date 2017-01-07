@@ -198,6 +198,7 @@ class BareItem(dict):
     # transformation
     cmap = {'ctime':da.convert, 'mtime':da.convert, 'active': ba.convert}
     dmap = {'ctime':da.display, 'mtime':da.display, 'active': ba.display}
+    qmap = {'ctime':da.query,   'mtime':da.query,   'active': ba.query  }
     rmap = {}
     wmap = {}
     # metadata
@@ -227,7 +228,7 @@ class BareItem(dict):
     def empty(cls):
         """Create new empty item."""
         item = cls()
-        item.update(cls._empty)
+        item.update(deepcopy(cls._empty)) # necessary in case of bulk import
         return item
 
     _format = 'Item {id}'
@@ -264,10 +265,10 @@ class BareItem(dict):
         validator = cls._validate
         try:
             _ = validator(doc)
-            return {'status': SUCCESS, 'data':{} }
+            return {'status': SUCCESS, 'data':''}
         except MultipleInvalid as e:
             error = '; '.join([str(el) for el in e.errors ])
-            return {'status': FAIL, 'data':error }
+            return {'status': FAIL, 'data':error}
 
     @classmethod
     def lookup(cls, oid):
@@ -620,10 +621,11 @@ def read_models(model_defs):
         schema.update(pm.schema)
         meta = BareItem.meta.copy()
         meta.update(pm.meta)
-        empty = BareItem._empty.copy()
+        empty = BareItem._empty.copy() # shallow copy, but that is acceptable here
         empty.update(pm.empty)
         pm.cmap.update(BareItem.cmap)
         pm.dmap.update(BareItem.dmap)
+        pm.qmap.update(BareItem.qmap)
         pm.rmap.update(BareItem.rmap)
         pm.wmap.update(BareItem.wmap)
         class_dict['name']      = model_name
