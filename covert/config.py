@@ -68,6 +68,7 @@ def read_config():
     if 'debug'   in config: setting.debug   = config['debug']
     if 'nostore' in config: setting.nostore = config['nostore']
     if 'verbose' in config: setting.verbose = config['verbose']
+    if 'port'    in config: setting.port    = config['port']
     setting.content = join(setting.site, config['content'])
     setting.layout  = join(setting.site, config['layout'])
     setting.store_dbname  = config['dbname']
@@ -78,8 +79,8 @@ def read_config():
     for name in setting.labels.keys():
         parts = setting.labels[name].split('|')
         setting.labels[name] = parts[label_index]
-    # save original configuration
-    setting.config  = config
+    # keep original configuration
+    setting.config = config
     # in debugging mode, print some configuration parameters
     if setting.debug:
         logger.setLevel(logging.DEBUG)
