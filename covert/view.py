@@ -11,8 +11,10 @@ do form validation in the client, using Parsley.js (jQuery) for example.
 
 import re
 from collections import OrderedDict
+from datetime import datetime, timedelta
 from inspect import getmembers, isclass, isfunction
 from itertools import chain
+from urllib.parse import urlencode
 from .common import InternalError, SUCCESS, logger
 from .common import decode_dict, encode_dict, show_dict
 from .model import unflatten, mapdoc
@@ -70,9 +72,11 @@ def label_for(name):
     """Return label for route 'name'."""
     return setting.labels.get(name, 'unknown')
 
-def url_for(view, name, item):
+def url_for(view, name, item, query=None):
     """Return URL for route 'name'."""
     url = setting.patterns[view+'_'+name].format(**item)
+    if query:
+        url += '?' + urlencode(query)
     return url
 
 # Routes
@@ -295,10 +299,9 @@ def normal_button(view_name, route_name, item):
 
 def form_button(view_name, route_name, item, button_name):
     """Create render-tree element for form button."""
-    action = url_for(view_name, route_name, item)
     return {'label': label_for(button_name), 'icon': icon_for(button_name),
-            'name': button_name, 'method':'POST',
-            'action': action}
+            'name': button_name,
+            'action': url_for(view_name, route_name, item), 'method':'POST'}
 
 def delete_button(view_name, route_name, item):
     """Create render-tree element for delete button."""
@@ -316,7 +319,8 @@ class RenderTree:
     attributes are specified by the class attribute 'nodes'. These attributes are used by the
     asdict() method.
     """
-    nodes = ['buttons', 'cursor', 'data', 'message', 'meta', 'method', 'status', 'style', 'title']
+    nodes = ['buttons', 'cursor', 'data', 'info',
+             'message', 'meta', 'method', 'status', 'style', 'title']
     def __init__(self, request, model, view_name, route_name):
         """Constructor method for RenderTree.
 
@@ -335,6 +339,7 @@ class RenderTree:
         self.buttons = []
         self.cursor = None
         self.data = None
+        self.info = {}
         self.message = ''
         self.meta = None
         self.method = ''
@@ -365,6 +370,8 @@ class RenderTree:
         """Add item to render tree."""
         if isinstance(oid_or_item, str):
             item = self.model.lookup(oid_or_item)
+            self.info['active'] = item['active']
+            self.info['recent'] = datetime.now()-item['mtime'] < timedelta(days=7) and item['active']
         else:
             item = oid_or_item
         self.data = item
@@ -378,6 +385,10 @@ class RenderTree:
         items = self.model.find(self.cursor.filter,
                                 limit=self.cursor.limit, skip=self.cursor.skip, sort=sort)
         self.data = []
+        active = []
+        recent = []
+        delta = timedelta(days=7)
+        now = datetime.now()
         if not items:
             qs = ', '.join(["{}{}{}".format(k, v[0], v[1]) for k, v in self.cursor.query.items()])
             self.message += 'Nothing found for query {}'.format(qs)
@@ -386,6 +397,10 @@ class RenderTree:
             button_list = [(delete_button if button == 'delete' else
                             normal_button)(self.view_name, button, item) for button in buttons]
             self.data.append({'item': item, 'buttons': button_list})
+            active.append(item['active'])
+            recent.append(now-item['mtime'] < delta and item['active'])
+        self.info['active'] = active
+        self.info['recent'] = recent
 
     def flatten_item(self):
         """Flatten the item in the render tree."""
@@ -396,7 +411,7 @@ class RenderTree:
         for row in self.data:
             row['item'] = row['item'].display().flatten()
 
-    def prune_item(self, depth, erase=False, form=False):
+    def prune_item(self, depth, clear=False, form=False):
         """Prune the item in the render tree."""
         item_meta = self.model.meta
         meta, item = OrderedDict(), OrderedDict()
@@ -413,7 +428,7 @@ class RenderTree:
                 label  = field_meta.label
             if (key.count('.') < depth) and not\
                (field_meta.schema=='itemref' and form):
-                item[key] = '' if erase else value
+                item[key] = '' if clear else value
                 meta[key] = {'label'   : label,
                              'enum'    : field_meta.enum,
                              'formtype': 'hidden' if field_meta.auto else field_meta.formtype,
@@ -468,7 +483,10 @@ class RenderTree:
         """Create dictionary representation of render tree."""
         if self.cursor:
             self.cursor = self.cursor.asdict()
-        return dict([(key, getattr(self, key)) for key in self.nodes])
+        result = dict([(key, getattr(self, key)) for key in self.nodes])
+        if setting.debug:
+            print(show_dict(result))
+        return result
 
 
 class BareItemView:
@@ -540,7 +558,7 @@ class ItemView(BareItemView):
         tree.add_empty_item()
         tree.add_search_button('match')
         tree.flatten_item()
-        tree.prune_item(1, erase=True, form=True)
+        tree.prune_item(1, clear=True, form=True)
         return tree.asdict()
 
     @route('/match', method='GET,POST', template='index')
@@ -565,7 +583,7 @@ class ItemView(BareItemView):
         # for repeatable fields, there are buttons Add and Remove
         tree.add_form_buttons('create')
         tree.flatten_item()
-        tree.prune_item(2, erase=True, form=True)
+        tree.prune_item(2, clear=True, form=True)
         return tree.asdict()
 
     @route('/{id:objectid}/modify', template='form')
@@ -649,7 +667,7 @@ class ItemView(BareItemView):
             tree.add_item(item)
             tree.add_form_buttons('create', 'POST')
             tree.flatten_item()
-            tree.prune_item(2, form=True, erase=True)
+            tree.prune_item(2, form=True, clear=True)
         return tree.asdict()
 
     @route('/{id:objectid}', method='DELETE', template='delete')
