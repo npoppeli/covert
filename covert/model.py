@@ -431,7 +431,7 @@ class ItemRef:
         """
         model = setting.models[self.collection]
         item = model.lookup(self.refid)
-        return str(item), '/{}/{}'.format(self.collection.lower(), self.refid), ''
+        return '', str(item), '/{}/{}'.format(self.collection.lower(), self.refid), ''
 
     def lookup(self):
         """Retrieve item referenced by itemref object from storage.
