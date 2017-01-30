@@ -131,7 +131,6 @@ def mapdoc(fnmap, doc):
                 else: # list of scalars
                     result[key] = [fnmap[key](element) for element in value]
             else: # scalar
-                # print(">> mapdoc: key={} value={} fn={}".format(key, value, fnmap[key]))
                 result[key] = fnmap[key](value)
         else: # no mapping for this element
             result[key] = value
@@ -349,7 +348,7 @@ def get_objectid(ref):
     Arguments:
         ref (itemref): item reference.
 
-    Returns/Yields:
+    Returns:
         str: item reference.
     """
     return ref.refid
@@ -362,11 +361,11 @@ def display_reference(ref):
     Arguments:
         ref (itemref): item reference.
 
-    Returns/Yields:
-        (str, str, str): label, URL, post-label.
+    Returns:
+        (str, str, str, str): prefix, infix, URL, postfix.
     """
     if ref.refid is None:
-        return '', '', ''
+        return '', '', '#', ''
     else:
         return ref.display()
 
