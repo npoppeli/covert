@@ -122,6 +122,9 @@ def kernel_init():
         if extension == '.py':
             module = import_module(name)
             for class_name, model_class in getmembers(module, isclass):
+                if class_name in ['BareItem', 'Item', 'ItemRef']:
+                    continue
+                logger.debug('Adding/replacing class %s', class_name)
                 setting.models[class_name] = model_class
         elif extension == '.yml':
             models = read_yaml_file(item)
