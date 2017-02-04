@@ -7,7 +7,7 @@ The Item class encapsulates the details of the storage engine.
 
 from datetime import datetime
 from pymongo import MongoClient
-from ..common import SUCCESS, ERROR, FAIL, logger
+from ..common import SUCCESS, ERROR, FAIL, logger, InternalError
 from ..model import BareItem, mapdoc
 from .. import setting
 from bson.objectid import ObjectId
@@ -224,7 +224,7 @@ class Item(BareItem):
             message = 'item {}\nnot written because of error\n{}\n'.format(doc, str(e))
             reply = {'status':ERROR, 'data':None, 'message':message}
             report_db_action(reply)
-            return reply
+            raise InternalError(message)
 
     # methods to set references (update database directly)
     def set_field(self, key, value):
@@ -250,12 +250,15 @@ class Item(BareItem):
             reply = {'status':SUCCESS if result.matched_count == 1 else FAIL,
                      'data': item_id, 'message':str(result.raw_result)}
             report_db_action(reply)
+            if reply['status'] == FAIL:
+                message = 'item {}\nnot updated, matched count={}'.format(self, result.matched_count)
+                raise InternalError(message)
             return reply
         except Exception as e:
             message = 'item {}\nnot updated because of error\n{}\n'.format(self, str(e))
             reply = {'status':ERROR, 'data':None, 'message':message}
             report_db_action(reply)
-            return reply
+            raise InternalError(message)
 
     def append_field(self, key, value):
         """Append value to list-valued field in item, directly in database.
@@ -280,12 +283,15 @@ class Item(BareItem):
             reply = {'status':SUCCESS if result.matched_count == 1 else FAIL,
                      'data': item_id, 'message':str(result.raw_result)}
             report_db_action(reply)
+            if reply['status'] == FAIL:
+                message = 'item {}\nnot updated, matched count={}'.format(self, result.matched_count)
+                raise InternalError(message)
             return reply
         except Exception as e:
             message = 'item {}\nnot written because of error\n{}\n'.format(self, str(e))
             reply = {'status':ERROR, 'data':None, 'message':message}
             report_db_action(reply)
-            return reply
+            raise InternalError(message)
 
     def remove(self):
         """Remove item from collection (permanently).
