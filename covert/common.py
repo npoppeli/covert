@@ -61,7 +61,7 @@ def read_file(filename):
     Returns:
         str: content as one string
     """
-    with open(filename, 'rU') as f:
+    with open(filename, 'r') as f:
         text = ''.join(f.readlines())
     return text
 
@@ -81,6 +81,18 @@ def read_yaml_file(path, multi=False):
         else:
             result = load(f, Loader=Loader)
     return result
+
+def write_file(path, text):
+    """Write text file.
+
+    Arguments:
+        filename (str): name of text file
+
+    Returns:
+        str: content as one string
+    """
+    with open(path, 'w') as f:
+        f.write(text)
 
 # JSON-related functions
 # JSend
@@ -130,5 +142,37 @@ def show_dict(d):
         str: content as one pretty-printed string
     """
     return json.dumps(d, separators=(',',':'), sort_keys=True, indent=2, cls=ExtendedEncoder)
+
+def read_json_file(path):
+    """Read JSON file.
+
+    Arguments:
+        filename (str): name of JSON file
+
+    Returns:
+        list|dict: list of documents or single document
+    """
+    with open(path, 'r') as f:
+        text = ''.join(f.readlines())
+    return json.loads(text)
+
+def show_value(s):
+    if isinstance(s, list):
+        return "[{}]".format(', '.join([str(el) for el in s]))
+    else:
+        return str(s)
+
+def show_item3(label1, label2, label3, item1, item2, item3):
+    fmt = "{:<15}: {!s:<35} {!s:<35} {!s:<35}"
+    print(fmt.format('', label1, label2, label3))
+    print('-' * 120)
+    for key in sorted(set(item1.keys()) | set(item2.keys()) | set(item3.keys())):
+        value1 = show_value(item1.get(key, '-'))
+        value2 = show_value(item2.get(key, '-'))
+        value3 = show_value(item3.get(key, '-'))
+        if key == '_id' or (value1 == '' and value2 == '' and value3 == ''):
+            continue
+        print(fmt.format(key, value1, value2, value3))
+    print('\n')
 
 # Trie data structure: see http://jtauber.com/2005/02/trie.py for Python implementation
