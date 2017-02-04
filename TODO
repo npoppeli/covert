@@ -12,14 +12,18 @@ config.py
   - https://flufli18n.readthedocs.io/en/latest/docs/using.html
   - http://pylonsbook.com/en/1.1/internationalization-and-localization.html
 
+layout.py
+---------
+* move Tonnikala out of the core
+
 model.py
 --------
 * embedding in show panels
 * embedding and linking in form panels
 * display_reference uses View.url_for()
 * tools for adding, modifying and deleting list-valued items (multiple=True)
-* tools for adding, modifying and deleting item references
-* tools for adding, modifying and deleting sub-items
+* tools for adding, modifying and deleting linked items (references)
+* tools for adding, modifying and deleting embedded items
 * item revisions (add 'rev' attribute)
 * make labels in BareItem language-dependent (I18N)
 * 'active' attribute in BareItem is not 'auto', but has a default (True)
@@ -43,12 +47,13 @@ view.py
 * authorization determines icon and button states (enabled, disabled)
 * delete button is enabled iff item.active
 * add 'import' method (form-based file upload, CSV and JSON)
+* allow fields of 'multiple' type in search form
 * make ItemView.sort independent from db engine
 * pass ItemView.sort to render tree methods in a more elegant way
 * itemlist with clickable column headers to influence sorting
 * define icon and label for custom methods
 * Use Mirage (JS) for client-side generation of search queries
-* add 'title' attribute to render tree, let routes fill this; apply in templates
+* routes should set 'title' attribute of render tree, templates should display it
 * add boolean vector 'active', 'modified' recently) to the render tree (add_item, add_items)
 * boolean vector 'modified' could be part of event handler
 
