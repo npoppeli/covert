@@ -22,7 +22,7 @@ from copy import deepcopy
 from collections import OrderedDict
 from voluptuous import Schema, Optional, MultipleInvalid
 from .atom import atom_map, EMPTY_DATETIME
-from .common import InternalError, SUCCESS, FAIL
+from .common import InternalError, SUCCESS, FAIL, logger
 from . import setting
 
 # functions for flattening and unflattening items (documents)
@@ -41,7 +41,7 @@ def _flatten(doc, prefix, keys):
     Yields:
         (key, value): key-value pair to build up flat dictionary.
     """
-    for key in [key for key in keys if key in doc.keys()]:  # keys in model order
+    for key in [el for el in keys if el in doc.keys()]: # keys in model order
         value = doc[key]
         sub_prefix = '{}{}.'.format(prefix, key)
         if isinstance(value, dict):  # embedded document
@@ -57,6 +57,8 @@ def _flatten(doc, prefix, keys):
                     yield sub_prefix + str(sub_key), element
         else:  # scalar
             yield prefix + key, value
+    for key in [el for el in doc.keys() if el not in keys]: # keys not defined in model
+        yield key, doc[key]
 
 def unflatten(doc):
     """Unflatten item (document).
@@ -605,12 +607,18 @@ def read_models(model_defs):
     setting.models['Item'] = Item
 
     model_names = [name for name in model_defs.keys() if name[0].isalpha()]
-    for model_name in model_names: # build reference classes
+    # build reference classes (unless they already exist)
+    for model_name in model_names:
         ref_name = model_name+'Ref'
         ref_class = type(ref_name, (ItemRef,), {})
         ref_class.collection = model_name
-        setting.models[ref_name] = ref_class
-    for model_name in model_names: # build actual (outer) classes
+        if ref_name in setting.models:
+            logger.debug('Reference class %s already defined', ref_name)
+        else:
+            logger.debug('Reference class %s is unmodified sub-class of ItemRef', ref_name)
+            setting.models[ref_name] = ref_class
+    # build actual (outer) classes
+    for model_name in model_names:
         model_def = model_defs[model_name]
         class_dict = {'index': [('id', 1)]}
         pm = parse_model_def(model_def, model_defs) # pm: instance of class ParsedModel
@@ -642,4 +650,5 @@ def read_models(model_defs):
         model_class = type(model_name, (Item,), class_dict)
         model_class.create_collection()
         model_class.create_index(class_dict['index'])
+        logger.debug('Adding model class %s', model_name)
         setting.models[model_name] = model_class
