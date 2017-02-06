@@ -117,7 +117,6 @@ def decode_dict(s):
     Returns:
         list|dict: JSON document
     """
-    # return json.loads(html.unescape(s)) if s else {}
     return json.loads(s) if s else {}
 
 def encode_dict(d):
