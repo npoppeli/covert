@@ -205,7 +205,8 @@ class Item(BareItem):
                 result = {'status':FAIL, 'data':message}
                 report_db_action(result)
                 return result
-        doc = mapdoc(self.wmap, self)
+        doc = {key: value for key, value in mapdoc(self.wmap, self).items()
+                          if not key.startswith('__')}
         collection = setting.store_db[self.name]
         if setting.nostore: # don't write to the database
             reply = {'status':SUCCESS, 'data':'simulate '+('insert' if new else 'update')}
