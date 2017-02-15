@@ -47,24 +47,26 @@ def str2int(s):
     return number
 
 setting.icons = {
-    'show'   :      'fa fa-eye',
-    'diagram':      'fa fa-tree',
-    'marriage_new': 'fa fa-venus-mars',
-    'family_new':   'fa fa-group',
-    'children_new': 'fa fa-birthday-cake',
-    'index'  :      'fa fa-list-alt',
-    'search' :      'fa fa-search',
-    'match'  :      'fa fa-search',
-    'modify' :      'fa fa-pencil',
-    'update' :      'fa fa-pencil',
-    'new'    :      'fa fa-new',
-    'create' :      'fa fa-new',
-    'delete' :      'fa fa-trash-o',
-    'home'   :      'fa fa-home',
-    'info'   :      'fa fa-info-circle',
-    'ok'     :      'fa fa-check',
-    'refresh':      'fa fa-refresh',
-    'cancel' :      'fa fa-times'
+    'show'         : 'fa fa-eye',
+    'diagram'      : 'fa fa-tree',
+    'marriage_new' : 'fa fa-venus-mars',
+    'family_new'   : 'fa fa-group',
+    'children_sort': 'fa fa-sort-amount-asc',
+    'marriage_sort': 'fa fa-sort-amount-asc',
+    'children_new' : 'fa fa-birthday-cake',
+    'index'        : 'fa fa-list-alt',
+    'search'       : 'fa fa-search',
+    'match'        : 'fa fa-search',
+    'modify'       : 'fa fa-pencil',
+    'update'       : 'fa fa-pencil',
+    'new'          : 'fa fa-new',
+    'create'       : 'fa fa-new',
+    'delete'       : 'fa fa-trash-o',
+    'home'         : 'fa fa-home',
+    'info'         : 'fa fa-info-circle',
+    'ok'           : 'fa fa-check',
+    'refresh'      : 'fa fa-refresh',
+    'cancel'       : 'fa fa-times'
 }
 
 def icon_for(name):
@@ -72,24 +74,26 @@ def icon_for(name):
     return setting.icons.get(name, 'fa fa-flash')
 
 setting.labels = {
-     'show'        : 'Show|Toon|Show',
-     'diagram'     : 'Tree|Boom|Träd',
-     'marriage_new': 'Marriage|Huwelijk|Gifte',
-     'family_new'  : 'Family|Gezin|Familj',
-     'children_new': 'Child|Kind|Barn',
-     'index'       : 'Browse|Blader|Bläddra',
-     'search'      : 'Search|Zoek|Sök',
-     'match'       : 'Match|Resultaat|Resultat',
-     'modify'      : 'Modify|Wijzig|Ändra',
-     'update'      : 'Update|Wijzig|Ändra',
-     'new'         : 'New|Nieuw|Ny',
-     'create'      : 'Create|Maak|Skapa',
-     'delete'      : 'Delete|Verwijder|Radera',
-     'home'        : 'Home|Begin|Hem',
-     'info'        : 'Info|Info|Info',
-     'ok'          : 'OK|OK|OK',
-     'refresh'     : 'Refresh|Ververs|Fylla på',
-     'cancel'      : 'Cancel|Annuleer|Upphäva'
+     'show'         : 'Show|Toon|Show',
+     'diagram'      : 'Tree|Boom|Träd',
+     'marriage_new' : 'Marriage|Huwelijk|Gifte',
+     'family_new'   : 'Family|Gezin|Familj',
+     'children_new' : 'Child|Kind|Barn',
+     'children_sort': 'Sort|Sorteer|Sortera',
+     'marriage_sort': 'Sort|Sorteer|Sortera',
+     'index'        : 'Browse|Blader|Bläddra',
+     'search'       : 'Search|Zoek|Sök',
+     'match'        : 'Match|Resultaat|Resultat',
+     'modify'       : 'Modify|Wijzig|Ändra',
+     'update'       : 'Update|Wijzig|Ändra',
+     'new'          : 'New|Nieuw|Ny',
+     'create'       : 'Create|Maak|Skapa',
+     'delete'       : 'Delete|Verwijder|Radera',
+     'home'         : 'Home|Begin|Hem',
+     'info'         : 'Info|Info|Info',
+     'ok'           : 'OK|OK|OK',
+     'refresh'      : 'Refresh|Ververs|Fylla på',
+     'cancel'       : 'Cancel|Annuleer|Upphäva'
 }
 
 def label_for(name):
@@ -400,8 +404,9 @@ class RenderTree:
             self.info['active'].append(item['active'])
         else:
             self.info['active'] = [item['active']]
-        now, delta = datetime.now(), timedelta(days=7)
-        recent = now-item['mtime']<delta and item['active']
+        # now, delta = datetime.now(), timedelta(days=50)
+        # recent = now-item['mtime']<delta
+        recent = item['mtime'].year == 2017
         if 'recent' in self.info:
             self.info['recent'].append(recent)
         else:
@@ -414,7 +419,7 @@ class RenderTree:
                                 limit=self.cursor.limit, skip=self.cursor.skip, sort=sort)
         if items:
             active, recent = [], []
-            delta, now = timedelta(days=31), datetime.now()
+            # now, delta = datetime.now(), timedelta(days=50)
             for item in items:
                 button_list = [(delete_button if button == 'delete' else
                                 normal_button)(self.view_name, button, item) for button in buttons]
@@ -424,7 +429,8 @@ class RenderTree:
                 item['__hidden'] = []
                 self.data.append(item)
                 active.append(item['active'])
-                recent.append(now-item['mtime'] < delta and item['active'])
+                # recent.append(now - item['mtime'] < delta)
+                recent.append(item['mtime'].year == 2017)
             self.info['active'] = active
             self.info['recent'] = recent
         else:
@@ -457,7 +463,7 @@ class RenderTree:
                             'formtype': 'hidden' if field_meta.auto else field_meta.formtype,
                             'auto': field_meta.auto, 'control': field_meta.control}
                 newitem[key] = {'value':value, 'meta':proplist, 'buttons':[]}
-        newitem['_keys'] = [k for k in newitem.keys() if not k.startswith('_')]
+        newitem['__keys'] = [k for k in newitem.keys() if not k.startswith('_')]
         self.data[nr] = newitem
 
     def flatten_items(self):
@@ -477,7 +483,7 @@ class RenderTree:
                 not (form and field['meta']['schema']=='itemref'):
                 if clear: field['value'] = ''
                 newitem[key] = field
-        newitem['_keys'] = [k for k in newitem.keys() if not k.startswith('_')]
+        newitem['__keys'] = [k for k in newitem.keys() if not k.startswith('_')]
         self.data[nr] = newitem
 
     def prune_items(self, depth=2, clear=False, form=False):
@@ -498,7 +504,7 @@ class RenderTree:
                             (field_meta['multiple'] or field_meta['auto'] or
                             field_meta['schema'] in ('text', 'memo', 'itemref')):
                             newitem[key] = field
-                    newitem['_keys'] = [k for k in newitem.keys() if not k.startswith('_')]
+                    newitem['__keys'] = [k for k in newitem.keys() if not k.startswith('_')]
                 self.data[nr] = newitem
 
     def apply_prefix(self):
@@ -512,7 +518,7 @@ class RenderTree:
                 newitem = OrderedDict()
                 for key, value in item.items():
                     newitem[key if key.startswith('_') else prefix + '.' + key] = item[key]
-                newitem['_keys'] = [k for k in newitem.keys() if not k.startswith('_')]
+                newitem['__keys'] = [k for k in newitem.keys() if not k.startswith('_')]
                 self.data[nr] = newitem
 
     def add_buttons(self, buttons):
@@ -673,7 +679,7 @@ class ItemView(BareItemView):
             for item in tree.data:
                 if not item['__hide']:
                     item.update(self.extract_item(prefix=item['__prefix'], model=type(item)))
-                validation.append(item.validate(item))
+                    validation.append(item.validate(item))
             if all([v['status']==SUCCESS for v in validation]):
                 if callable(postproc):
                     postproc(tree)

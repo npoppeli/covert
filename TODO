@@ -20,7 +20,6 @@ model.py
 --------
 * embedding in show panels
 * embedding and linking in form panels
-* display_reference uses View.url_for()
 * tools for adding, modifying and deleting list-valued items (multiple=True)
 * tools for adding, modifying and deleting linked items (references)
 * tools for adding, modifying and deleting embedded items

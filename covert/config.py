@@ -75,10 +75,6 @@ def read_config():
     setting.dbtype  = config['dbtype']
     setting.language = config['language'] if config['language'] in setting.languages\
                        else config_default['language']
-    label_index = setting.languages.index(setting.language)
-    for name in setting.labels.keys():
-        parts = setting.labels[name].split('|')
-        setting.labels[name] = parts[label_index]
     # keep original configuration
     setting.config = config
     # in debugging mode, print some configuration parameters
@@ -86,8 +82,7 @@ def read_config():
         logger.setLevel(logging.DEBUG)
     logger.debug("Debug option is {}".format(setting.debug))
     logger.debug("Verbose option is {}".format(setting.verbose))
-    logger.debug("Changes are{}written to the database".\
-                 format(' *not* ' if setting.nostore else ' '))
+    logger.debug("Changes are{}written to the database".format(' *not* ' if setting.nostore else ' '))
     logger.debug("Static content is in directory {}".format(setting.content))
     logger.debug("User interface is in the '{}' language".format(setting.language))
 
@@ -112,7 +107,7 @@ def kernel_init():
     # read templates
     read_templates()
 
-    # import models (YAML or Python)
+    # import models
     if isinstance(setting.config['models'], list):
         model_list = setting.config['models']
     else:
@@ -130,12 +125,18 @@ def kernel_init():
             models = read_yaml_file(item)
             read_models(models)
         else:
-            logger.info('{} not a valid option for models'.format(item))
+            logger.info('{} should be in YAML or Python form'.format(item))
 
-    # import views (Python)
+    # import views
     name, extension = splitext(setting.config['views'])
     module = import_module(name)
     read_views(module)
+
+    # I18N
+    label_index = setting.languages.index(setting.language)
+    for name in setting.labels.keys():
+        parts = setting.labels[name].split('|')
+        setting.labels[name] = parts[label_index]
 
     # print information about models and views
     if setting.tables:
