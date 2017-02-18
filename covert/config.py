@@ -142,7 +142,7 @@ def kernel_init():
     if setting.tables:
         # print all routes (tabular)
         print('Application has {0} routes'.format(len(setting.routes)))
-        fmt = "{:<25}: {:<10} {:<15} {:<10} {:<30}"
+        fmt = "{:<30}: {:<10} {:<15} {:<15} {:<30}"
         print(fmt.format('pattern', 'method', 'view', 'route', 'templates'))
         print('-' * 90)
         for route in setting.routes:
