@@ -47,26 +47,21 @@ def str2int(s):
     return number
 
 setting.icons = {
-    'show'         : 'fa fa-eye',
-    'diagram'      : 'fa fa-tree',
-    'marriage_new' : 'fa fa-venus-mars',
-    'family_new'   : 'fa fa-group',
-    'children_sort': 'fa fa-sort-amount-asc',
-    'marriage_sort': 'fa fa-sort-amount-asc',
-    'children_new' : 'fa fa-birthday-cake',
-    'index'        : 'fa fa-list-alt',
-    'search'       : 'fa fa-search',
-    'match'        : 'fa fa-search',
-    'modify'       : 'fa fa-pencil',
-    'update'       : 'fa fa-pencil',
-    'new'          : 'fa fa-new',
-    'create'       : 'fa fa-new',
-    'delete'       : 'fa fa-trash-o',
-    'home'         : 'fa fa-home',
-    'info'         : 'fa fa-info-circle',
-    'ok'           : 'fa fa-check',
-    'refresh'      : 'fa fa-refresh',
-    'cancel'       : 'fa fa-times'
+    'show'   : 'fa fa-eye',
+    'sort'   : 'fa fa-sort-amount-asc',
+    'index'  : 'fa fa-list-alt',
+    'search' : 'fa fa-search',
+    'match'  : 'fa fa-search',
+    'modify' : 'fa fa-pencil',
+    'update' : 'fa fa-pencil',
+    'new'    : 'fa fa-new',
+    'create' : 'fa fa-new',
+    'delete' : 'fa fa-trash-o',
+    'home'   : 'fa fa-home',
+    'info'   : 'fa fa-info-circle',
+    'ok'     : 'fa fa-check',
+    'refresh': 'fa fa-refresh',
+    'cancel' : 'fa fa-times'
 }
 
 def icon_for(name):
@@ -75,12 +70,7 @@ def icon_for(name):
 
 setting.labels = {
      'show'         : 'Show|Toon|Show',
-     'diagram'      : 'Tree|Boom|Träd',
-     'marriage_new' : 'Marriage|Huwelijk|Gifte',
-     'family_new'   : 'Family|Gezin|Familj',
-     'children_new' : 'Child|Kind|Barn',
-     'children_sort': 'Sort|Sorteer|Sortera',
-     'marriage_sort': 'Sort|Sorteer|Sortera',
+     'sort'         : 'Sort|Sorteer|Sortera',
      'index'        : 'Browse|Blader|Bläddra',
      'search'       : 'Search|Zoek|Sök',
      'match'        : 'Match|Resultaat|Resultat',
@@ -144,21 +134,27 @@ class route:
 
     This decorator adds attributes to methods. Once set, these attributes cannot be changed anymore.
     """
-    def __init__(self, pattern, method='GET', template=''):
+    def __init__(self, pattern, method='GET', template='', icon='', label=''):
         """Constructor for 'route' decorator.
 
         Attributes:
             * pattern  (str): URL pattern, given as a format string
             * method   (str): string identifying HTTP method (e.g. 'GET' or 'GET, POST')
             * template (str): name(s) of template(s) that render(s) the result of the view
+            * icon     (str): icon name for this route
+            * label    (str): label for this route
         """
         self.pattern  = pattern
         self.method   = method
         self.template = template
+        self.icon     = icon
+        self.label    = label
     def __call__(self, wrapped):
         wrapped.pattern  = self.pattern
         wrapped.method   = self.method
         wrapped.template = self.template
+        wrapped.icon     = self.icon
+        wrapped.label    = self.label
         return wrapped
 
 # regular expressions used in routes
@@ -244,6 +240,8 @@ def read_views(module):
             continue
         view_name = class_name.replace('View', '', 1).lower()
         view_class.view_name = view_name
+        item_buttons_extra = []
+        # TODO: collection_buttons_extra = []
         for member_name, member in getmembers(view_class, isfunction):
             if hasattr(member, 'pattern'): # this member (method) is a route
                 full_pattern  = '/' + view_name + member.pattern
@@ -259,10 +257,22 @@ def read_views(module):
                         templates.append(parent_name)
                     else:
                         templates.append('default')
+                if member.icon:
+                    if member_name in setting.icons:
+                        logger.debug('Attempt to redefine icon for %s', member_name)
+                    else:
+                        setting.icons[member_name] = member.icon
+                        item_buttons_extra.append(member_name)
+                if member.label:
+                    if member_name in setting.labels:
+                        logger.debug('Attempt to redefine label for %s', member_name)
+                    else:
+                        setting.labels[member_name] = member.label
                 for method in member.method.split(','):
                     setting.patterns[view_name+'_'+member_name] = pattern
                     setting.routes.append(Route(pattern, method, templates,
                                                 re.compile(regex), view_class, member_name))
+        view_class.item_buttons_extra = item_buttons_extra
     # sorting in reverse alphabetical order ensures words like 'match' and 'index'
     # are not absorbed by {id} or other components of the regex patterns
     setting.routes.sort(key=lambda r: r.pattern, reverse=True)
