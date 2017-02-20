@@ -21,9 +21,10 @@ query_map = {
 }
 
 def report_db_action(result):
-    logger.debug("{}: status={} data={}".format(datetime.now(), result['status'], result['data']))
+    message = "{}: status={} data={} ".format(datetime.now(), result['status'], result['data'])
     if 'message' in result:
-        logger.debug(result['message'])
+        message += result['message']
+    logger.debug(message)
 
 def translate_query(query):
     """Translate query to form suitable for this storage engine.
@@ -34,14 +35,17 @@ def translate_query(query):
     """
     result = {}
     for key, value in query.items():
-        operator = value[0]
+        # field with 'multiple' property corresponds to a query term of a list with 1 value
+        multiple = isinstance(value, list)
+        term = value[0] if multiple else value
+        operator = term[0]
         if operator in query_map:  # apply mapping function
-            if isinstance(value, dict):  # embedded document
-                result[key] = mapdoc(query_map, value)
+            if isinstance(term, dict):  # embedded document
+                result[key] = mapdoc(query_map, term)
             else:  # scalar
-                result[key] = query_map[operator](value)
+                result[key] = query_map[operator](term)
         else:  # no mapping for this element
-            result[key] = value
+            result[key] = term
     return result
 
 def init_storage():
@@ -215,10 +219,12 @@ class Item(BareItem):
         try:
             if new:
                 result = collection.insert_one(doc)
-                reply= {'status':SUCCESS, 'data':str(result.inserted_id)}
+                message = 'nInserted=1'
+                reply= {'status':SUCCESS, 'data':str(result.inserted_id), 'message':message}
             else:
                 result = collection.replace_one({'_id':self['_id']}, doc)
-                reply = {'status':SUCCESS, 'data':self['id'], 'message':str(result.raw_result)}
+                message = 'nModified={}'.format(result.raw_result['nModified'])
+                reply = {'status':SUCCESS, 'data':self['id'], 'message':message}
             report_db_action(reply)
             return reply
         except Exception as e:
