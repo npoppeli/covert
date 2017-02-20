@@ -16,7 +16,7 @@ from inspect import getmembers, isclass, isfunction
 from itertools import chain
 from urllib.parse import urlencode
 from .common import SUCCESS, write_file, logger
-from .common import decode_dict, encode_dict, show_dict
+from .common import decode_dict, encode_dict
 from .model import unflatten, mapdoc
 from . import setting
 
@@ -444,8 +444,11 @@ class RenderTree:
             self.info['active'] = active
             self.info['recent'] = recent
         else:
-            qs = ', '.join(["{}{}{}".format(k, v[0], v[1]) for k, v in self.cursor.query.items()])
-            self.message += 'Nothing found for query {}'.format(qs)
+            query = []
+            for key, value in self.cursor.query.items():
+                term = value[0] if isinstance(value, list) else value
+                query.append("{}{}{}".format(key, term[0], term[1]))
+            self.message = 'Nothing found for this query: ' + ', '.join(query)
 
     def flatten_item(self, nr=0):
         """Flatten one item in the render tree."""
@@ -656,7 +659,7 @@ class ItemView(BareItemView):
         tree.add_item(self.model.empty())
         tree.add_search_button('match')
         tree.flatten_item()
-        tree.prune_item(depth=1, clear=True, form=True)
+        tree.prune_item(clear=True, form=True)
         return tree.asdict()
 
     @route('/match', method='GET,POST', template='index')
@@ -664,7 +667,8 @@ class ItemView(BareItemView):
         """Show the result list of a search."""
         return self.show_items('match')
 
-    def build_form(self, description, action, bound=False, postproc=None, method='POST', clear=False):
+    def build_form(self, description, action, bound=False, postproc=None, method='POST',
+                   clear=False, keep_empty=False):
         """Prepare render tree for rendering as a form.
 
         This function handles simple (single-item) forms and multi-faceted (multiple items,
@@ -678,6 +682,7 @@ class ItemView(BareItemView):
             postproc    (func): function to perform optional post-processing after validation.
             method      (str):  HTTP method, usually 'POST' or 'PUT'.
             clear       (bool): clear form (used in new/create forms).
+            keep_empty  (bool): keep empty values (used in modify/update forms).
 
         Returns:
             None.
@@ -685,7 +690,7 @@ class ItemView(BareItemView):
         tree = self.tree
         validation = []
         if bound:
-            self.convert_form()
+            self.convert_form(keep_empty=keep_empty)
             for item in tree.data:
                 if not item['__hide']:
                     item.update(self.extract_item(prefix=item['__prefix'], model=type(item)))
@@ -695,6 +700,7 @@ class ItemView(BareItemView):
                     postproc(tree)
                 for item in tree.data:
                     item.write(validate=False)
+                tree.title = ''
                 tree.message = '{} {}'.format(description, str(tree.data[0]))
                 return self.show_item(tree.data[0])
             else:
@@ -718,7 +724,8 @@ class ItemView(BareItemView):
     def update(self):
         """Update an existing item."""
         self.tree.add_item(self.model.lookup(self.params['id']))
-        return self.build_form(description='Modified item', action='update', method='PUT', bound=True)
+        return self.build_form(description='Modified item', action='update', method='PUT',
+                               bound=True, keep_empty=True)
 
     @route('/new', template='form')
     def new(self):
