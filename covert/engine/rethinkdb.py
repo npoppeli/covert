@@ -13,9 +13,11 @@ from .. import setting
 from bson.objectid import ObjectId
 
 def report_db_action(result):
-    logger.debug("{}: status={} data={}".format(datetime.now(), result['status'], result['data']))
+    message = "{}: status={} data={} ".format(datetime.now(), result['status'], result['data'])
     if 'message' in result:
-        logger.debug(result['message'])
+        message += result['message']
+    logger.debug(message)
+
 
 def init_storage():
     """Initialize storage engine."""
@@ -73,6 +75,7 @@ class Item(BareItem):
         """
         query = r.table(cls.name)
         for key, value in doc.items():
+            # TODO: add possibility to search through array fields
             operator = value[0]
             if operator == '==':
                 query = query.filter(r.row[key] == value[1])
