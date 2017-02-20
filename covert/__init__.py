@@ -34,9 +34,9 @@ Classes:
 
 from .           import setting
 from .atom       import EMPTY_DATE, EMPTY_DATETIME, EMPTY_TIME
-from .common     import read_yaml_file, logger, SUCCESS, FAIL, ERROR
+from .common     import read_yaml_file, logger, SUCCESS, FAIL, ERROR, show_dict, encode_dict
 from .config     import read_config, parse_cmdline, kernel_init, add_argument
 from .controller import http_server, SwitchRouter, MapRouter, PageRouter, JSONRouter
 from .model      import ItemRef
-from .view       import route, BareItemView, ItemView, url_for, show_dict, encode_dict
+from .view       import route, BareItemView, ItemView, url_for
 from .view       import route2pattern, route2regex, RenderTree, normal_button
