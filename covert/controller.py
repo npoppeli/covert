@@ -185,8 +185,8 @@ class MapRouter:
                     print(result)
                 response.status = 500
         else: # no match in the known routes
-            print('{}: {} {}'.format(controller_name, 'nothing found for', request.path_qs))
-            result = 'Nothing found for '+request.path_qs
+            result = 'nothing found for {} {}'.format(req_method, request.path_qs)
+            logger.warning('{} - {}'.format(controller_name, result))
             response.status = 404
         # encode to UTF8 and return according to WSGI protocol
         response.charset = 'utf-8'
