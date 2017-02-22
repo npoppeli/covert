@@ -1,18 +1,29 @@
+<!--! title -->
+<div tal:define="title this['title']">
+  <p class="class">${title}</p>
+</div>
 <!--! data -->
-<form class="form-horizontal" action="${this['buttons'][0]['action']}" method="POST"
-      tal:define="item this['data']; meta this['meta']; fields item.keys()">
+<form class="form-horizontal" action="${this['buttons'][0]['action']}" method="POST">
   <fieldset>
     <input tal:condition="this['method']" type="hidden" name="_method" value="${this['method']}"/>
-    <span tal:repeat="key [key for key in fields if meta[key]['formtype'] == 'hidden']" tal:omit-tag="">
-      <input type="hidden" name="${key}" value="${item[key]}"/>
-    </span>
-    <div tal:repeat="key [key for key in fields if meta[key]['formtype'] != 'hidden']">
-      <label tal:define="label meta[key]['label']"
-             for="${key}" class="col-sm-3 control-label">${label}</label>
+    <div tal:repeat="item this['data']" tal:omit-tag="">
+      <span tal:define="fields item['__keys']"
+            tal:repeat="key [key for key in fields if item[key]['meta']['formtype'] == 'hidden']" tal:omit-tag="">
+        <input type="hidden" name="${key}" value="${item[key]['value']}"/>
+      </span>
+      <div class="form-group" tal:define="prefix item['__prefix']" tal:condition="prefix">
+        <label class="col-sm-3 control-label">&nbsp;</label>
+        <div class="col-sm-7"><p class="form-control-static">${prefix}</p></div>
+      </div>
+      <div class="form-group" tal:define="fields item['__keys']"
+           tal:repeat="key [key for key in fields if item[key]['meta']['formtype'] != 'hidden']">
+        <label tal:define="label item[key]['meta']['label']"
+               for="${key}" class="col-sm-3 control-label">${label}</label>
         <div class="col-sm-7"
-             tal:define="value item[key]; control meta[key]['control']" tal:switch="control">
+             tal:define="field item[key]; meta field['meta']; value field['value']; control meta['control']"
+             tal:switch="control">
           <div class="form-control" tal:case="'radio'">
-            <span tal:repeat="option meta[key]['enum']" tal:omit-tag="">
+            <span tal:repeat="option meta['enum']" tal:omit-tag="">
               <label tal:define="subkey key+'_'+str(repeat.option.index)" class="radio-inline" for="${subkey}">
                 <input type="radio" name="${key}" id="${subkey}"
                        tal:attributes="checked 'checked' if item[key]==option  else default"
@@ -20,13 +31,14 @@
             </span>
           </div>
           <span tal:case="'input'" tal:omit-tag="">
-            <input class="form-control" type="${meta[key]['formtype']}" name="${key}" id="${key}" value="${value}"/>
+            <input class="form-control" type="${meta['formtype']}" name="${key}" id="${key}" value="${value}"/>
           </span>
           <span tal:case="'textarea'" tal:omit-tag="">
             <textarea class="form-control" rows="4" cols="50" name="${key}" id="${key}">${value}</textarea>
           </span>
         </div>
       </div>
+    </div>
   </fieldset>
 <!--! buttons -->
   <div>

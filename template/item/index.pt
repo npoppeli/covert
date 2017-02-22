@@ -1,7 +1,6 @@
 <!--! cursor -->
 <div style="margin-bottom:20px">
   <form tal:define="cursor this['cursor']" class="form-inline" action="${cursor.action}" method="POST">
-    <input type="hidden" name="_incl0" value="${cursor.incl0}"/>
     <input type="hidden" name="_skip"  value="${cursor.skip}" />
     <input type="hidden" name="_query" value="${cursor.query}"/>
     <div class="form-group">
@@ -26,27 +25,34 @@
     </div>
   </form>
 </div>
+<!--! title -->
+<div tal:define="title this['title']">
+  <p class="class">${title}</p>
+</div>
 <!--! data -->
 <div tal:condition="len(this['data'])>0">
-  <table class='table table-bordered table-condensed' tal:define="data this['data']; meta this['meta']; fields data[0]['item'].keys()">
+  <table class='table table-bordered table-condensed'
+    tal:define="data this['data']; top data[0]; fields top['__keys']; info this['info']">
   <thead>
   <tr>
-    <th tal:repeat="field fields">${meta[field]['label']}</th>
+    <th tal:repeat="field fields">${top[field]['meta']['label']}</th>
     <th>&nbsp;</th>
   </tr>
   </thead>
   <tbody>
-   <tr tal:repeat="row data" tal:attributes="class 'text-muted' if row['item']['active'][0]=='n' else default">
-       <span tal:define="item row['item']" tal:repeat="field fields" tal:omit-tag="">
-           <td tal:define="cell item[field]" tal:switch="isinstance(cell,tuple)">
-               <span tal:case="True" tal:omit-tag=""><a href="${cell[1]}">${cell[0]}</a>&nbsp;</span>
-               <span tal:case="False" tal:replace="cell"></span>
-           </td>
-       </span>
-       <td class="text-nowrap">
-           <a tal:repeat="button row['buttons']" href="${button['action']}" data-method="${button['method']}">
-             <button class="btn btn-default btn-xs"><span class="${button['icon']}"></span></button></a>
+   <tr tal:repeat="item data"
+       tal:attributes="id 'id'+str(repeat.item.index); class 'success' if info['recent'][repeat.item.index] else (default if info['active'][repeat.item.index] else 'text-muted')">
+     <span tal:repeat="field fields" tal:omit-tag="">
+       <td tal:define="value item[field]['value']" tal:switch="isinstance(value, tuple)">
+         <span tal:case="True" tal:omit-tag=""><a href="${value[1]}">${value[0]}</a>&nbsp;</span>
+         <span tal:case="False" tal:replace="value"></span>
        </td>
+     </span>
+     <td class="text-nowrap">
+       <a tal:repeat="button item['__buttons']" href="${button['action']}"
+          data-bind="${'id'+str(repeat.item.index)}" data-method="${button['method']}">
+       <button class="btn btn-default btn-xs"><span class="${button['icon']}"></span></button></a>
+     </td>
      </tr>
   </tbody>
   </table>
