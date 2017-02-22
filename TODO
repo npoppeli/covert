@@ -50,8 +50,8 @@ view.py
 * make ItemView.sort independent from db engine
 * pass ItemView.sort to render tree methods in a more elegant way
 * itemlist with clickable column headers to influence sorting
-* define icon and label for custom methods
 * Use Mirage (JS) for client-side generation of search queries
+* Use Alpaca (JS) for client-side form handling
 * routes should set 'title' attribute of render tree, templates should display it
 * add boolean vector 'active', 'modified' recently) to the render tree (add_item, add_items)
 * boolean vector 'modified' could be part of event handler
