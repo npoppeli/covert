@@ -16,7 +16,7 @@ from inspect import getmembers, isclass, isfunction
 from itertools import chain
 from urllib.parse import urlencode
 from .common import SUCCESS, write_file, logger
-from .common import decode_dict, encode_dict
+from .common import decode_dict, encode_dict, show_dict
 from .model import unflatten, mapdoc
 from . import setting
 
@@ -404,10 +404,10 @@ class RenderTree:
     def add_item(self, oid_or_item, prefix='', hide=None):
         """Add item to render tree."""
         item = self.model.lookup(oid_or_item) if isinstance(oid_or_item, str) else oid_or_item
-        item['__buttons'] = []
-        item['__prefix'] = prefix
-        item['__hide'] = hide == 'all'
-        item['__hidden'] = [] if hide is None or hide == 'all' else hide
+        item['_buttons'] = []
+        item['_prefix'] = prefix+'.' if prefix else ''
+        item['_hide'] = hide == 'all'
+        item['_hidden'] = [] if hide is None or hide == 'all' else hide
         # TODO: move lines below to event handler
         self.data.append(item)
         if 'active' in self.info:
@@ -433,10 +433,10 @@ class RenderTree:
             for item in items:
                 button_list = [(delete_button if button == 'delete' else
                                 normal_button)(self.view_name, button, item) for button in buttons]
-                item['__buttons'] = button_list
-                item['__prefix'] = ''
-                item['__hide'] = False
-                item['__hidden'] = []
+                item['_buttons'] = button_list
+                item['_prefix'] = ''
+                item['_hide'] = False
+                item['_hidden'] = []
                 self.data.append(item)
                 active.append(item['active'])
                 # recent.append(now - item['mtime'] < delta)
@@ -476,7 +476,7 @@ class RenderTree:
                             'formtype': 'hidden' if field_meta.auto else field_meta.formtype,
                             'auto': field_meta.auto, 'control': field_meta.control}
                 newitem[key] = {'value':value, 'meta':proplist, 'buttons':[]}
-        newitem['__keys'] = [k for k in newitem.keys() if not k.startswith('_')]
+        newitem['_keys'] = [k for k in newitem.keys() if not k.startswith('_')]
         self.data[nr] = newitem
 
     def flatten_items(self):
@@ -487,7 +487,7 @@ class RenderTree:
     def prune_item(self, nr=0, depth=2, clear=False, form=False):
         """Prune one item in the render tree."""
         item = self.data[nr]
-        hidden = item['__hidden']
+        hidden = item['_hidden']
         newitem = OrderedDict()
         for key, field in item.items():
             if key.startswith('_'):
@@ -496,7 +496,7 @@ class RenderTree:
                 not (form and field['meta']['schema']=='itemref'):
                 if clear: field['value'] = ''
                 newitem[key] = field
-        newitem['__keys'] = [k for k in newitem.keys() if not k.startswith('_')]
+        newitem['_keys'] = [k for k in newitem.keys() if not k.startswith('_')]
         self.data[nr] = newitem
 
     def prune_items(self, depth=2, clear=False, form=False):
@@ -506,7 +506,7 @@ class RenderTree:
                 self.prune_item(nr=nr, depth=depth, clear=clear, form=form)
         else:
             for nr, item in enumerate(self.data):
-                hidden = item['__hidden']
+                hidden = item['_hidden']
                 newitem = OrderedDict()
                 for key, field in item.items():
                     if key.startswith('_'):
@@ -517,21 +517,7 @@ class RenderTree:
                             (field_meta['multiple'] or field_meta['auto'] or
                             field_meta['schema'] in ('text', 'memo', 'itemref')):
                             newitem[key] = field
-                    newitem['__keys'] = [k for k in newitem.keys() if not k.startswith('_')]
-                self.data[nr] = newitem
-
-    def apply_prefix(self):
-        """Apply prefix to all items in the render tree.
-
-        For each item: add item['_prefix']+'.' to all keys.
-        """
-        for nr, item in enumerate(self.data):
-            prefix = item['__prefix']
-            if prefix:
-                newitem = OrderedDict()
-                for key, value in item.items():
-                    newitem[key if key.startswith('_') else prefix + '.' + key] = item[key]
-                newitem['__keys'] = [k for k in newitem.keys() if not k.startswith('_')]
+                    newitem['_keys'] = [k for k in newitem.keys() if not k.startswith('_')]
                 self.data[nr] = newitem
 
     def add_buttons(self, buttons):
@@ -562,7 +548,7 @@ class RenderTree:
         if result.get('cursor', None):
             result['cursor'] = result['cursor'].asdict()
             result['cursor']['query'] = encode_dict(result['cursor']['query'])
-        result['data'] = [item for item in result['data'] if not item['__hide']]
+        result['data'] = [item for item in result['data'] if not item['_hide']]
         return result
 
     def dump(self, name):
@@ -639,7 +625,7 @@ class ItemView(BareItemView):
     def extract_item(self, prefix=None, model=None):
         """Convert unflattened form to item."""
         # after unflattening, this is easy
-        selection = self.form[prefix] if prefix else self.form
+        selection = self.form[prefix.rstrip('.')] if prefix else self.form
         return (model or self.model).convert(selection)
 
     @route('/{id:objectid}', template='show')
@@ -692,8 +678,8 @@ class ItemView(BareItemView):
         if bound:
             self.convert_form(keep_empty=keep_empty)
             for item in tree.data:
-                if not item['__hide']:
-                    item.update(self.extract_item(prefix=item['__prefix'], model=type(item)))
+                if not item['_hide']:
+                    item.update(self.extract_item(prefix=item['_prefix'], model=type(item)))
                     validation.append(item.validate(item))
             if all([v['status']==SUCCESS for v in validation]):
                 if callable(postproc):
@@ -709,9 +695,11 @@ class ItemView(BareItemView):
                                format(description, str(tree.data[0]), errors)
                 tree.style = 1
         tree.add_form_buttons(action, method)
+        self.tree.dump('tree0.json')
         tree.flatten_items()
+        self.tree.dump('tree1.json')
         tree.prune_items(form=True, clear=clear)
-        tree.apply_prefix()
+        self.tree.dump('tree2.json')
         return tree.asdict()
 
     @route('/{id:objectid}/modify', template='form')
