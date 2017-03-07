@@ -615,7 +615,7 @@ def read_models(model_defs):
         if ref_name in setting.models:
             logger.debug('Reference class %s already defined', ref_name)
         else:
-            logger.debug('Reference class %s is unmodified sub-class of ItemRef', ref_name)
+            # logger.debug('Reference class %s is unmodified sub-class of ItemRef', ref_name)
             setting.models[ref_name] = ref_class
     # build actual (outer) classes
     for model_name in model_names:
@@ -650,5 +650,5 @@ def read_models(model_defs):
         model_class = type(model_name, (Item,), class_dict)
         model_class.create_collection()
         model_class.create_index(class_dict['index'])
-        logger.debug('Adding model class %s', model_name)
+        # logger.debug('Adding model class %s', model_name)
         setting.models[model_name] = model_class

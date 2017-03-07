@@ -32,7 +32,7 @@
 <!--! data -->
 <div tal:condition="len(this['data'])>0">
   <table class='table table-bordered table-condensed'
-    tal:define="data this['data']; top data[0]; fields top['__keys']; info this['info']">
+    tal:define="data this['data']; top data[0]; fields top['_keys']; info this['info']">
   <thead>
   <tr>
     <th tal:repeat="field fields">${top[field]['meta']['label']}</th>
@@ -49,7 +49,7 @@
        </td>
      </span>
      <td class="text-nowrap">
-       <a tal:repeat="button item['__buttons']" href="${button['action']}"
+       <a tal:repeat="button item['_buttons']" href="${button['action']}"
           data-bind="${'id'+str(repeat.item.index)}" data-method="${button['method']}">
        <button class="btn btn-default btn-xs"><span class="${button['icon']}"></span></button></a>
      </td>

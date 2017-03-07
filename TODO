@@ -14,13 +14,13 @@ config.py
 
 layout.py
 ---------
-* move Tonnikala out of the core
+* move Tonnikala and Mako out of the core
 
 model.py
 --------
 * embedding in show panels
 * embedding and linking in form panels
-* tools for adding, modifying and deleting list-valued items (multiple=True)
+* tools for adding, modifying and deleting list-valued items
 * tools for adding, modifying and deleting linked items (references)
 * tools for adding, modifying and deleting embedded items
 * item revisions (add 'rev' attribute)
@@ -46,15 +46,12 @@ view.py
 * authorization determines icon and button states (enabled, disabled)
 * delete button is enabled iff item.active
 * add 'import' method (form-based file upload, CSV and JSON)
-* allow fields of 'multiple' type in search form
 * make ItemView.sort independent from db engine
 * pass ItemView.sort to render tree methods in a more elegant way
 * itemlist with clickable column headers to influence sorting
 * Use Mirage (JS) for client-side generation of search queries
 * Use Alpaca (JS) for client-side form handling
-* routes should set 'title' attribute of render tree, templates should display it
-* add boolean vector 'active', 'modified' recently) to the render tree (add_item, add_items)
-* boolean vector 'modified' could be part of event handler
+* move boolean vector 'active' and 'modified' to event handler
 
 engine/mongodb.py
 -----------------
