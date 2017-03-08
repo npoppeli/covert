@@ -35,8 +35,8 @@ def translate_query(query):
     """
     result = {}
     for key, value in query.items():
-        # field with 'multiple' property corresponds to a query term of a list with 1 value
-        multiple = isinstance(value, list)
+        # field with 'multiple' property corresponds to a query term of a 1-item list
+        multiple = isinstance(value, list) and len(value)==1
         term = value[0] if multiple else value
         operator = term[0]
         if operator in query_map:  # apply mapping function
@@ -98,7 +98,9 @@ class Item(BareItem):
         Returns:
             dict: query in MongoDB form.
         """
-        return translate_query(doc)
+        result = translate_query(doc)
+        logger.debug("Item.query: translated query=%s", result)
+        return result
 
     @classmethod
     def count(cls, doc):
