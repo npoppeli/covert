@@ -96,13 +96,17 @@ def _unflatten(list_rep):
         end = bisect_right(car_list, key)
         children = list_rep[begin:end]
         if len(children) == 1:
-            # We can distinguish 3 cases: 1. cdr = ['0']; 2. cdr is empty;
-            # 3. cdr = [a] where a != '0', but this is unrealistic.
             child = children[0]
-            result[key] = [child[1]] if child[0] == ['0'] else child[1]  # scalar
+            if not child[0]: # empty list
+                result[key] = child[1]
+            elif child[0] == ['0']:
+                result[key] = [child[1]]
+            else:
+                result[key] = _unflatten(children)
         else:
             result[key] = _unflatten(children)
-    if car_set and all([key.isnumeric() for key in car_set]): # dict with all keys numeric=list
+    # convert a dict with numeric keys to a list
+    if car_set and all([key.isnumeric() for key in car_set]):
         return [t[1] for t in sorted(result.items(), key=lambda t: int(t[0]))]
     else:
         return result
