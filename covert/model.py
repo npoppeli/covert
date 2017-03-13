@@ -95,14 +95,15 @@ def _unflatten(list_rep):
         begin = bisect_left(car_list, key)
         end = bisect_right(car_list, key)
         children = list_rep[begin:end]
-        if len(children) == 1:
+        if len(children) == 1: # recursion terminates here
             child = children[0]
-            if not child[0]: # empty list
+            path = child[0]
+            if not path: # empty list
                 result[key] = child[1]
-            elif child[0] == ['0']:
+            elif path[0].isnumeric(): # one-item list
                 result[key] = [child[1]]
-            else:
-                result[key] = _unflatten(children)
+            else: # one-item dict
+                result[key] = {path[0]:child[1]}
         else:
             result[key] = _unflatten(children)
     # convert a dict with numeric keys to a list
@@ -216,25 +217,19 @@ class BareItem(dict):
     def __init__(self, doc=None):
         """Initialize item.
 
-        Initialize item in steps: (1) super-class initialization, (2) set fields to
-        None or [], (3) add fields from 'doc' (if available)*[]:
+        Initialize item in steps:
+        1. super-class initialization
+        2. update with contents of'empty item'
+        3. update with contents of 'doc' (if available):
 
         Arguments:
             * doc (dict): item read from storage.
         """
         super().__init__()
-        for field in self.fields:
-            if not self.meta[field].optional:
-                self[field] = [] if self.meta[field].multiple else None
+        empty = deepcopy(self._empty)
+        self.update(empty) # necessary in case of bulk import
         if doc:
             self.update(mapdoc(self.rmap, doc))
-
-    @classmethod
-    def empty(cls):
-        """Create new empty item."""
-        item = cls()
-        item.update(deepcopy(cls._empty)) # necessary in case of bulk import
-        return item
 
     _format = 'Item {id}'
     def __str__(self):
@@ -632,7 +627,7 @@ def read_models(model_defs):
         schema.update(pm.schema)
         meta = BareItem.meta.copy()
         meta.update(pm.meta)
-        empty = BareItem._empty.copy() # shallow copy, but that is acceptable here
+        empty = BareItem._empty.copy() # shallow copy, but that is sufficient here
         empty.update(pm.empty)
         pm.cmap.update(BareItem.cmap)
         pm.dmap.update(BareItem.dmap)
