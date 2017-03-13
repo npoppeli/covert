@@ -99,7 +99,6 @@ class Item(BareItem):
             dict: query in MongoDB form.
         """
         result = translate_query(doc)
-        logger.debug("Item.query: translated query=%s", result)
         return result
 
     @classmethod
