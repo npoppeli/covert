@@ -157,7 +157,7 @@ def kernel_init():
             else:
                 model = setting.models[name]
                 print('{0}\n{1}'.format(name, '-'*len(name)))
-                fmt = "{:<15}: {:<15} {:<10} {!s:<10} {!s:<10} {!s:<10} {!s:<10}"
+                fmt = "{:<15}: {:<20} {:<10} {!s:<10} {!s:<10} {!s:<10} {!s:<10}"
                 print(fmt.format('name', 'label', 'schema', 'optional',
                                  'multiple', 'auto', 'formtype'))
                 print('-'*90)
