@@ -90,10 +90,25 @@ class Item(BareItem):
         return query
 
     @classmethod
+    def max(cls, field):
+        """Find maximum value in collection of field value.
+
+        Go through all items in collection, and determine maximum value of 'field'.
+        Arguments:
+            field (str): field name
+
+        Returns:
+            any: maximum value.
+        """
+        result = r.table(cls.name).max(field).run(setting.store_connection)
+        return result[field]
+
+    @classmethod
     def count(cls, doc):
         """Count items in collection that match a given query.
 
         Find zero or more items (documents) in collection, and count them.
+
         Arguments:
             doc (dict): dictionary specifying the query, e.g. {'id': ('==', '1234')}
 

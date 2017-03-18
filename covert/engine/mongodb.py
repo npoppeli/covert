@@ -102,10 +102,25 @@ class Item(BareItem):
         return result
 
     @classmethod
+    def max(cls, field):
+        """Find maximum value in collection of field value.
+
+        Go through all items in collection, and determine maximum value of 'field'.
+        Arguments:
+            field (str): field name
+
+        Returns:
+            any: maximum value.
+        """
+        cursor = setting.store_db[cls.name].find().sort([(field, -1)]).limit(1)
+        return cursor[0][field]
+
+    @classmethod
     def count(cls, doc):
         """Count items in collection that match a given query.
 
         Find zero or more items (documents) in collection, and count them.
+
         Arguments:
             doc (dict): dictionary specifying the query, e.g. {'id': ('==', '1234')}
 
@@ -121,6 +136,7 @@ class Item(BareItem):
 
         Find zero or more items in collection, and return these in the
         form of a list of 'cls' instances. Assumption: stored items are valid.
+
         Arguments:
             doc   (dict): dictionary specifying the query, e.g. {'id': ('==', '1234')}.
             skip  (int):  number of items to skip.
