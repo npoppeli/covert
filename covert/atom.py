@@ -83,11 +83,17 @@ define_atom('boolean',
             )
 
 # date and datetime use str.format in the display map, to avoid Python issue 13305
-date_convert = lambda x: datetime.strptime(x, "%Y-%m-%d")
+def date_convert(x):
+    return datetime.strptime(x, "%Y-%m-%d") if x else EMPTY_DATE
+
+def date_display(x):
+    return '????-??-??' if x.year == MINYEAR\
+    else '{0:04d}-{1:02d}-{2:02d}'.format(x.year, x.month, x.day)
+
 define_atom('date',
             schema   = date,
             convert  = date_convert,
-            display  = lambda x: '{0:04d}-{1:02d}-{2:02d}'.format(x.year, x.month, x.day),
+            display  = date_display,
             query    = lambda x: ('==', date_convert(x)),
             read     = lambda x: x.date(),
             write    = lambda x: datetime.combine(x, MIDNIGHT),
@@ -96,7 +102,9 @@ define_atom('date',
             control  = 'input'
             )
 
-datetime_convert = lambda x: datetime.strptime(x, "%Y-%m-%dT%H:%M:%S")
+def datetime_convert(x):
+    return datetime.strptime(x, "%Y-%m-%dT%H:%M:%S") if x else EMPTY_DATETIME
+
 define_atom('datetime',
             schema   = datetime,
             convert  = datetime_convert,
