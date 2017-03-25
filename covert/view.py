@@ -16,7 +16,7 @@ from inspect import getmembers, isclass, isfunction
 from itertools import chain
 from urllib.parse import urlencode
 from .common import SUCCESS, write_file, logger
-from .common import decode_dict, encode_dict
+from .common import decode_dict, encode_dict, show_dict
 from .model import unflatten, mapdoc
 from . import setting
 
@@ -161,6 +161,7 @@ class route:
 patterns = {
     'alpha'   : r'[a-zA-Z]+',
     'digits'  : r'\d+',
+    'ids'     : r'\d+(?:\s+\d+)*',
     'objectid': r'\w{24}'
 }
 
@@ -415,6 +416,7 @@ class RenderTree:
         item['_hidden'] = [] if hide is None or hide == 'all' else hide
         # TODO: move lines below to event handler
         self.data.append(item)
+        logger.debug("add_item: item=%s", show_dict(item))
         if 'active' in self.info:
             self.info['active'].append(item['active'])
         else:
@@ -436,7 +438,7 @@ class RenderTree:
                                 limit=self.cursor.limit, skip=self.cursor.skip, sort=sort)
         if items:
             active, recent = [], []
-            # now, delta = datetime.now(), timedelta(days=50)
+            now, delta = datetime.now(), timedelta(days=50)
             for item in items:
                 button_list = [(delete_button if button == 'delete' else
                                 normal_button)(self.view_name, button, item) for button in buttons]
@@ -446,8 +448,7 @@ class RenderTree:
                 item['_hidden'] = []
                 self.data.append(item)
                 active.append(item['active'])
-                # recent.append(now - item['mtime'] < delta)
-                recent.append(item['mtime'].year == 2017)
+                recent.append(now - item['mtime'] < delta)
             self.info['active'] = active
             self.info['recent'] = recent
         else:
@@ -523,6 +524,8 @@ class RenderTree:
                         if (key.count('.') < depth) and key not in hidden and not \
                             (field_meta['multiple'] or field_meta['auto'] or
                             field_meta['schema'] in ('text', 'memo', 'itemref')):
+                            newitem[key] = field
+                        elif key=='guid':
                             newitem[key] = field
                     newitem['_keys'] = [k for k in newitem.keys() if not k.startswith('_')]
                 self.data[nr] = newitem
@@ -641,7 +644,7 @@ class ItemView(BareItemView):
         """Convert unflattened form to item."""
         # after unflattening, this is easy
         selection = self.form[prefix.rstrip('.')] if prefix else self.form
-        # logger.debug("extract_item: selection=%s", selection)
+        logger.debug("extract_item: selection=%s", selection)
         return (model or self.model).convert(selection)
 
     @route('/{id:objectid}', template='show')

@@ -20,6 +20,8 @@ except ImportError:
 # logging
 logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
 logger = logging.getLogger('waitress')
+# The Waitress logger does not define handlers. It inherits the handler, a StreamHandler,
+# from the root logger.
 
 # exceptions
 class InternalError(Exception):

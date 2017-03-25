@@ -16,8 +16,8 @@ def report_db_action(result):
     message = "{}: status={} data={} ".format(datetime.now(), result['status'], result['data'])
     if 'message' in result:
         message += result['message']
-    logger.debug(message)
-
+    if setting.debug > 1:
+        logger.debug(message)
 
 def init_storage():
     """Initialize storage engine."""
