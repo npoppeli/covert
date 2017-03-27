@@ -40,7 +40,7 @@ def parse_cmdline():
         parser.add_argument(name[1:3], name, **options)
     args = parser.parse_args()
     setting.config_file = args.config
-    setting.debug = args.debug
+    setting.debug   = args.debug
     setting.nostore = args.nostore
     setting.tables  = args.tables
     setting.verbose = args.verbose

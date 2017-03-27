@@ -16,7 +16,7 @@ from inspect import getmembers, isclass, isfunction
 from itertools import chain
 from urllib.parse import urlencode
 from .common import SUCCESS, write_file, logger
-from .common import decode_dict, encode_dict, show_dict
+from .common import decode_dict, encode_dict
 from .model import unflatten, mapdoc
 from . import setting
 
@@ -288,7 +288,7 @@ class Cursor:
     """
     __slots__ = ['skip', 'limit', 'incl', 'dir',
                  'filter', 'query', 'prev', 'next', 'action', 'submit']
-    default = {'skip':0, 'limit':10, 'incl':0, 'dir':0, 'submit':''}
+    default = {'skip':0, 'limit':20, 'incl':0, 'dir':0, 'submit':''}
 
     def __init__(self, request, model):
         """Constructor method for Cursor.
@@ -416,14 +416,14 @@ class RenderTree:
         item['_hidden'] = [] if hide is None or hide == 'all' else hide
         # TODO: move lines below to event handler
         self.data.append(item)
-        logger.debug("add_item: item=%s", show_dict(item))
+        # logger.debug("add_item: item=%s", show_dict(item))
         if 'active' in self.info:
             self.info['active'].append(item['active'])
         else:
             self.info['active'] = [item['active']]
-        # now, delta = datetime.now(), timedelta(days=50)
-        # recent = now-item['mtime']<delta
-        recent = item['mtime'].year == 2017
+        now, delta = datetime.now(), timedelta(days=50)
+        recent = now-item['mtime']<delta
+        # recent = item['mtime'].year == 2017
         if 'recent' in self.info:
             self.info['recent'].append(recent)
         else:
@@ -644,7 +644,7 @@ class ItemView(BareItemView):
         """Convert unflattened form to item."""
         # after unflattening, this is easy
         selection = self.form[prefix.rstrip('.')] if prefix else self.form
-        logger.debug("extract_item: selection=%s", selection)
+        # logger.debug("extract_item: selection=%s", selection)
         return (model or self.model).convert(selection)
 
     @route('/{id:objectid}', template='show')
@@ -714,11 +714,8 @@ class ItemView(BareItemView):
                                format(description, str(tree.data[0]), errors)
                 tree.style = 1
         tree.add_form_buttons(action, method)
-        self.tree.dump('tree0.json')
         tree.flatten_items()
-        self.tree.dump('tree1.json')
         tree.prune_items(form=True, clear=clear)
-        self.tree.dump('tree2.json')
         return tree.asdict()
 
     @route('/{id:objectid}/modify', template='form')
