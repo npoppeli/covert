@@ -187,20 +187,24 @@ class BareItem(dict):
 
     Attributes:
         * id     (string):   unique id attribute (unique at least within the collection)
+        * _skey  (string):   sort key
+        * active (boolean):  True if active item, False if inactive (deleted) item
         * ctime  (datetime): creation time (automatic)
         * mtime  (datetime): modification time (automatic)
-        * active (boolean):  True if active item, False if inactive (deleted) item
     """
     # basics
     ba = atom_map['boolean']
     sa = atom_map['string']
     da = atom_map['datetime']
     name = 'BareItem'
-    fields = ['id', 'ctime', 'mtime', 'active']
+    fields = ['id', '_skey', 'ctime', 'mtime', 'active']
+    index = [('id', 1), ('_skey', 1)]
     # validation
-    _schema   = {'id':sa.schema, 'ctime':da.schema, 'mtime':da.schema, 'active': ba.schema}
+    _schema   = {'id':sa.schema, '_skey': sa.schema, 'active': ba.schema,
+                 'ctime':da.schema, 'mtime':da.schema}
     _validate = None
-    _empty    = {'id':'', 'ctime':EMPTY_DATETIME, 'mtime':EMPTY_DATETIME, 'active':True}
+    _empty    = {'id':'', '_skey': '', 'active':True,
+                 'ctime':EMPTY_DATETIME, 'mtime':EMPTY_DATETIME}
     # transformation
     cmap = {'ctime':da.convert, 'mtime':da.convert, 'active': ba.convert}
     dmap = {'ctime':da.display, 'mtime':da.display, 'active': ba.display}
@@ -210,9 +214,10 @@ class BareItem(dict):
     # metadata
     meta = OrderedDict()
     meta['id']     = Field(label='Id',       schema='string',   formtype='hidden',  auto=True)
+    meta['_skey']  = Field(label='Sort by',  schema='string',   formtype='hidden',  auto=True)
+    meta['active'] = Field(label='Actief',   schema='boolean',  formtype='boolean', auto=False)
     meta['ctime']  = Field(label='Created',  schema='datetime', formtype='hidden',  auto=True)
     meta['mtime']  = Field(label='Modified', schema='datetime', formtype='hidden',  auto=True)
-    meta['active'] = Field(label='Actief',   schema='boolean',  formtype='boolean', auto=False)
 
     def __init__(self, doc=None):
         """Initialize item.
@@ -248,6 +253,9 @@ class BareItem(dict):
         """
         content = ', '.join(["'{}':'{}'".format(key, self.get(key, '')) for key in self.fields])
         return '{}({})'.format(self.__class__.__name__, content)
+
+    def accept(self, visitor):
+        visitor.visit(self)
 
     @classmethod
     def validate(cls, doc):
@@ -339,6 +347,16 @@ class BareItem(dict):
                 clone[name] = None
         item.update(clone)
         return item
+
+# Visitor design pattern uses:
+# 1. instance method BareItem.accept()
+# 2. instances of Visitor class (or sub-class thereof)
+
+class Visitor:
+    def visit(self, obj):
+        method = getattr(obj, 'visit' + obj.__class__.__name__, None)
+        if method:
+            method(obj)
 
 # Item reference
 def get_objectid(ref):
@@ -485,7 +503,7 @@ def parse_model_def(model_def, model_defs):
     """Parse definition of one model.
 
     Arguments:
-        model_def (dict):
+        model_def (dict):  model definition to be parsed
         model_defs (list): list of all model definitions
                            (needed for forward references to inner classes)
     """
@@ -611,18 +629,16 @@ def read_models(model_defs):
         ref_name = model_name+'Ref'
         ref_class = type(ref_name, (ItemRef,), {})
         ref_class.collection = model_name
-        if ref_name in setting.models:
-            logger.debug('Reference class %s already defined', ref_name)
-        else:
-            # logger.debug('Reference class %s is unmodified sub-class of ItemRef', ref_name)
+        if ref_name not in setting.models:
             setting.models[ref_name] = ref_class
     # build actual (outer) classes
     for model_name in model_names:
         model_def = model_defs[model_name]
-        class_dict = {'index': [('id', 1)]}
+        class_dict = {}
         pm = parse_model_def(model_def, model_defs) # pm: instance of class ParsedModel
         pm.names.extend(Item.fields)
-        class_dict['index'].extend(pm.index)
+        index = BareItem.index.copy()
+        index.extend(pm.index)
         schema = BareItem._schema.copy()
         schema.update(pm.schema)
         meta = BareItem.meta.copy()
@@ -635,6 +651,7 @@ def read_models(model_defs):
         pm.rmap.update(BareItem.rmap)
         pm.wmap.update(BareItem.wmap)
         class_dict['name']      = model_name
+        class_dict['index']     = index
         class_dict['cmap']      = pm.cmap
         class_dict['dmap']      = pm.dmap
         class_dict['rmap']      = pm.rmap
