@@ -309,20 +309,21 @@ class Cursor:
         for key, value in self.default.items():
             setattr(self, key, value)
         self.query = {}
-        query = {}
+        form = {}
         for key, value in request.params.items():
             if key == '_query':
-                self.query = decode_dict(value)
+                for k, v in decode_dict(value).items():
+                    self.query[k] = tuple(v) if isinstance(v, list) else v
             elif key.startswith('_'):
                 setattr(self, key[1:], str2int(value) if key[1:] in self.default else value)
             elif value:
-                query[key] = value
+                form[key] = value
         if initial: # initial post
             # transform query given by form to actual query
-            self.query = mapdoc(model.qmap, unflatten(query))
-            # logger.debug("cursor_init (initial): self.query=%s", self.query)
-            # else:
-            # logger.debug("cursor_init (follow-up): self.query=%s", self.query)
+            self.query = mapdoc(model.qmap, unflatten(form))
+            logger.debug("cursor_init (initial): self.query=%s", self.query)
+        else:
+            logger.debug("cursor_init (follow-up): self.query=%s", self.query)
 
     def __str__(self):
         d = dict([(key, getattr(self, key, '')) for key in self.__slots__])
@@ -400,9 +401,9 @@ class RenderTree:
         cursor = self.cursor
         cursor.filter = {} if cursor.incl == 1 else {'active': ('==', True)}
         cursor.filter.update(cursor.query)
-        # logger.debug("move_cursor: filter=%s", cursor.filter)
+        logger.debug("move_cursor: filter=%s", cursor.filter)
         count = self.model.count(cursor.filter)
-        # logger.debug("move_cursor: count=%d", count)
+        logger.debug("move_cursor: count=%d", count)
         cursor.skip = max(0, min(count, cursor.skip+cursor.dir*cursor.limit))
         cursor.prev = cursor.skip>0
         cursor.next = cursor.skip+cursor.limit < count
@@ -416,29 +417,25 @@ class RenderTree:
         item['_hidden'] = [] if hide is None or hide == 'all' else hide
         # TODO: move lines below to event handler
         self.data.append(item)
-        # logger.debug("add_item: item=%s", show_dict(item))
         if 'active' in self.info:
             self.info['active'].append(item['active'])
         else:
             self.info['active'] = [item['active']]
-        now, delta = datetime.now(), timedelta(days=50)
+        now, delta = datetime.now(), timedelta(days=10)
         recent = now-item['mtime']<delta
-        # recent = item['mtime'].year == 2017
         if 'recent' in self.info:
             self.info['recent'].append(recent)
         else:
             self.info['recent'] = [recent]
 
-    def add_items(self, buttons, sort):
+    def add_items(self, buttons):
         """Add list of items to render tree."""
         self.data, self.poly = [], False
-        # logger.debug("add_items: filter=%s limit=%d skip=%d",
-        #              self.cursor.filter, self.cursor.limit, self.cursor.skip)
         items = self.model.find(self.cursor.filter,
-                                limit=self.cursor.limit, skip=self.cursor.skip, sort=sort)
+                                limit=self.cursor.limit, skip=self.cursor.skip)
         if items:
             active, recent = [], []
-            now, delta = datetime.now(), timedelta(days=50)
+            now, delta = datetime.now(), timedelta(days=10)
             for item in items:
                 button_list = [(delete_button if button == 'delete' else
                                 normal_button)(self.view_name, button, item) for button in buttons]
@@ -525,8 +522,6 @@ class RenderTree:
                             (field_meta['multiple'] or field_meta['auto'] or
                             field_meta['schema'] in ('text', 'memo', 'itemref')):
                             newitem[key] = field
-                        elif key=='guid':
-                            newitem[key] = field
                     newitem['_keys'] = [k for k in newitem.keys() if not k.startswith('_')]
                 self.data[nr] = newitem
 
@@ -607,7 +602,6 @@ class ItemView(BareItemView):
     for searching, which is a variation of 'index'.
     """
     model = 'Item'
-    sort = []
     item_buttons = ['index', 'search', 'modify', 'delete']
     item_buttons_extra = []
     collection_buttons = ['index', 'search', 'new']
@@ -626,10 +620,13 @@ class ItemView(BareItemView):
         tree = self.tree
         tree.add_cursor(action)
         tree.move_cursor()
-        tree.add_items(['show', 'modify', 'delete'], self.sort)
+        tree.add_items(['show', 'modify', 'delete'])
+        self.tree.dump('tree0.json')
         tree.add_buttons(self.collection_buttons+self.collection_buttons_extra)
         tree.flatten_items()
+        self.tree.dump('tree1.json')
         tree.prune_items(depth=1)
+        self.tree.dump('tree2.json')
         return tree.asdict()
 
     def convert_form(self, keep_empty=False):
