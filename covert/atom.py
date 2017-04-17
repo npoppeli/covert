@@ -3,6 +3,11 @@
 
 The atomic constituents of items should be a common subset of MongoDB, RethinkDB and ArangoDB.
 Otherwise, atoms have a partial dependence on the storage engine, via the read and write maps.
+
+ISO 8601 datetime notation:
+* date    : yyyy-mm-dd
+* time    : hh:mm:ss
+* datetime: <date>T<time>
 """
 
 from datetime import datetime, date, time
