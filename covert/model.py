@@ -354,7 +354,7 @@ class BareItem(dict):
 
 class Visitor:
     def visit(self, obj):
-        method = getattr(obj, 'visit' + obj.__class__.__name__, None)
+        method = getattr(obj, 'visit_' + obj.__class__.__name__.lower(), None)
         if method:
             method(obj)
 
@@ -564,8 +564,8 @@ def parse_model_def(model_def, model_defs):
                 raise InternalError("reference to unknown model '{0}' in {1}".format(ref_name, line))
             # don not extend pm.cmap, since model reference needs no conversion
             pm.dmap[field_name] = display_reference
-            pm.rmap[field_name] = ref_class # create ItemRef instance with argument 'objectid'
-            pm.wmap[field_name] = get_objectid # write only object id to database
+            pm.rmap[field_name] = ref_class
+            pm.wmap[field_name] = get_objectid
             pm.qmap[field_name] = None
             empty_ref = ref_class(None)
             if multiple_field:
