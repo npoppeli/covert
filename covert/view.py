@@ -57,6 +57,8 @@ setting.icons = {
     'new'    : 'fa fa-new',
     'create' : 'fa fa-new',
     'delete' : 'fa fa-trash-o',
+    'expand' : 'fa fa-plus-square-o',
+    'shrink' : 'fa fa-minus-square-o',
     'home'   : 'fa fa-home',
     'info'   : 'fa fa-info-circle',
     'ok'     : 'fa fa-check',
@@ -79,6 +81,8 @@ setting.labels = {
      'new'          : 'New|Nieuw|Ny',
      'create'       : 'Create|Maak|Skapa',
      'delete'       : 'Delete|Verwijder|Radera',
+     'expand'       : 'Expand|Vergroot|Utbreda',
+     'shrink'       : 'Shrink|Verklein|Krympa',
      'home'         : 'Home|Begin|Hem',
      'info'         : 'Info|Info|Info',
      'ok'           : 'OK|OK|OK',
@@ -321,9 +325,9 @@ class Cursor:
         if initial: # initial post
             # transform query given by form to actual query
             self.query = mapdoc(model.qmap, unflatten(form))
-            logger.debug("cursor_init (initial): self.query=%s", self.query)
-        else:
-            logger.debug("cursor_init (follow-up): self.query=%s", self.query)
+            # logger.debug("cursor_init (initial): self.query=%s", self.query)
+            # else:
+            # logger.debug("cursor_init (follow-up): self.query=%s", self.query)
 
     def __str__(self):
         d = dict([(key, getattr(self, key, '')) for key in self.__slots__])
@@ -347,6 +351,11 @@ def delete_button(view_name, action, item):
     """Create render-tree element for delete button."""
     return {'label': label_for(action), 'icon': icon_for(action),
             'action': url_for(view_name, action, item), 'method':'DELETE'}
+
+def js_button(view_name, action, item):
+    """Create render-tree element for Javascript button."""
+    return {'label': label_for(action), 'icon': icon_for(action),
+            'name': action}
 
 class RenderTree:
     """Tree representation of information created by a route.
@@ -401,9 +410,9 @@ class RenderTree:
         cursor = self.cursor
         cursor.filter = {} if cursor.incl == 1 else {'active': ('==', True)}
         cursor.filter.update(cursor.query)
-        logger.debug("move_cursor: filter=%s", cursor.filter)
+        # logger.debug("move_cursor: filter=%s", cursor.filter)
         count = self.model.count(cursor.filter)
-        logger.debug("move_cursor: count=%d", count)
+        # logger.debug("move_cursor: count=%d", count)
         cursor.skip = max(0, min(count, cursor.skip+cursor.dir*cursor.limit))
         cursor.prev = cursor.skip>0
         cursor.next = cursor.skip+cursor.limit < count
@@ -430,7 +439,8 @@ class RenderTree:
 
     def add_items(self, buttons):
         """Add list of items to render tree."""
-        self.data, self.poly = [], False
+        self.data = []
+        self.poly = False
         items = self.model.find(self.cursor.filter,
                                 limit=self.cursor.limit, skip=self.cursor.skip)
         if items:
@@ -455,23 +465,29 @@ class RenderTree:
                 query.append("{}{}{}".format(key, term[0], term[1]))
             self.message = 'Nothing found for this query: ' + ', '.join(query)
 
-    def flatten_item(self, nr=0):
+    def flatten_item(self, nr=0, form=False):
         """Flatten one item in the render tree."""
         item = self.data[nr]
         item_meta = item.meta
-        display_item = item.display()
-        flat_item = display_item.flatten()
+        flat_item = item.display().flatten()
         newitem = OrderedDict()
         for key, value in flat_item.items():
             if key.startswith('_'):
                 newitem[key] = value
             else:
                 path = key.split('.')
+                button_list = []
                 if path[-1].isnumeric():
                     field = path[-2]
                     field_meta = item_meta[field]
                     pos = int(path[-1])+1
-                    label = field_meta.label if pos==1 else str(pos)
+                    if pos == 1:
+                        label = field_meta.label
+                        if form:
+                            button_list = [js_button(self.view_name, 'expand', item),
+                                           js_button(self.view_name, 'shrink', item)]
+                    else:
+                        label = str(pos)
                 else:
                     field = path[-1]
                     field_meta = item_meta[field]
@@ -480,14 +496,14 @@ class RenderTree:
                             'multiple': field_meta.multiple,
                             'formtype': 'hidden' if field_meta.auto else field_meta.formtype,
                             'auto': field_meta.auto, 'control': field_meta.control}
-                newitem[key] = {'value':value, 'meta':proplist, 'buttons':[]}
+                newitem[key] = {'value':value, 'meta':proplist, 'buttons':button_list}
         newitem['_keys'] = [k for k in newitem.keys() if not k.startswith('_')]
         self.data[nr] = newitem
 
-    def flatten_items(self):
+    def flatten_items(self, form=False):
         """Flatten all items in the render tree."""
         for nr in range(len(self.data)):
-            self.flatten_item(nr=nr)
+            self.flatten_item(nr=nr, form=form)
 
     def prune_item(self, nr=0, depth=2, clear=False, form=False):
         """Prune one item in the render tree."""
@@ -541,8 +557,10 @@ class RenderTree:
            Returns: None
         """
         if self.data:
+            # first the main button(s) of the form
             item = self.data[0]
             self.buttons = [form_button(self.view_name, action, item, 'ok')]
+            # then the expand/shrink buttons for list-valued fields
             if method:
                 self.method = method
 
@@ -621,12 +639,12 @@ class ItemView(BareItemView):
         tree.add_cursor(action)
         tree.move_cursor()
         tree.add_items(['show', 'modify', 'delete'])
-        self.tree.dump('tree0.json')
+        # self.tree.dump('tree0.json')
         tree.add_buttons(self.collection_buttons+self.collection_buttons_extra)
         tree.flatten_items()
-        self.tree.dump('tree1.json')
+        # self.tree.dump('tree1.json')
         tree.prune_items(depth=1)
-        self.tree.dump('tree2.json')
+        # self.tree.dump('tree2.json')
         return tree.asdict()
 
     def convert_form(self, keep_empty=False):
@@ -660,8 +678,11 @@ class ItemView(BareItemView):
         tree = self.tree
         tree.add_item(self.model())
         tree.add_search_button('match')
+        self.tree.dump('tree0.json')
         tree.flatten_item()
+        self.tree.dump('tree1.json')
         tree.prune_item(clear=True, form=True)
+        self.tree.dump('tree2.json')
         return tree.asdict()
 
     @route('/match', method='GET,POST', template='index')
@@ -711,7 +732,7 @@ class ItemView(BareItemView):
                                format(description, str(tree.data[0]), errors)
                 tree.style = 1
         tree.add_form_buttons(action, method)
-        tree.flatten_items()
+        tree.flatten_items(form=True)
         tree.prune_items(form=True, clear=clear)
         return tree.asdict()
 
