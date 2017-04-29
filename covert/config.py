@@ -65,6 +65,9 @@ def read_config():
     if exists(config_file) and isfile(config_file):
         doc0 = read_yaml_file(config_file)
         config.update(doc0)
+    else:
+        logger.error("Current directory does not contain a 'config' file")
+        sys.exit()
     if 'debug'   in config: setting.debug   = config['debug']
     if 'nostore' in config: setting.nostore = config['nostore']
     if 'verbose' in config: setting.verbose = config['verbose']
