@@ -23,6 +23,7 @@ from collections import OrderedDict
 from voluptuous import Schema, Optional, MultipleInvalid
 from .atom import atom_map, EMPTY_DATETIME
 from .common import InternalError, SUCCESS, FAIL, logger
+from .controller import exception_report
 from . import setting
 
 # functions for flattening and unflattening items (documents)
@@ -234,7 +235,11 @@ class BareItem(dict):
         empty = deepcopy(self._empty)
         self.update(empty) # necessary in case of bulk import
         if doc:
-            self.update(mapdoc(self.rmap, doc))
+            try:
+                self.update(mapdoc(self.rmap, doc))
+            except Exception as e:
+                logger.error('Error in applying rmap to doc=%s\n%s',
+                             doc, exception_report(e, ashtml=False))
 
     _format = 'Item {id}'
     def __str__(self):
