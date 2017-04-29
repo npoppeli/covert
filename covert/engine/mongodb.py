@@ -85,7 +85,8 @@ class Item(BareItem):
             None
         """
         collection = setting.store_db[cls.name]
-        collection.ensure_index(index_keys, unique=False)
+        for item in index_keys:
+            collection.create_index(item[0], unique=False)
 
     @classmethod
     def query(cls, doc):
@@ -147,8 +148,9 @@ class Item(BareItem):
         Returns:
             list: list of 'cls' instances.
         """
+        sort_spec = sort if sort else [('_skey',1)]
         cursor = setting.store_db[cls.name].find(filter=cls.query(doc),
-                                                 skip=skip, limit=limit, sort=sort)
+                                                 skip=skip, limit=limit, sort=sort_spec)
         return [cls(item) for item in cursor]
 
     @classmethod
@@ -199,6 +201,7 @@ class Item(BareItem):
         """
         new = self.get('id', '') == ''
         self['mtime'] = datetime.now()
+        self['_skey'] = str(self['mtime'])
         if new:
             self['_id'] = ObjectId()
             self['id'] = str(self['_id'])

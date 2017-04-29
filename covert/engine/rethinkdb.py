@@ -139,7 +139,9 @@ class Item(BareItem):
         if limit: cursor = cursor.limit(limit)
         if sort:
             sort_spec = [r.asc(el[0]) if el[1] == 1 else r.desc(el[0]) for el in sort]
-            cursor = cursor.order_by(*sort_spec)
+        else:
+            sort_spec = [r.asc('_skey')]
+        cursor = cursor.order_by(*sort_spec)
         result = cursor.run(setting.store_connection)
         return [cls(item) for item in result]
 
@@ -191,6 +193,7 @@ class Item(BareItem):
         """
         new = self.get('id', '') == ''
         self['mtime'] = datetime.now()
+        self['_skey'] = str(self['mtime'])
         if new:
             self['id'] = str(ObjectId())
             self['active'] = True
