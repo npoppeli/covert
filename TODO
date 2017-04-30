@@ -7,6 +7,7 @@ MINYEAR = 1400 (not midnight) to avoid complaints from RethinkDB
 
 config.py
 ---------
+* raise error if no config file
 * I18N the right way
   - http://inventwithpython.com/blog/2014/12/20/translate-your-python-3-program-with-the-gettext-module/
   - https://flufli18n.readthedocs.io/en/latest/docs/using.html
@@ -15,15 +16,16 @@ config.py
 layout.py
 ---------
 * move Tonnikala and Mako out of the core
+* migrate to Bootstrap 4 (now 3.3.7)
+* migrate to jQuery 3 (now 1.10.2)
 
 model.py
 --------
 * embedding in show panels
 * embedding and linking in form panels
-* tools for adding, modifying and deleting list-valued items
 * tools for adding, modifying and deleting linked items (references)
 * tools for adding, modifying and deleting embedded items
-* item revisions (add 'rev' attribute)
+* item revisions (add 'key' and 'rev' attributes)
 * make labels in BareItem language-dependent (I18N)
 * 'active' attribute in BareItem is not 'auto', but has a default (True)
 * query translation must include mapping of values as well (wmap)
@@ -33,9 +35,6 @@ Notes on item revisions
    most recent one of them as the active revision.
 2. Otherwise, keep only the active revision in the item storage, and store
    backward deltas in a separate storage (use libdiff for text).
-
-List items in forms: add grid buttons 'insert before' and 'insert after'
-(FontAwesome: angle-double-up and angle-double-down). JavaScript with local action.
 
 Item references in forms: t0 and t2 readonly=true, t1 hidden.
 JavaScript with server interaction.
@@ -47,7 +46,7 @@ view.py
 * delete button is enabled iff item.active
 * add 'import' method (form-based file upload, CSV and JSON)
 * make ItemView.sort independent from db engine
-* pass ItemView.sort to render tree methods in a more elegant way
+* make Itemview.prune configurable (Itemview.clip(), 2 modes)
 * itemlist with clickable column headers to influence sorting
 * Use Mirage (JS) for client-side generation of search queries
 * Use Alpaca (JS) for client-side form handling

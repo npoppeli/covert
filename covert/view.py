@@ -315,19 +315,24 @@ class Cursor:
         self.query = {}
         form = {}
         for key, value in request.params.items():
-            if key == '_query':
-                for k, v in decode_dict(value).items():
-                    self.query[k] = tuple(v) if isinstance(v, list) else v
+            if key == '_query': # query is in display form, so some fields need conversion
+                for field, cond in decode_dict(value).items():
+                    if field in model.cmap:
+                        converted = list(map(model.cmap[field], cond[1:]))
+                        converted.insert(0, cond[0])
+                        self.query[field] = tuple(converted)
+                    else:
+                        self.query[field] = tuple(cond)
             elif key.startswith('_'):
                 setattr(self, key[1:], str2int(value) if key[1:] in self.default else value)
             elif value:
                 form[key] = value
         if initial: # initial post
-            # transform query given by form to actual query
+            # translate query in form to actual query
             self.query = mapdoc(model.qmap, unflatten(form))
-            # logger.debug("cursor_init (initial): self.query=%s", self.query)
-            # else:
-            # logger.debug("cursor_init (follow-up): self.query=%s", self.query)
+            logger.debug("cursor_init (initial): self.query=%s", self.query)
+        else: # follow-up post
+            logger.debug("cursor_init (follow-up): self.query=%s", self.query)
 
     def __str__(self):
         d = dict([(key, getattr(self, key, '')) for key in self.__slots__])
@@ -404,15 +409,24 @@ class RenderTree:
     def move_cursor(self):
         """Move cursor to new position.
 
-        The actual filter used in the search is built from the search query specified by the user
-        in the form, and an extra condition depending on the value of cursor.incl.
+        The actual filter used in the search is built from the search query given by
+        the form, and an extra condition depending on the value of cursor.incl.
         """
         cursor = self.cursor
         cursor.filter = {} if cursor.incl == 1 else {'active': ('==', True)}
+        # translate interval specifications in query
+        for key, value in cursor.query.items():
+            if isinstance(value, dict): # dict that wasn't recognized by mapdoc as sub-document
+                convert = self.model.cmap[key]
+                value_keys = sorted(value.keys())
+                if  value_keys == ['from', 'to']:
+                    cursor.query[key] = ('[]', convert(value['from']), convert(value['to']))
+                elif value_keys == ['from']:
+                    cursor.query[key] = ('==', convert(value['from']))
         cursor.filter.update(cursor.query)
-        # logger.debug("move_cursor: filter=%s", cursor.filter)
+        logger.debug("move_cursor: filter=%s", cursor.filter)
         count = self.model.count(cursor.filter)
-        # logger.debug("move_cursor: count=%d", count)
+        logger.debug("move_cursor: count=%d", count)
         cursor.skip = max(0, min(count, cursor.skip+cursor.dir*cursor.limit))
         cursor.prev = cursor.skip>0
         cursor.next = cursor.skip+cursor.limit < count
@@ -461,8 +475,11 @@ class RenderTree:
         else:
             query = []
             for key, value in self.cursor.query.items():
-                term = value[0] if isinstance(value, list) else value
-                query.append("{}{}{}".format(key, term[0], term[1]))
+                cond = value[0] if isinstance(value, list) else value
+                if len(cond) == 2:
+                    query.append("{} {} {}".format(key, cond[0], cond[1]))
+                else:
+                    query.append("{} {} {}, {}".format(key, cond[0], cond[1], cond[2]))
             self.message = 'Nothing found for this query: ' + ', '.join(query)
 
     def flatten_item(self, nr=0, form=False):
@@ -557,10 +574,8 @@ class RenderTree:
            Returns: None
         """
         if self.data:
-            # first the main button(s) of the form
             item = self.data[0]
             self.buttons = [form_button(self.view_name, action, item, 'ok')]
-            # then the expand/shrink buttons for list-valued fields
             if method:
                 self.method = method
 
@@ -639,27 +654,24 @@ class ItemView(BareItemView):
         tree.add_cursor(action)
         tree.move_cursor()
         tree.add_items(['show', 'modify', 'delete'])
-        # self.tree.dump('tree0.json')
         tree.add_buttons(self.collection_buttons+self.collection_buttons_extra)
         tree.flatten_items()
-        # self.tree.dump('tree1.json')
         tree.prune_items(depth=1)
-        # self.tree.dump('tree2.json')
         return tree.asdict()
 
     def convert_form(self, keep_empty=False):
         """Convert request parameters to unflattened dictionary."""
         raw_form = {key:value for key, value in self.request.params.items()
                               if (value or keep_empty) and not key.startswith('_')}
-        # logger.debug("convert_form: raw form=%s", raw_form)
+        logger.debug("convert_form: raw form=%s", raw_form)
         self.form = unflatten(raw_form)
-        # logger.debug("convert_form: unflattened=%s", self.form)
+        logger.debug("convert_form: unflattened=%s", self.form)
 
     def extract_item(self, prefix=None, model=None):
         """Convert unflattened form to item."""
         # after unflattening, this is easy
         selection = self.form[prefix.rstrip('.')] if prefix else self.form
-        # logger.debug("extract_item: selection=%s", selection)
+        logger.debug("extract_item: selection=%s", selection)
         return (model or self.model).convert(selection)
 
     @route('/{id:objectid}', template='show')
@@ -694,9 +706,9 @@ class ItemView(BareItemView):
                    clear=False, keep_empty=False):
         """Prepare render tree for rendering as a form.
 
-        This function handles simple (single-item) forms and multi-faceted (multiple items,
-        not necessarily the same model) forms. A form is called 'bound' if it contains
-        user input (concept borrowed from Django) and otherwise 'unbound'.
+        This function handles simple forms (single item) and multi-faceted forms (multiple items,
+        not necessarily the same model). A form is called 'bound' if it contains user input
+        (a concept borrowed from Django) and otherwise 'unbound'.
 
         Arguments:
             description (str):  description of form.

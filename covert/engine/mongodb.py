@@ -27,34 +27,36 @@ def report_db_action(result):
     if setting.debug > 1:
         logger.debug(message)
 
-def translate_query(query):
+def translate_query(query, wmap):
     """Translate query to form suitable for this storage engine.
 
-    In the view methods, queries are specified as sequences of tuples (op, value) or (op, value1,
-    value2) where 'op' is a 2-character string specifying a search operator, and 'value' is a
-    value used in the search. The translation to MongoDB form is given by 'query_map'.
+    In the view methods, queries are specified as sequences of conditions, where a condition
+    is a tuple (op, value) or (op, value1, value2), where 'op' is a 2-character string
+    specifying a search operator, and 'value' is a value used in the search.
+    The translation to MongoDB form is given by 'query_map'.
     """
     result = {}
     for key, value in query.items():
-        # field with 'multiple' property corresponds to a query term of a 1-item list
-        multiple = isinstance(value, list) and len(value)==1
-        term = value[0] if multiple else value
-        operator = term[0]
-        if operator in query_map:  # apply mapping function
-            if isinstance(term, dict):  # embedded document
-                result[key] = mapdoc(query_map, term)
-            else:  # scalar
-                result[key] = query_map[operator](term)
-        else:  # no mapping for this element
-            result[key] = term
+        # field with 'multiple' property corresponds to a query condition of a 1-item list
+        # a query condition is a tuple (op, value) or (op, value1, value2)
+        multiple = isinstance(value, list) and len(value) == 1
+        cond = value[0] if multiple else value
+        operator = cond[0]
+        if operator in query_map:
+            if key in wmap: # conversion is necessary (e.g. date to datetime)
+                converted = list(map(wmap[key], cond[1:]))
+                converted.insert(0, operator)
+                cond = tuple(converted)
+            result[key] = query_map[operator](cond)
+        else: # no mapping for this element
+            result[key] = cond
     return result
 
 def init_storage():
     """Initialize storage engine."""
-    logger.debug('Creating MongoDB connection')
     setting.store_connection = MongoClient()
-    logger.debug("Setting MongoDB database to '{}'".format(setting.store_dbname))
     setting.store_db = setting.store_connection[setting.store_dbname]
+    logger.debug("Create MongoDB connection, set database to '{}'".format(setting.store_dbname))
 
 class Item(BareItem):
     """Class for reading and writing objects from/to this storage engine.
@@ -100,7 +102,7 @@ class Item(BareItem):
         Returns:
             dict: query in MongoDB form.
         """
-        result = translate_query(doc)
+        result = translate_query(doc, cls.wmap)
         return result
 
     @classmethod

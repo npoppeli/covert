@@ -89,7 +89,7 @@ define_atom('boolean',
 
 # date and datetime use str.format in the display map, to avoid Python issue 13305
 def date_convert(x):
-    return datetime.strptime(x, "%Y-%m-%d") if x else EMPTY_DATE
+    return datetime.strptime(x, "%Y-%m-%d").date() if x else EMPTY_DATE
 
 def date_display(x):
     return '????-??-??' if x.year == MINYEAR\

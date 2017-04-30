@@ -21,10 +21,9 @@ def report_db_action(result):
 
 def init_storage():
     """Initialize storage engine."""
-    logger.debug('Creating RethinkDB connection')
     setting.store_connection = r.connect(db=setting.store_dbname).repl()
-    logger.debug("Setting RethinkDB database to '{}'".format(setting.store_dbname))
     setting.store_db = r.db(setting.store_dbname)
+    logger.debug("Create RethinkDB connection, set database to '{}'".format(setting.store_dbname))
 
 class Item(BareItem):
     """Class for reading and writing objects from/to this storage engine.
@@ -66,7 +65,10 @@ class Item(BareItem):
         """Create query.
 
         Create query from dictionary doc.
-
+        In the view methods, queries are specified as sequences of conditions, where a condition
+        is a tuple (op, value) or (op, value1, value2), where 'op' is a 2-character string
+        specifying a search operator, and 'value' is a value used in the search.
+        
         Arguments:
             doc (dict): dictionary specifying a search query.
 
@@ -75,7 +77,8 @@ class Item(BareItem):
         """
         query = r.table(cls.name)
         for key, value in doc.items():
-            # TODO: add possibility to search through array fields
+            # TODO 1. add possibility to search through array fields
+            # TODO 2. apply wmap where needed
             operator = value[0]
             if operator == '==':
                 query = query.filter(r.row[key] == value[1])
