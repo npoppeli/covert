@@ -68,6 +68,9 @@ class Item(BareItem):
         In the view methods, queries are specified as sequences of conditions, where a condition
         is a tuple (op, value) or (op, value1, value2), where 'op' is a 2-character string
         specifying a search operator, and 'value' is a value used in the search.
+        Fields with 'multiple' property (list-valued fields) have a normal query condition.
+        Since RethinkDB differentiates search scalar field and search list field, we must use
+        information from the model to rewrite the query. 
         
         Arguments:
             doc (dict): dictionary specifying a search query.

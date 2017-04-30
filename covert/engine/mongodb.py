@@ -34,22 +34,18 @@ def translate_query(query, wmap):
     is a tuple (op, value) or (op, value1, value2), where 'op' is a 2-character string
     specifying a search operator, and 'value' is a value used in the search.
     The translation to MongoDB form is given by 'query_map'.
+    Fields with 'multiple' property (list-valued fields) have a normal query condition, since
+    MongoDB does not differentiate search scalar field and search list field. 
     """
     result = {}
-    for key, value in query.items():
-        # field with 'multiple' property corresponds to a query condition of a 1-item list
-        # a query condition is a tuple (op, value) or (op, value1, value2)
-        multiple = isinstance(value, list) and len(value) == 1
-        cond = value[0] if multiple else value
+    for field, cond in query.items():
         operator = cond[0]
         if operator in query_map:
-            if key in wmap: # conversion is necessary (e.g. date to datetime)
-                converted = list(map(wmap[key], cond[1:]))
-                converted.insert(0, operator)
-                cond = tuple(converted)
-            result[key] = query_map[operator](cond)
+            if field in wmap: # conversion is necessary (e.g. date to datetime)
+                cond = tuple([operator] + list(map(wmap[field], cond[1:])))
+            result[field] = query_map[operator](cond)
         else: # no mapping for this element
-            result[key] = cond
+            result[field] = cond
     return result
 
 def init_storage():

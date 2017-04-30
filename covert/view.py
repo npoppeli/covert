@@ -318,9 +318,7 @@ class Cursor:
             if key == '_query': # query is in display form, so some fields need conversion
                 for field, cond in decode_dict(value).items():
                     if field in model.cmap:
-                        converted = list(map(model.cmap[field], cond[1:]))
-                        converted.insert(0, cond[0])
-                        self.query[field] = tuple(converted)
+                        self.query[field] = tuple([cond[0]] + list(map(model.cmap[field], cond[1:])))
                     else:
                         self.query[field] = tuple(cond)
             elif key.startswith('_'):
@@ -328,8 +326,9 @@ class Cursor:
             elif value:
                 form[key] = value
         if initial: # initial post
-            # translate query in form to actual query
-            self.query = mapdoc(model.qmap, unflatten(form))
+            # flatten list-valued conditions
+            self.query = {key:(value[0] if isinstance(value, list) else value)
+                          for key, value in mapdoc(model.qmap, unflatten(form)).items()}
             logger.debug("cursor_init (initial): self.query=%s", self.query)
         else: # follow-up post
             logger.debug("cursor_init (follow-up): self.query=%s", self.query)
