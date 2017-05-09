@@ -1,0 +1,6 @@
+Version 0.7
+-----------
+
+### Features
+-   API change: removed distinction between extension and suffix ('markup' and 'layout' modules)
+-   Updated README and manual

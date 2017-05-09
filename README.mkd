@@ -1,0 +1,35 @@
+Covert
+======
+
+Covert (COntent as VERsatile uniTs) is a publishing framework based on Webob and Chameleon, and a
+ variety of storage engines, e.g. RethinkDB and MongoDB.
+
+Documentation
+-------------
+
+Documentation is in the `doc` directory.
+An example site is in the `test` directory.
+
+Installation
+------------
+
+The recommended way to install Covert is from the [Python Package Index][pypi]
+with this command: `sudo pip install covert`.
+
+[pypi]: http://pypi.python.org/pypi
+
+### Dependencies
+
+All dependencies are available through pip.
+
+#### Required
+
+- *WebOb*
+- *Waitress*
+- *Chameleon*
+- *MongoDB* or *RethinkDB*
+
+About
+-----
+
+Covert is written by Nico Poppelier and licensed under the MIT license.
