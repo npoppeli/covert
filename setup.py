@@ -24,8 +24,14 @@ setup(
     ],
     install_requires=[
         'Chameleon>=2.18',
+        'mongodb-org>=3.2', # plus mongo tools
         'pymongo>=3.0.0',
-        'webOb>=1.5.0'
+        'webOb>=1.5.0',
+        'pyyaml>=...',
+        'voluptuous >=...',
+        'waitress   >=...',
+        'tonnikala  >= 1.0.0b3', # optional
+        'mako       >= ...'  # optional
     ],
     packages=['covert']
 )
