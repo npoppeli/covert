@@ -12,7 +12,7 @@ Only in cases where performance matters, save one dictionary lookup with:
 """
 
 # version number of package
-__version__ = '0.7'
+__version__ = '0.8'
 
 # configuration
 content     = None # (static) content directory
@@ -23,7 +23,8 @@ views       = {}
 language    = ''
 languages   = ['en', 'nl', 'sv']
 config      = {} # configuration dictionary
-port        = 8000
+host        = ''
+port        = 0
 config_file = 'config' # name of configuration file
 dbtype      = 'mongodb'
 debug       = 0
