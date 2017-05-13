@@ -48,6 +48,7 @@ def parse_cmdline():
 
 config_default = dict(content='content', layout='layout',
                       dbname='test', dbtype='mongodb',
+                      host='localhost', port='8080',
                       models='models', views='views', language='en')
 
 def read_config():
@@ -71,6 +72,7 @@ def read_config():
     if 'debug'   in config: setting.debug   = config['debug']
     if 'nostore' in config: setting.nostore = config['nostore']
     if 'verbose' in config: setting.verbose = config['verbose']
+    if 'host'    in config: setting.host    = config['host']
     if 'port'    in config: setting.port    = config['port']
     setting.content = join(setting.site, config['content'])
     setting.layout  = join(setting.site, config['layout'])
@@ -88,6 +90,7 @@ def read_config():
     logger.debug("Changes are{}written to the database".format(' *not* ' if setting.nostore else ' '))
     logger.debug("Static content is in directory {}".format(setting.content))
     logger.debug("User interface is in the '{}' language".format(setting.language))
+    logger.debug("Web server listens to {}:{}'".format(setting.host, setting.port))
 
 def kernel_init():
     """Initialize kernel.
