@@ -138,7 +138,7 @@ class route:
 
     This decorator adds attributes to methods. Once set, these attributes cannot be changed anymore.
     """
-    def __init__(self, pattern, method='GET', template='', icon='', label=''):
+    def __init__(self, pattern, method='GET', template='', icon='', label='', alias=''):
         """Constructor for 'route' decorator.
 
         Attributes:
@@ -153,12 +153,14 @@ class route:
         self.template = template
         self.icon     = icon
         self.label    = label
+        self.alias    = alias
     def __call__(self, wrapped):
         wrapped.pattern  = self.pattern
         wrapped.method   = self.method
         wrapped.template = self.template
         wrapped.icon     = self.icon
         wrapped.label    = self.label
+        wrapped.alias    = self.alias
         return wrapped
 
 # regular expressions used in routes
@@ -246,13 +248,13 @@ def read_views(module):
         view_name = class_name.replace('View', '', 1).lower()
         view_class.view_name = view_name
         item_buttons_extra = []
-        # TODO: collection_buttons_extra = []
+        collection_buttons_extra = []
         for member_name, member in getmembers(view_class, isfunction):
             if hasattr(member, 'pattern'): # this member (method) is a route
                 full_pattern  = '/' + view_name + member.pattern
                 pattern       = route2pattern(full_pattern)
                 regex         = route2regex(full_pattern)
-                templates     = [] # each route can have 1 or more templates
+                templates     = [] # each route has one or more templates
                 for name in member.template.split(';'):
                     template_name = view_name+'_' + name
                     parent_name   = 'item_'       + name
@@ -276,7 +278,10 @@ def read_views(module):
                 for method in member.method.split(','):
                     setting.patterns[view_name+'_'+member_name] = pattern
                     setting.routes.append(Route(pattern, method, templates,
-                                                re.compile(regex), view_class, member_name))
+                        re.compile(regex), view_class, member_name))
+                    if member.alias:
+                        setting.routes.append(Route(member.alias, method, templates,
+                            re.compile('^'+member.alias+'$'), view_class, member_name))
         view_class.item_buttons_extra = item_buttons_extra
     # sorting in reverse alphabetical order ensures words like 'match' and 'index'
     # are not absorbed by {id} or other components of the regex patterns
