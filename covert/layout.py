@@ -92,7 +92,7 @@ def read_templates():
                 file_path = join(dirpath, filename)
                 try:
                     setting.templates[template_name] = template_factory[extension](file_path)
-                    # logger.debug("Template {} is in file {}".format(template_name, relpath(file_path, setting.layout)))
+                    logger.debug("Template {} is in file {}".format(template_name, relpath(file_path, setting.layout)))
                 except Exception as e:
                     logger.error("Error in template '{0}' in file {1}".format(template_name, file_path))
                     logger.error(exception_report(e, ashtml=False))

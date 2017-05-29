@@ -386,7 +386,7 @@ class RenderTree:
             * request   (Request): HTTP request (WebOb)
             * model     (Item):    model class
             * view_name (str):     name of view class
-            * action(str):     name of route (view method)
+            * action    (str):     name of route (view method)
         """
         # attributes for request handling
         self.request = request
