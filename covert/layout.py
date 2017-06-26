@@ -60,14 +60,15 @@ except ImportError as e:
     logger.critical('Tonnikala template engine not available (%s)', e)
     sys.exit(1)
 
-try:
-    from mako.template import Template
-    def makoTemplateFile(path):
-        return Template(filename=path)
-    add_template_type('.mko', makoTemplateFile)
-except ImportError as e:
-    logger.critical('Mako template engine not available (%s)', e)
-    sys.exit(1)
+# TODO: remove completely, and mention as an example in API documentation
+# try:
+#     from mako.template import Template
+#     def makoTemplateFile(path):
+#         return Template(filename=path)
+#     add_template_type('.mko', makoTemplateFile)
+# except ImportError as e:
+#     logger.critical('Mako template engine not available (%s)', e)
+#     sys.exit(1)
 
 def read_templates():
     """Read templates from layout directory.
@@ -92,7 +93,7 @@ def read_templates():
                 file_path = join(dirpath, filename)
                 try:
                     setting.templates[template_name] = template_factory[extension](file_path)
-                    logger.debug("Template {} is in file {}".format(template_name, relpath(file_path, setting.layout)))
+                    # logger.debug("Template {} is in file {}".format(template_name, relpath(file_path, setting.layout)))
                 except Exception as e:
                     logger.error("Error in template '{0}' in file {1}".format(template_name, file_path))
                     logger.error(exception_report(e, ashtml=False))
