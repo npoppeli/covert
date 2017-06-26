@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 """Objects and functions common to two or more modules in the package.
-This includes reporting and logging. For logging we use the 'logging' module.
 
-Logging levels are DEBUG, INFO, WARNING, ERROR, CRITICAL. Covert uses logging level INFO by
-default, and DEBUG if called with --debug. Since the Waitress package is one of the dependencies,
-we can re-use the logger object of that package.
+This includes JSON and YAML functions, but also reporting and logging.
+
+For logging we use the 'logging' module. Logging levels are DEBUG, INFO, WARNING, ERROR,
+CRITICAL. Covert uses logging level INFO by default, and DEBUG if called with --debug. Since the
+Waitress package is one of the dependencies, we can re-use the logger object of that package.
+The Waitress logger does not define handlers itself. It inherits the handler from the root logger.
 """
 
 import logging
@@ -17,13 +19,13 @@ try:
 except ImportError:
     from yaml import Loader
 
-# logging
+# Logging
+# basicConfig add a StreamHandler with default Formatter to the root logger. This function
+# does nothing if the root logger already has handlers configured for it.
 logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
 logger = logging.getLogger('waitress')
-# The Waitress logger does not define handlers. It inherits the handler, a StreamHandler,
-# from the root logger.
 
-# exceptions
+# Exceptions
 class InternalError(Exception):
     """Internal error exception.
 
