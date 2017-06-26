@@ -216,7 +216,8 @@ class BareItem(dict):
     meta = OrderedDict()
     meta['id']     = Field(label='Id',       schema='string',   formtype='hidden',  auto=True)
     meta['_skey']  = Field(label='Sort by',  schema='string',   formtype='hidden',  auto=True)
-    meta['active'] = Field(label='Actief',   schema='boolean',  formtype='boolean', auto=False)
+    meta['active'] = Field(label='Actief',   schema='boolean',  formtype='boolean', auto=False,
+                           enum=ba.enum, control=ba.control)
     meta['ctime']  = Field(label='Created',  schema='datetime', formtype='hidden',  auto=True)
     meta['mtime']  = Field(label='Modified', schema='datetime', formtype='hidden',  auto=True)
 

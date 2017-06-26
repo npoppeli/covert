@@ -72,10 +72,10 @@ EMPTY_DATE     = date(MINYEAR, 1, 1)
 MIDNIGHT       = time(0, 0, 0, 0)
 
 true_strings = ('j', 'ja')
-# EN: yes/no or y/n, SV: ja/nej
+# TODO I18N EN: yes/no or y/n, SV: ja/nej
 bool_repr = {True:'ja', False:'nee'}
 
-boolean_convert = lambda x: x.lower() in true_strings
+boolean_convert = lambda x: bool(int(x))
 define_atom('boolean',
             schema   = bool,
             convert  = boolean_convert,
