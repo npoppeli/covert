@@ -193,6 +193,8 @@ class Item(BareItem):
         """Finalize item before writing to permanent storage.
 
         Finalization includes setting of auto fields.
+        NOTE: if you want to skip this step, at least update self['mtime'], e.g.
+        +timedelta(hours=1) to avoid writing an item with duplicate id to the database.
 
         Returns:
             None
