@@ -41,3 +41,14 @@ the first action is picked up as the action of the form. The action is a URL or 
 expression, e.g. confirmDelete(action). Defined in /_static/script/site.js (can be done fancier
 with Dojo's dijit/Dialog) The shape of a button (label, icon or both) is determined by the
 template that serializes the page in which the button is embedded.
+
+Template engines can be added as follows:
+
+try:
+    from mako.template import Template
+    def makoTemplateFile(path):
+        return Template(filename=path)
+    add_template_type('.mko', makoTemplateFile)
+except ImportError as e:
+    logger.critical('Mako template engine not available (%s)', e)
+    sys.exit(1)

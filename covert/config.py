@@ -110,6 +110,14 @@ def kernel_init():
         raise InternalError('Unknown storage engine: only MongoDB and RethinkDB are supported')
     init_storage()
 
+    # execute prelude (if present)
+    if 'prelude' in setting.config:
+        name, extension =  splitext(setting.config['prelude'])
+        if extension == '.py':
+            module = import_module(name)
+        else:
+            logger.info('{} should be Python module'.format(setting.config['prelude']))
+
     # read templates
     read_templates()
 

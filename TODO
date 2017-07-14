@@ -1,6 +1,5 @@
 atom.py
 -------
-define_atom('gender', ...) in application, not in framework
 genders = ['?', 'v', 'm'] must be I18N
 define_atom('boolean', ...) also I18N
 MINYEAR = 1400 (not midnight) to avoid complaints from RethinkDB
@@ -15,20 +14,18 @@ config.py
 
 layout.py
 ---------
-* move Tonnikala and Mako out of the core
 * migrate to Bootstrap 4 (now 3.3.7)
 * migrate to jQuery 3 (now 1.10.2)
 
 model.py
 --------
 * embedding in show panels
-* embedding and linking in form panels
+* embedding in form panels
 * tools for adding, modifying and deleting linked items (references)
 * tools for adding, modifying and deleting embedded items
 * item revisions (add 'key' and 'rev' attributes)
 * make labels in BareItem language-dependent (I18N)
 * 'active' attribute in BareItem is not 'auto', but has a default (True)
-* query translation must include mapping of values as well (wmap)
 
 Notes on item revisions
 1. If the number of revisions is low, keep all of them in the storage, and mark the
@@ -43,13 +40,13 @@ view.py
 -------
 * I18N of setting.labels and messages
 * authorization determines icon and button states (enabled, disabled)
-* delete button is enabled iff item.active
+* delete button is enabled if authorized and item is active
 * collection_buttons_extra: where to set them?
 * add 'import' method (form-based file upload, CSV and JSON)
 * make ItemView.sort independent from db engine
 * make Itemview.prune configurable (Itemview.clip(), 2 modes)
 * itemlist with clickable column headers to influence sorting
-* Use Mirage (JS) for client-side generation of search queries
+* Use JavaScript for client-side generation of search queries
 * Use Alpaca (JS) for client-side form handling
 * move boolean vector 'active' and 'modified' to event handler
 
@@ -63,3 +60,4 @@ engine/rethinkdb.py
 -------------------
 * datetime objects *with* timezone
 * text index via ...
+* query translation must include mapping of values as well (wmap)

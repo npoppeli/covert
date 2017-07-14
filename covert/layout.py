@@ -2,7 +2,8 @@
 """Objects and functions related to layout.
 
 The layout of HTML pages, and HTML and XML fragments is specified by templates.
-In the current implementation only Chameleon templates are supported.
+In the current implementation Chameleon templates are supported out-of-the-box.
+Other template engines can be added by the application.
 """
 
 import sys
@@ -17,9 +18,8 @@ from .controller import exception_report
 # implement the following interface:
 #   - filename -> template: template = template_factory(filename)
 #   - context  -> string: template.render(this=context) returns HTML page for context 'this' (dict)
-# Template factories are stored in a dictionary template_factory, with the extension as key.
+# Template factories are stored in a dictionary 'template_factory', with the extension as key.
 
-# TODO: Tonnikala and Mako are added here temporarily, but should move to application level
 template_factory = {}
 
 def add_template_type(extension, factory):
@@ -44,32 +44,6 @@ except ImportError as e:
     logger.critical('Chameleon template engine not available (%s)', e)
     sys.exit(1)
 
-try:
-    from tonnikala import FileLoader
-    tkLoader = FileLoader()
-    class TkTemplateFile:
-        def __init__(self, path):
-            super().__init__()
-            if not tkLoader.paths:
-                tkLoader.add_path(setting.layout)
-            self.template = tkLoader.load(relpath(path, setting.layout))
-        def render(self, **vars):
-            return self.template.render_to_buffer(vars, '__main__').join()
-    add_template_type('.tk', TkTemplateFile)
-except ImportError as e:
-    logger.critical('Tonnikala template engine not available (%s)', e)
-    sys.exit(1)
-
-# TODO: remove completely, and mention as an example in API documentation
-# try:
-#     from mako.template import Template
-#     def makoTemplateFile(path):
-#         return Template(filename=path)
-#     add_template_type('.mko', makoTemplateFile)
-# except ImportError as e:
-#     logger.critical('Mako template engine not available (%s)', e)
-#     sys.exit(1)
-
 def read_templates():
     """Read templates from layout directory.
 
@@ -93,7 +67,8 @@ def read_templates():
                 file_path = join(dirpath, filename)
                 try:
                     setting.templates[template_name] = template_factory[extension](file_path)
-                    # logger.debug("Template {} is in file {}".format(template_name, relpath(file_path, setting.layout)))
+                    if setting.tables:
+                        logger.debug("Template {} is in file {}".format(template_name, relpath(file_path, setting.layout)))
                 except Exception as e:
                     logger.error("Error in template '{0}' in file {1}".format(template_name, file_path))
                     logger.error(exception_report(e, ashtml=False))

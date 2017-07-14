@@ -131,18 +131,6 @@ define_atom('float',
             control  = 'input'
             )
 
-genders = ['?', 'v', 'm']
-define_atom('gender',
-    schema   = int,
-            convert  = int,
-            display  = lambda x: genders[x],
-            query    = lambda x: ('==', int(x)),
-            formtype = 'gender',
-            control  = 'radio',
-            default  = 0,
-            enum     = genders
-            )
-
 define_atom('integer',
             schema   = int,
             convert  = int,
