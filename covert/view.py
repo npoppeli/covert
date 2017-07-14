@@ -16,7 +16,7 @@ from inspect import getmembers, isclass, isfunction
 from itertools import chain
 from urllib.parse import urlencode
 from .common import SUCCESS, write_file, logger
-from .common import decode_dict, encode_dict
+from .common import decode_dict, encode_dict, show_dict
 from .model import unflatten, mapdoc
 from . import setting
 
@@ -462,6 +462,7 @@ class RenderTree:
         items = self.model.find(self.cursor.filter,
                                 limit=self.cursor.limit, skip=self.cursor.skip)
         if items:
+            logger.debug('add_items: count={}'.format(len(items)))
             active, recent = [], []
             now, delta = datetime.now(), timedelta(days=10)
             for item in items:
@@ -602,7 +603,7 @@ class RenderTree:
     def dump(self, name):
         if setting.debug:
             d = self.asdict()
-            write_file(name, encode_dict(d))
+            write_file(name, show_dict(d))
 
 
 class BareItemView:
@@ -659,8 +660,11 @@ class ItemView(BareItemView):
         tree.move_cursor()
         tree.add_items(['show', 'modify', 'delete'])
         tree.add_buttons(self.collection_buttons+self.collection_buttons_extra)
+        self.tree.dump('showitems0.json')
         tree.flatten_items()
+        self.tree.dump('showitems1.json')
         tree.prune_items(depth=1)
+        self.tree.dump('showitems2.json')
         return tree.asdict()
 
     def convert_form(self, keep_empty=False):
@@ -694,11 +698,11 @@ class ItemView(BareItemView):
         tree = self.tree
         tree.add_item(self.model())
         tree.add_search_button('match')
-        self.tree.dump('tree0.json')
+        self.tree.dump('search0.json')
         tree.flatten_item()
-        self.tree.dump('tree1.json')
+        self.tree.dump('search1.json')
         tree.prune_item(clear=True, form=True)
-        self.tree.dump('tree2.json')
+        self.tree.dump('search2.json')
         return tree.asdict()
 
     @route('/match', method='GET,POST', template='index')
