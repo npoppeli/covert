@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Classes and functions related to HTTP and WSGI servers.
 
+The most important items in this module are the two router classes.
 The switching router creates a response object with full HTML, partial HTML or JSON,
 depending on the request parameters.
 The mapping router creates a response object based on route patterns.
@@ -36,7 +37,7 @@ def exception_report(exc, ashtml=True):
 
     Arguments:
         exc    (Exception): exception object
-        ashmtl (bool):      render as HTML (True) or plain text (False)
+        ashtml (bool):      render as HTML (True) or plain text (False)
 
     Returns:
         str: exception report as plain or HTML text
@@ -56,56 +57,52 @@ def exception_report(exc, ashtml=True):
 class SwitchRouter:
     """WSGI application that serves as front-end to one or more web applications.
 
-    This WSGI application checks PATH_INFO and the 'X-Requested-With' request header
-    to determine what the operating mode is: static file, complete HTML page, HTML
-    fragment, XML document or JSON document. Each operating mode is handled by a
-    different WSGI application. These applications should be registered by calling
-    static(), page(), fragment(), xml() and json() methods.
+    This WSGI application checks PATH_INFO and the 'X-Requested-With' request header to determine
+    what the operating mode is: mount point with its own application (e.g. static file), complete
+    HTML page, HTML fragment, XML document or JSON document. Each operating mode is handled by a
+    different WSGI application. These applications should be registered by calling static(),
+    page(), fragment(), xml() and json() methods.
     """
     # Operating modes
-    STATIC_MODE  = 0 # static file
+    MOUNT_MODE   = 0 # mount point with its own application
     PAGE_MODE    = 1 # complete HTML page
     FRAG_MODE    = 2 # HTML fragment
     XML_MODE     = 3 # XML document
     JSON_MODE    = 4 # JSON document
     UNKNOWN_MODE = 5 # unknown
 
-    mode_name = ['STATIC', 'PAGE', 'FRAGMENT', 'XML', 'JSON']
+    mode_name = ['MOUNT', 'PAGE', 'FRAGMENT', 'XML', 'JSON']
 
     def __init__(self):
-        self._app = {self.STATIC_MODE : bad_request,
-                     self.PAGE_MODE   : bad_request,
+        self._app = {self.PAGE_MODE   : bad_request,
                      self.FRAG_MODE   : bad_request,
                      self.XML_MODE    : bad_request,
                      self.JSON_MODE   : bad_request,
                      self.UNKNOWN_MODE: bad_request}
-        self._static = ''
 
-    def static(self, app, prefix):
-        self._app[self.STATIC_MODE] = app
-        self._static = prefix
+    def mount(self, app, path):
+        self._app[path] = app
 
     def page(self, app):
-        self._add(self.PAGE_MODE, app)
+        self._app[self.PAGE_MODE] = app
 
     def fragment(self, app):
-        self._add(self.FRAG_MODE, app)
+        self._app[self.FRAG_MODE] = app
 
     def xml(self, app):
-        self._add(self.XML_MODE, app)
+        self._app[self.XML_MODE] = app
 
     def json(self, app):
-        self._add(self.JSON_MODE, app)
-
-    def _add(self, mode, app):
-        self._app[mode] = app
+        self._app[self.JSON_MODE] = app
 
     def __call__(self, environ, start_response):
         request = Request(environ)
         req_method = request.params.get('_method', request.method).upper()
-        if request.path_info.startswith(self._static):
-            mode = self.STATIC_MODE
-            request.path_info = request.path_info.replace(self._static, '', 1)
+        path0 = '/'.join(request.path_info.split('/')[0:2])
+        if path0 in self._app:
+            mode = self.MOUNT_MODE
+            app = self._app[path0]
+            request.path_info = request.path_info.replace(path0, '', 1)
         elif request.headers.get('X-Requested-With', '') == 'XMLHttpRequest': # jQuery.ajax()
             if 'application/json' in request.accept:
                 mode = self.JSON_MODE
@@ -113,10 +110,12 @@ class SwitchRouter:
                 mode = self.FRAG_MODE
             else:
                 mode = self.UNKNOWN_MODE
+            app = self._app[mode]
         else:
             mode = self.PAGE_MODE
+            app = self._app[mode]
         try:
-            response = request.get_response(self._app[mode])
+            response = request.get_response(app)
             dt = datetime.strftime(datetime.now(), "%Y-%m-%d %H:%M:%S")
             logger.info('{} "{} {}" {} {} [{}]'.\
                         format(dt, request.method, request.path_info,
@@ -162,9 +161,11 @@ class MapRouter:
         req_path = request.path_info
         # find first route that matches request
         view_cls = None
-        for route in setting.routes: # route=(pattern, method, templates, regex, cls, name)
+        # route is tuple (pattern, method, templates, regex, cls, name)
+        for route in setting.routes:
             match = route.regex.match(req_path)
-            if route.method == req_method and match: # exit loop if matching route found
+            # exit loop if matching route found
+            if route.method == req_method and match:
                 view_cls, route_name, route_templates = route.cls, route.name, route.templates
                 break
         response = Response(content_type=self.content_type, status=200)
