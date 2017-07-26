@@ -6,7 +6,6 @@ MINYEAR = 1400 (not midnight) to avoid complaints from RethinkDB
 
 config.py
 ---------
-* raise error if no config file
 * I18N the right way
   - http://inventwithpython.com/blog/2014/12/20/translate-your-python-3-program-with-the-gettext-module/
   - https://flufli18n.readthedocs.io/en/latest/docs/using.html
@@ -26,6 +25,11 @@ model.py
 * item revisions (add 'key' and 'rev' attributes)
 * make labels in BareItem language-dependent (I18N)
 * 'active' attribute in BareItem is not 'auto', but has a default (True)
+* images: keep thumbnail in db as binary date field
+  show with
+  <img alt="..." src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIA..." />
+  and keep images > 1 MB in filesystem (content-addressable storage).
+  See "To BLOB or Not To BLOB", Microsoft Research Technical Report 2006-45
 
 Notes on item revisions
 1. If the number of revisions is low, keep all of them in the storage, and mark the
@@ -43,12 +47,17 @@ view.py
 * delete button is enabled if authorized and item is active
 * collection_buttons_extra: where to set them?
 * add 'import' method (form-based file upload, CSV and JSON)
-* make ItemView.sort independent from db engine
 * make Itemview.prune configurable (Itemview.clip(), 2 modes)
 * itemlist with clickable column headers to influence sorting
 * Use JavaScript for client-side generation of search queries
 * Use Alpaca (JS) for client-side form handling
 * move boolean vector 'active' and 'modified' to event handler
+* image upload with:
+if form[field].file:
+  path = os.path.join(upload_dir, form[field].filename)
+  copy fileitem.file to file 'path' with shutil.copyfileobj
+else:
+  # something else
 
 engine/mongodb.py
 -----------------
