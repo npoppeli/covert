@@ -117,9 +117,9 @@ class SwitchRouter:
         try:
             response = request.get_response(app)
             dt = datetime.strftime(datetime.now(), "%Y-%m-%d %H:%M:%S")
-            logger.info('{} "{} {}" {} {} [{}]'.\
-                        format(dt, request.method, request.path_info,
-                               response.status, response.content_length, self.mode_name[mode]))
+            logger.debug('{} "{} {}" {} {}'.\
+                         format(dt, request.method, request.path_info,
+                                response.status, response.content_length))
         except Exception as e:
             response = Response()
             response.text = exception_report(e)
