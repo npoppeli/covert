@@ -228,7 +228,7 @@ def route2regex(pattern):
 def read_views(module):
     """Read views from module object.
 
-    Read all views from the module object 'module'. A view is a class that is a sub-class of
+    Read all views from the module object `module`. A view is a class that is a sub-class of
     BareItemView and has a name ending in 'View'.
     In each view, locate the members that are of 'function' type and have a 'pattern'
     attribute, indicating they have been decorated with '@route'. These members are

@@ -15,9 +15,10 @@ Only in cases where performance matters, save one dictionary lookup with:
 __version__ = '0.8'
 
 # configuration
-content     = None # (static) content directory
-layout      = None # layout (template) directory
-site        = None # site directory
+content     = '' # relative path to static content
+media       = '' # relative path to media storage
+layout      = '' # relative layout to template directory
+site        = '' # site directory
 models      = {}
 views       = {}
 language    = ''
@@ -33,9 +34,10 @@ tables      = False
 verbose     = 0
 
 # storage
-store_connection = None # connection for database
-store_db         = None # database
-store_dbname     = ''   # name of database
+store_connection = None    # connection for item database
+store_db         = None    # item database
+store_dbname     = ''      # name of item database
+store_mdb        = None    # media database (CAS)
 
 # routes
 routes    = []

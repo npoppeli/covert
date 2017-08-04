@@ -8,14 +8,12 @@ module developed by Derrick Gilland, and is only targeted at Python 3.x.
 This module defines the HashFS class and related utilities.
 """
 
-import glob
-import hashlib
-import io
-import os
-import shutil
+import hashlib, io, os, shutil
 from distutils.dir_util import mkpath
 from tempfile import NamedTemporaryFile
-from contextlib import closing
+
+def to_bytes(s):
+    return s if isinstance(s, bytes) else bytes(s, 'utf8')
 
 class HashFS:
     """Class that implements a content-addressable file store.
@@ -46,18 +44,18 @@ class HashFS:
             HashAddress: hash address of file.
         """
         stream = Stream(file)
-        with closing(stream):
-            shash = self.compute_hash(stream)
-            path = self._copy(stream, shash)
-        return HashAddress(id, self.relpath(path), path)
+        digest = self.compute_digest(stream)
+        path = self._copy(stream, digest)
+        stream.close()
+        return HashAddress(digest, self.relpath(path), path)
 
-    def _copy(self, stream, shash):
+    def _copy(self, stream, digest):
         """Copy the contents of `stream` to disk.
 
         The copy process uses a temporary file to store the initial contents and then moves that
         file to its final location.
         """
-        path = self.idpath(shash)
+        path = self.idpath(digest)
         if not os.path.isfile(path):
             file_name = self._temp_file(stream)
             self.makepath(os.path.dirname(path))
@@ -116,36 +114,35 @@ class HashFS:
         return io.open(realpath, mode)
 
     def delete(self, file):
-        """Delete file using id or path.
-
-        Remove any empty directories after deleting. No exception is raised if file doesn't exist.
+        """Delete file using id or path. Remove any empty directories after deleting.
+        No exception is raised if file does not exist.
 
         Arguments:
             file (str): address ID or path of file.
         """
-        realpath = self.realpath(file)
-        if realpath is None:
+        real_path = self.realpath(file)
+        if real_path is None:
             return
         try:
-            os.remove(realpath)
+            os.remove(real_path)
         except OSError:
             pass
         else:
-            self.remove_empty(os.path.dirname(realpath))
+            self.remove_empty(os.path.dirname(real_path))
 
-    def remove_empty(self, subpath):
+    def remove_empty(self, path):
         """Remove empty folders.
 
-        Successively remove all empty folders starting with `subpath` and proceeding 'up' through
+        Successively remove all empty folders starting with `path` and proceeding 'up' through
         directory tree until reaching the `root` folder.
         """
-        if not self.haspath(subpath):
+        if not self.haspath(path):
             return
-        while subpath != self.root:
-            if len(os.listdir(subpath)) > 0 or os.path.islink(subpath):
+        while path != self.root:
+            if len(os.listdir(path)) > 0 or os.path.islink(path):
                 break
-            os.rmdir(subpath)
-            subpath = os.path.dirname(subpath)
+            os.rmdir(path)
+            path = os.path.dirname(path)
 
     def exists(self, file):
         """Check whether a given file id or path exists on disk."""
@@ -153,7 +150,9 @@ class HashFS:
 
     def haspath(self, path):
         """Return whether `path` is a subdirectory of the `root` directory."""
-        return issubdir(path, self.root)
+        root = os.path.realpath(self.root) + os.sep
+        path = os.path.realpath(path)
+        return path.startswith(root)
 
     def makepath(self, path):
         """Physically create the folder path on disk."""
@@ -164,45 +163,44 @@ class HashFS:
         return os.path.relpath(path, self.root)
 
     def realpath(self, file):
-        """Determine rea lpath of file.
+        """Determine real path of file.
 
         Attempt to determine the real path of a file id or path through successive checking of
-        candidate paths. If the real path is stored with an extension, the path is considered a
-        match if the basename matches the expected file path of the id.
+        candidate paths.
         """
-        # Check for absoluate path.
+        # check for absolute path
         if os.path.isfile(file):
             return file
-        # Check for relative path.
+        # check for relative path
         relpath = os.path.join(self.root, file)
         if os.path.isfile(relpath):
             return relpath
-        # Check for sharded path.
+        # check for sharded path
         filepath = self.idpath(file)
         if os.path.isfile(filepath):
             return filepath
-        # Check for sharded path with any extension.
-        paths = glob.glob('{0}.*'.format(filepath))
-        if paths:
-            return paths[0]
-        # Could not determine a match.
+        # no match
         return None
 
-    def idpath(self, shash):
+    def idpath(self, digest):
         """Build the file path for a given secure hash."""
-        paths = self.shard(shash)
-        return os.path.join(self.root, *paths)
+        path_list = self.shard(digest)
+        return os.path.join(self.root, *path_list)
 
-    def compute_hash(self, stream):
-        """Compute hash of file using `algorithm`."""
+    def compute_digest(self, stream):
+        """Compute digest of file."""
         hashobj = hashlib.new(self.algorithm)
         for data in stream:
             hashobj.update(to_bytes(data))
         return hashobj.hexdigest()
 
-    def shard(self, shash):
-        """Shard content ID into subfolders."""
-        return shard(shash, self.depth, self.width)
+    def shard(self, digest):
+        """Divide `digest` into folder path and file name. Procedure: create a list of `depth` of
+        tokens with width `width` from the first part of the digest plus the remainder.
+        """
+        d, w = self.depth, self.width
+        items = [digest[w*k:w*(k+1)] for k in range(d)] + [digest[d*w:]]
+        return [item for item in items if item]
 
     def unshard(self, path):
         """Unshard path to determine hash value."""
@@ -221,15 +219,15 @@ class HashAddress:
     """File address containing file's path on disk and it's content hash ID.
 
     Attributes:
-        shash (str)  : secure hash (digest) of file contents.
+        digest (str)  : secure hash (digest) of file contents.
         relpath (str): relative path location to `HashFS.root`.
         abspath (str): absolute path location of file on disk.
     """
-    __slots__ = ('shash', 'relpath', 'abspath')
-    def __init__(self, shash, relpath, abspath):
-        self.shash        = shash
-        self.relpath      = relpath
-        self.abspath      = abspath
+    __slots__ = ('digest', 'relpath', 'abspath')
+    def __init__(self, digest, relpath, abspath):
+        self.digest  = digest
+        self.relpath = relpath
+        self.abspath = abspath
 
 class Stream:
     """Common interface for file-like objects.
@@ -249,13 +247,13 @@ class Stream:
             obj = io.open(obj, 'rb')
             pos = None
         else:
-            raise ValueError('Stream.init: argument is not a valid file path or readable object')
+            raise ValueError('Stream: {} is not a valid file path or readable object'.format(obj))
         self._obj = obj
         self._pos = pos
 
     def __iter__(self):
         """Read underlying IO object and yield results. Return object to
-        original position if we didn't open it originally.
+        original position if this application did not open it originally.
         """
         self._obj.seek(0)
         while True:
@@ -267,28 +265,9 @@ class Stream:
             self._obj.seek(self._pos)
 
     def close(self):
-        """Close underlying IO object if we opened it, else return it to original position.
+        """Close underlying IO object if this application opened it, else return it to original position.
         """
         if self._pos is None:
             self._obj.close()
         else:
             self._obj.seek(self._pos)
-
-def issubdir(subpath, path):
-    """Return whether `subpath` is a sub-directory of `path`."""
-    # Append os.sep so that paths like /usr/var2/log doesn't match /usr/var.
-    path = os.path.realpath(path) + os.sep
-    subpath = os.path.realpath(subpath)
-    return subpath.startswith(path)
-
-def shard(digest, depth, width):
-    """Create a list of `depth` of tokens with width `width` from the first part of the digest
-    (secure hash) id plus the remainder.
-    """
-    items = [digest[k * width:width * (k + 1)] for k in range(depth)] + [digest[depth * width:]]
-    return [item for item in items if item]
-
-def to_bytes(text):
-    if not isinstance(text, bytes):
-        text = bytes(text, 'utf8')
-    return text

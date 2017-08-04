@@ -8,13 +8,14 @@ Attributes:
 import argparse, logging, sys
 from importlib import import_module
 from inspect import getmembers, isclass
-from os import getcwd
+from os import getcwd, mkdir
 from os.path import join, exists, isfile, splitext
 from . import setting
 from .model import read_models
 from .view import read_views
 from .layout import read_templates
 from .common import read_yaml_file, InternalError, logger
+from .engine.hashfs import HashFS
 
 extra_arguments = {}
 
@@ -46,7 +47,7 @@ def parse_cmdline():
     setting.verbose = args.verbose
     return args
 
-config_default = dict(content='content', layout='layout',
+config_default = dict(content='content', layout='layout', media='media',
                       dbname='test', dbtype='mongodb',
                       host='localhost', port='8080',
                       models='models', views='views', language='en')
@@ -76,6 +77,7 @@ def read_config():
     if 'port'    in config: setting.port    = config['port']
     setting.content = join(setting.site, config['content'])
     setting.layout  = join(setting.site, config['layout'])
+    setting.media   = join(setting.site, config['media'])
     setting.store_dbname  = config['dbname']
     setting.dbtype  = config['dbtype']
     setting.language = config['language'] if config['language'] in setting.languages\
@@ -101,7 +103,7 @@ def kernel_init():
     Returns:
         None
     """
-    # initialize storage
+    # initialize item storage
     if setting.dbtype == 'mongodb':
         from .engine.mongodb import init_storage
     elif setting.dbtype == 'rethinkdb':
@@ -109,12 +111,18 @@ def kernel_init():
     else:
         raise InternalError('Unknown storage engine: only MongoDB and RethinkDB are supported')
     init_storage()
+    # initialize media storage
+    if not exists(setting.media):
+        mkdir(setting.media)
+        logger.debug("Created new folder for media storage: {}".format(setting.media))
+    setting.store_mdb = HashFS(setting.media)
+    logger.debug("Initialized content-addressable media storage")
 
     # execute prelude (if present)
     if 'prelude' in setting.config:
         name, extension =  splitext(setting.config['prelude'])
         if extension == '.py':
-            module = import_module(name)
+            _ = import_module(name)
         else:
             logger.info('{} should be Python module'.format(setting.config['prelude']))
 
@@ -129,8 +137,8 @@ def kernel_init():
     for item in model_list:
         name, extension = splitext(item)
         if extension == '.py':
-            module = import_module(name)
-            for class_name, model_class in getmembers(module, isclass):
+            mod = import_module(name)
+            for class_name, model_class in getmembers(mod, isclass):
                 if class_name in ['BareItem', 'Item', 'ItemRef']:
                     continue
                 logger.debug('Adding/replacing class %s', class_name)
@@ -143,8 +151,8 @@ def kernel_init():
 
     # import views
     name, extension = splitext(setting.config['views'])
-    module = import_module(name)
-    read_views(module)
+    mod = import_module(name)
+    read_views(mod)
 
     # I18N
     label_index = setting.languages.index(setting.language)
