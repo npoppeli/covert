@@ -334,9 +334,10 @@ class Cursor:
             # flatten list-valued conditions
             self.query = {key:(value[0] if isinstance(value, list) else value)
                           for key, value in mapdoc(model.qmap, unflatten(form)).items()}
-            logger.debug("cursor_init (initial): self.query=%s", self.query)
+            # logger.debug("cursor_init (initial): self.query=%s", self.query)
         else: # follow-up post
-            logger.debug("cursor_init (follow-up): self.query=%s", self.query)
+            pass
+            # logger.debug("cursor_init (follow-up): self.query=%s", self.query)
 
     def __str__(self):
         d = dict([(key, getattr(self, key, '')) for key in self.__slots__])
@@ -428,9 +429,9 @@ class RenderTree:
                 elif value_keys == ['from']:
                     cursor.query[key] = ('==', convert(value['from']))
         cursor.filter.update(cursor.query)
-        logger.debug("move_cursor: filter=%s", cursor.filter)
+        # logger.debug("move_cursor: filter=%s", cursor.filter)
         count = self.model.count(cursor.filter)
-        logger.debug("move_cursor: count=%d", count)
+        # logger.debug("move_cursor: count=%d", count)
         cursor.skip = max(0, min(count, cursor.skip+cursor.dir*cursor.limit))
         cursor.prev = cursor.skip>0
         cursor.next = cursor.skip+cursor.limit < count
@@ -462,7 +463,7 @@ class RenderTree:
         items = self.model.find(self.cursor.filter,
                                 limit=self.cursor.limit, skip=self.cursor.skip)
         if items:
-            logger.debug('add_items: count={}'.format(len(items)))
+            # logger.debug('add_items: count={}'.format(len(items)))
             active, recent = [], []
             now, delta = datetime.now(), timedelta(days=10)
             for item in items:
@@ -660,26 +661,24 @@ class ItemView(BareItemView):
         tree.move_cursor()
         tree.add_items(['show', 'modify', 'delete'])
         tree.add_buttons(self.collection_buttons+self.collection_buttons_extra)
-        self.tree.dump('showitems0.json')
+        # self.tree.dump('showitems0.json')
         tree.flatten_items()
-        self.tree.dump('showitems1.json')
         tree.prune_items(depth=1)
-        self.tree.dump('showitems2.json')
         return tree.asdict()
 
     def convert_form(self, keep_empty=False):
         """Convert request parameters to unflattened dictionary."""
         raw_form = {key:value for key, value in self.request.params.items()
                               if (value or keep_empty) and not key.startswith('_')}
-        logger.debug("convert_form: raw form=%s", raw_form)
+        # logger.debug("convert_form: raw form=%s", raw_form)
         self.form = unflatten(raw_form)
-        logger.debug("convert_form: unflattened=%s", self.form)
+        # logger.debug("convert_form: unflattened=%s", self.form)
 
     def extract_item(self, prefix=None, model=None):
         """Convert unflattened form to item."""
         # after unflattening, this is easy
         selection = self.form[prefix.rstrip('.')] if prefix else self.form
-        logger.debug("extract_item: selection=%s", selection)
+        # logger.debug("extract_item: selection=%s", selection)
         return (model or self.model).convert(selection)
 
     @route('/{id:objectid}', template='show')
@@ -698,11 +697,9 @@ class ItemView(BareItemView):
         tree = self.tree
         tree.add_item(self.model())
         tree.add_search_button('match')
-        self.tree.dump('search0.json')
+        # self.tree.dump('search0.json')
         tree.flatten_item()
-        self.tree.dump('search1.json')
         tree.prune_item(clear=True, form=True)
-        self.tree.dump('search2.json')
         return tree.asdict()
 
     @route('/match', method='GET,POST', template='index')
