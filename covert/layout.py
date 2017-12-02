@@ -25,8 +25,9 @@ template_factory = {}
 def add_template_type(extension, factory):
     """Add template factory for given suffix.
 
-    :param extension: file extension (.foo)
-    :param factory:   template factory (callable object)
+    Arguments:
+      extension (str)     : file extension (.foo)
+      factory   (callable): template factory
 
     Returns:
         None
