@@ -219,7 +219,7 @@ class HashAddress:
     """File address containing file's path on disk and it's content hash ID.
 
     Attributes:
-        digest (str)  : secure hash (digest) of file contents.
+        digest  (str): secure hash (digest) of file contents.
         relpath (str): relative path location to `HashFS.root`.
         abspath (str): absolute path location of file on disk.
     """
