@@ -208,6 +208,15 @@ class Item(BareItem):
             self['active'] = True
             self['ctime'] = self['mtime']
 
+    def notify(self):
+        """Notify other items that the present item has been modified.
+        NOTE: this should be used with care, avoiding cycles, infinite recursion etcetera.
+
+        Returns:
+            None
+        """
+        pass
+
     def write(self, validate=True):
         """Write item to permanent storage.
 
@@ -247,6 +256,7 @@ class Item(BareItem):
                 message = 'nModified={}'.format(result.raw_result['nModified'])
                 reply = {'status':SUCCESS, 'data':self['id'], 'message':message}
             report_db_action(reply)
+            self.notify()
             return reply
         except Exception as e:
             message = 'item {}\nnot written because of error\n{}\n'.format(doc, str(e))
