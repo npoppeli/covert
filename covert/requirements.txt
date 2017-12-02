@@ -4,5 +4,5 @@ WebOb      >= 1.5.0
 pyyaml     >=
 voluptuous >=
 waitress   >=
-tonnikala  >= ... (optional)
+tonnikala  >= ... (optional), install from latest wheel file!
 mako       >= ... (optional)
