@@ -354,15 +354,56 @@ class BareItem(dict):
         item.update(clone)
         return item
 
-# Visitor design pattern uses:
-# 1. instance method BareItem.accept()
-# 2. instances of Visitor class (or sub-class thereof)
 
+# Auxiliary classes: Visitor, Query and friends
 class Visitor:
+    """Visitor design pattern uses:
+    1. instances of Visitor class (or sub-class thereof)
+    2. dynamic method determination.
+    """
     def visit(self, obj):
-        method = getattr(obj, 'visit_' + obj.__class__.__name__.lower(), None)
+        name = 'visit_' + obj.__class__.__name__.lower()
+        method = getattr(self, name, None)
         if method:
-            method(obj)
+            return method(obj)
+        else:
+            return None
+
+class Clause:
+    def __init__(self, *terms):
+        self.terms = []
+        if terms:
+            self.terms.extend(terms)
+            # print(' ', str(self))
+
+    def __str__(self):
+        return ' {}({})'.format(self.__class__.__name__, ', '.join([str(t) for t in self.terms]))
+
+    def add(self, term):
+        self.terms.append(term)
+        # print('+', str(self))
+
+class Query(Clause):
+    pass
+
+class And(Clause):
+    pass
+
+class Or(Clause):
+    pass
+
+class Term:
+    def __init__(self, field, operator, value1, value2=None):
+        self.field = field
+        self.operator = operator
+        self.value1 = value1
+        self.value2 = value2
+
+    def __str__(self):
+        if self.value2:
+            return 'Term({}{}{}{})'.format(self.field, self.operator, self.value1, self.value2)
+        else:
+            return 'Term({}{}{})'.format(self.field, self.operator, self.value1)
 
 # Item reference
 def get_objectid(ref):

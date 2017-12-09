@@ -69,4 +69,3 @@ engine/rethinkdb.py
 -------------------
 * datetime objects *with* timezone
 * text index via ...
-* query translation must include mapping of values as well (wmap)

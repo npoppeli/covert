@@ -8,17 +8,9 @@ The Item class encapsulates the details of the storage engine.
 from datetime import datetime
 from pymongo import MongoClient
 from ..common import SUCCESS, ERROR, FAIL, logger, InternalError
-from ..model import BareItem, mapdoc
+from ..model import BareItem, mapdoc, Visitor
 from .. import setting
 from bson.objectid import ObjectId
-
-query_map = {
-    '==': lambda t: t[1],
-    '=~': lambda t: {'$regex':t[1]},
-    '[]': lambda t: {'$gte': t[1], '$lte': t[2]},
-    '<=': lambda t: {'$lte': t[1]},
-    '>=': lambda t: {'$gte': t[1]}
-}
 
 def report_db_action(result):
     message = "{}: status={} data={} ".format(datetime.now(), result['status'], result['data'])
@@ -27,26 +19,52 @@ def report_db_action(result):
     if setting.debug > 1:
         logger.debug(message)
 
-def translate_query(query, wmap):
+query_map = {
+    '==': lambda x, y: x,
+    '=~': lambda x, y: {'$regex': x},
+    '[]': lambda x, y: {'$gte': x, '$lte': y},
+    '<=': lambda x, y: {'$lte': x},
+    '>=': lambda x, y: {'$gte': x}
+}
+
+class Translator(Visitor):
     """Translate query to form suitable for this storage engine.
 
-    In the view methods, queries are specified as sequences of conditions, where a condition
-    is a tuple (op, value) or (op, value1, value2), where 'op' is a 2-character string
-    specifying a search operator, and 'value' is a value used in the search.
-    The translation to MongoDB form is given by 'query_map'.
-    Fields with 'multiple' property (list-valued fields) have a normal query condition, since
-    MongoDB does not differentiate search scalar field and search list field. 
+    A query is a sequence of conditions, where a condition is a tuple (op, value) or
+    (op, value1, value2), where 'op' is a 2-character string specifying a search operator,
+    and 'value' is a value used in the search.
+    The translation to MongoDB form is given by 'query_map'. Fields with 'multiple' property
+    (list-valued fields) have a normal query condition, since MongoDB does not distinguish
+    search scalar field from search list field.
     """
-    result = {}
-    for field, cond in query.items():
-        operator = cond[0]
+    def  __init__(self, wmap):
+        self.wmap = wmap
+
+    def visit_query(self, node):
+        result = {}
+        for term in node.terms:
+            result.update(self.visit(term))
+        return result
+
+    def visit_and(self, node):
+        result = [self.visit(term) for term in node.terms]
+        return {'$and': result}
+
+    def visit_or(self, node):
+        result = [self.visit(term) for term in node.terms]
+        return {'$or': result}
+
+    def visit_term(self, node):
+        field = node.field
+        operator = node.operator
+        wmap = self.wmap
+        value1 = wmap[field](node.value1) if (node.value1 and field in wmap) else node.value1
+        value2 = wmap[field](node.value2) if (node.value2 and field in wmap) else node.value2
         if operator in query_map:
-            if field in wmap: # conversion is necessary (e.g. date to datetime)
-                cond = tuple([operator] + list(map(wmap[field], cond[1:])))
-            result[field] = query_map[operator](cond)
-        else: # no mapping for this element
-            result[field] = cond
-    return result
+            result = {field: query_map[operator](value1, value2)}
+        else:
+            result = {field: {operator: value1}}
+        return result
 
 def init_storage():
     """Initialize storage engine."""
@@ -98,8 +116,8 @@ class Item(BareItem):
         Returns:
             dict: query in MongoDB form.
         """
-        result = translate_query(doc, cls.wmap)
-        return result
+        translator = Translator(cls.wmap)
+        return translator.visit(doc)
 
     @classmethod
     def max(cls, field):
@@ -147,7 +165,9 @@ class Item(BareItem):
             list: list of 'cls' instances.
         """
         sort_spec = sort if sort else [('_skey',1)]
-        cursor = setting.store_db[cls.name].find(filter=cls.query(doc),
+        q = cls.query(doc)
+        if q is None: return []
+        cursor = setting.store_db[cls.name].find(filter=q,
                                                  skip=skip, limit=limit, sort=sort_spec)
         return [cls(item) for item in cursor]
 

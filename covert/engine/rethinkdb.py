@@ -8,7 +8,7 @@ The Item class encapsulates the details of the storage engine.
 from datetime import datetime
 import rethinkdb as r
 from ..common import SUCCESS, ERROR, FAIL, logger, InternalError
-from ..model import BareItem, mapdoc
+from ..model import BareItem, mapdoc, Visitor
 from .. import setting
 from bson.objectid import ObjectId
 
@@ -18,6 +18,55 @@ def report_db_action(result):
         message += result['message']
     if setting.debug > 1:
         logger.debug(message)
+
+class Translator(Visitor):
+    """Translate query to form suitable for this storage engine.
+
+    A query is a sequence of conditions, where a condition is a tuple (op, value) or
+    (op, value1, value2), where 'op' is a 2-character string specifying a search operator,
+    and 'value' is a value used in the search.
+    Fields with 'multiple' property (list-valued fields) have a normal query condition,
+    since RethinkDB does not distinguish search scalar field from search list field.
+
+    TODO: add possibility to search through array fields
+    """
+    def  __init__(self, wmap, name):
+        self.wmap = wmap
+        self.query = r.table(name)
+
+    def visit_query(self, node):
+        for term in node.terms:
+            new_term = self.visit(term)
+            for field, cond in new_term.items():
+                operator = cond[0]
+                if operator == '==':
+                    self.query = self.query.filter(r.row[field] == cond[1])
+                elif operator == '=~':
+                    self.query = self.query.filter(r.row[field].match(cond[1]))
+                elif operator == '[]':
+                    self.query = self.query.filter((r.row[field] >= cond[1]) & (r.row[field] <= cond[2]))
+                elif operator == '<=':
+                    self.query = self.query.filter(r.row[field] <= cond[1])
+                elif operator == '>=':
+                    self.query = self.query.filter(r.row[field] >= cond[1])
+        return self.query
+
+    def visit_and(self, node):
+        logger.debug('Translator: visit_and not implemented yet')
+        return {}
+
+    def visit_or(self, node):
+        logger.debug('Translator: visit_or not implemented yet')
+        return {}
+
+    def visit_term(self, node):
+        field = node.field
+        operator = node.operator
+        wmap = self.wmap
+        value1 = wmap[field](node.value1) if (node.value1 and field in wmap) else node.value1
+        value2 = wmap[field](node.value2) if (node.value2 and field in wmap) else node.value2
+        return {field: (operator, value1, value2)}
+
 
 def init_storage():
     """Initialize storage engine."""
@@ -78,22 +127,8 @@ class Item(BareItem):
         Returns:
             query: query in RethinkDB form.
         """
-        query = r.table(cls.name)
-        for key, value in doc.items():
-            # TODO 1. add possibility to search through array fields
-            # TODO 2. apply wmap where needed
-            operator = value[0]
-            if operator == '==':
-                query = query.filter(r.row[key] == value[1])
-            elif operator == '=~':
-                query = query.filter(r.row[key].match(value[1]))
-            elif operator == '[]':
-                query = query.filter((r.row[key] >= value[1]) & (r.row[key] <= value[2]))
-            elif operator == '<=':
-                query = query.filter(r.row[key] <= value[1])
-            elif operator == '>=':
-                query = query.filter(r.row[key] >= value[1])
-        return query
+        translator = Translator(cls.wmap, cls.name)
+        return translator.visit(doc)
 
     @classmethod
     def max(cls, field):
