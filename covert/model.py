@@ -360,11 +360,11 @@ class Visitor:
     1. instances of Visitor class (or sub-class thereof)
     2. dynamic method determination.
     """
-    def visit(self, obj):
+    def visit(self, obj, **kwarg):
         name = 'visit_' + obj.__class__.__name__.lower()
         method = getattr(self, name, None)
         if method:
-            return method(obj)
+            return method(obj, **kwarg)
         else:
             return None
 
