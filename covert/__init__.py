@@ -40,6 +40,6 @@ from .common     import read_yaml_file, read_file, logger, SUCCESS, FAIL, ERROR,
 from .config     import read_config, parse_cmdline, kernel_init, add_argument
 from .controller import http_server, SwitchRouter, MapRouter, PageRouter, JSONRouter
 from .layout     import add_template_type
-from .model      import ItemRef, Visitor, Query, And, Or, Term
+from .model      import ItemRef, Visitor, Filter, And, Or, Term
 from .view       import route, BareItemView, ItemView, url_for
 from .view       import route2pattern, route2regex, RenderTree, normal_button

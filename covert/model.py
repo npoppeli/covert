@@ -185,8 +185,7 @@ class BareItem(dict):
     """Base class for Item.
 
     The BareItem class defines common data attributes and storage-independent methods.
-
-    Attributes:
+    The common data attributes are:
         * id     (string):   unique id attribute (unique at least within the collection)
         * _skey  (string):   sort key
         * active (boolean):  True if active item, False if inactive (deleted) item
@@ -374,16 +373,28 @@ class Clause:
         self.terms = []
         if terms:
             self.terms.extend(terms)
-            # print(' ', str(self))
-
-    def __str__(self):
-        return ' {}({})'.format(self.__class__.__name__, ', '.join([str(t) for t in self.terms]))
 
     def add(self, term):
         self.terms.append(term)
-        # print('+', str(self))
 
-class Query(Clause):
+    def __contains__(self, key):
+        return any([t.field == key for t in self.terms if isinstance(t, Term)])
+
+    def __delitem__(self, key):
+        if key in self:
+            position = -1
+            for n, term in enumerate(self.terms):
+                if isinstance(term, Term) and term.field == key:
+                    position = n
+                    break
+            if position >= 0:
+                del self.terms[position]
+
+    def __repr__(self):
+        return "{}({})".\
+            format(self.__class__.__name__, ', '.join([repr(t) for t in self.terms]))
+
+class Filter(Clause):
     pass
 
 class And(Clause):
@@ -399,11 +410,13 @@ class Term:
         self.value1 = value1
         self.value2 = value2
 
-    def __str__(self):
+    def __repr__(self):
         if self.value2:
-            return 'Term({}{}{}{})'.format(self.field, self.operator, self.value1, self.value2)
+            return "{}({}, {}, {}, {})".\
+                   format('Term', repr(self.field), repr(self.operator), repr(self.value1), repr(self.value2))
         else:
-            return 'Term({}{}{})'.format(self.field, self.operator, self.value1)
+            return "{}({}, {}, {})".\
+                   format('Term', repr(self.field), repr(self.operator), repr(self.value1))
 
 # Item reference
 def get_objectid(ref):

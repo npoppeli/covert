@@ -9,7 +9,8 @@ In the present implementation, form validation is performed on the server. Alter
 do form validation in the client, using Parsley.js (jQuery) for example.
 """
 
-import re
+from base64 import b64decode, b64encode
+import pickle, re
 from collections import OrderedDict
 from datetime import datetime, timedelta
 from inspect import getmembers, isclass, isfunction
@@ -17,7 +18,7 @@ from itertools import chain
 from urllib.parse import urlencode
 from .common import SUCCESS, write_file, logger
 from .common import decode_dict, encode_dict, show_dict
-from .model import unflatten, mapdoc
+from .model import unflatten, mapdoc, Filter, Term
 from . import setting
 
 def show_value(s):
@@ -296,8 +297,8 @@ class Cursor:
     For a few attributes, default values are defined in the 'default' dictionary.
     """
     __slots__ = ['skip', 'limit', 'incl', 'dir',
-                 'filter', 'query', 'prev', 'next', 'action', 'submit']
-    default = {'skip':0, 'limit':20, 'incl':0, 'dir':0, 'submit':''}
+                 'filter', 'form', 'prev', 'next', 'action', 'submit']
+    default = {'skip': 0, 'limit': 20, 'incl': 0, 'dir': 0, 'submit': ''}
 
     def __init__(self, request, model):
         """Constructor method for Cursor.
@@ -308,43 +309,39 @@ class Cursor:
             * incl      (int):     1 if inactive items are included, 0 otherwise
             * dir       (int):     direction of browsing
             * filter    (str):     filter to pass to storage engine
-            * query     (str):     transformed dictionary
+            * form      (str):     transformed dictionary
             * prev      (bool):    True if 'previous' button enabled
             * next      (bool):    True if 'next' button enabled
             * action    (str):     form action
             * submit    (str):     value of the form button that was pressed
         """
-        initial = '_skip' not in request.params
+        initial_post = '_skip' not in request.params
         for key, value in self.default.items():
             setattr(self, key, value)
-        self.query = {}
+        self.form = {}
         form = {}
         for key, value in request.params.items():
-            if key == '_query': # query is in display form, so some fields need conversion
-                for field, cond in decode_dict(value).items():
-                    if field in model.cmap:
-                        self.query[field] = tuple([cond[0]] + list(map(model.cmap[field], cond[1:])))
-                    else:
-                        self.query[field] = tuple(cond)
+            if key == '_filter': # rebuild filter that was saved in form
+                decoded = b64decode(value.encode())
+                self.filter = pickle.loads(decoded)
+                logger.debug("cursor_init: filter={}".format(self.filter))
             elif key.startswith('_'):
                 setattr(self, key[1:], str2int(value) if key[1:] in self.default else value)
             elif value:
                 form[key] = value
-        if initial: # initial post
-            # flatten list-valued conditions
-            self.query = {key:(value[0] if isinstance(value, list) else value)
-                          for key, value in mapdoc(model.qmap, unflatten(form)).items()}
-            # logger.debug("cursor_init (initial): self.query=%s", self.query)
-        else: # follow-up post
-            pass
-            # logger.debug("cursor_init (follow-up): self.query=%s", self.query)
+        if initial_post: # flatten list-valued conditions
+            self.form = {key:(value[0] if isinstance(value, list) else value)
+                         for key, value in mapdoc(model.qmap, unflatten(form)).items()}
 
     def __str__(self):
         d = dict([(key, getattr(self, key, '')) for key in self.__slots__])
+        d['filter'] = b64encode(pickle.dumps(d['filter'])).decode()
         return encode_dict(d)
 
     def asdict(self):
-        return dict([(key, getattr(self, key, '')) for key in self.__slots__])
+        d = dict([(key, getattr(self, key, '')) for key in self.__slots__])
+        d['filter'] = b64encode(pickle.dumps(d['filter'])).decode()
+        return d
 
 def normal_button(view_name, action, item):
     """Create render-tree element for normal button."""
@@ -414,24 +411,42 @@ class RenderTree:
     def move_cursor(self):
         """Move cursor to new position.
 
-        The actual filter used in the search is built from the search query given by
-        the form, and an extra condition depending on the value of cursor.incl.
+        Initially, the filter used in the search is built from the form contents, and an extra
+        condition depending on the value of cursor.incl.
+        On follow-up posts, the filter is rebuilt from a pickle, and only the 'active'
+        term (if present) needs to be looked at for possible adjustment.
         """
         cursor = self.cursor
-        cursor.filter = {} if cursor.incl == 1 else {'active': ('==', True)}
-        # translate interval specifications in query
-        for key, value in cursor.query.items():
-            if isinstance(value, dict): # dict that wasn't recognized by mapdoc as sub-document
-                convert = self.model.cmap[key]
-                value_keys = sorted(value.keys())
-                if  value_keys == ['from', 'to']:
-                    cursor.query[key] = ('[]', convert(value['from']), convert(value['to']))
-                elif value_keys == ['from']:
-                    cursor.query[key] = ('==', convert(value['from']))
-        cursor.filter.update(cursor.query)
-        # logger.debug("move_cursor: filter=%s", cursor.filter)
+        initial_post = bool(cursor.form)
+        if initial_post:
+           # translate interval specifications in form
+           for key, value in cursor.form.items():
+               if isinstance(value, dict): # not converted by mapdoc
+                   convert = self.model.cmap[key]
+                   key_set = set(value.keys())
+                   if  key_set == {'from', 'to'}:
+                       cursor.form[key] = ('[]', convert(value['from']), convert(value['to']))
+                   elif key_set == {'from'}:
+                       cursor.form[key] = ('==', convert(value['from']))
+           filter_spec = {} if cursor.incl == 1 else {'active': ('==', True)}
+           filter_spec.update(cursor.form)
+           # translate filter dictionary to Filter object
+           cursor.filter = Filter()
+           for key, value in filter_spec.items():
+               if len(value) == 3:
+                   cursor.filter.add(Term(key, value[0], value[1], value[2]))
+               else:
+                   cursor.filter.add(Term(key, value[0], value[1]))
+        else:
+            if cursor.incl == 1: # remove term 'active=True' from filter, if present
+                if 'active' in cursor.filter:
+                    del cursor.filter['active']
+            else: # add term 'active=True' to filter, unless already present
+                if 'active' not in cursor.filter:
+                    cursor.filter.add(Term('active', '==', True))
+        logger.debug("move_cursor: filter=%s", cursor.filter)
         count = self.model.count(cursor.filter)
-        # logger.debug("move_cursor: count=%d", count)
+        logger.debug("move_cursor: count=%d", count)
         cursor.skip = max(0, min(count, cursor.skip+cursor.dir*cursor.limit))
         cursor.prev = cursor.skip>0
         cursor.next = cursor.skip+cursor.limit < count
@@ -597,7 +612,7 @@ class RenderTree:
         result = dict([(key, getattr(self, key)) for key in self.nodes])
         if result.get('cursor', None):
             result['cursor'] = result['cursor'].asdict()
-            result['cursor']['query'] = encode_dict(result['cursor']['query'])
+            result['cursor']['filter'] = encode_dict(result['cursor']['filter'])
         result['data'] = [item for item in result['data'] if not item['_hide']]
         return result
 
@@ -712,8 +727,8 @@ class ItemView(BareItemView):
         """Prepare render tree for rendering as a form.
 
         This function handles simple forms (single item) and multi-faceted forms (multiple items,
-        not necessarily the same model). A form is called 'bound' if it contains user input
-        (a concept borrowed from Django) and otherwise 'unbound'.
+        not necessarily the same model). A form is called 'bound' if it contains user input and
+        otherwise 'unbound'.
 
         Arguments:
             description (str):  description of form.

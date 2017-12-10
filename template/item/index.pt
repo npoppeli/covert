@@ -1,8 +1,8 @@
 <!--! cursor -->
 <div style="margin-bottom:20px">
   <form tal:define="cursor this['cursor']" class="form-inline" action="${cursor.action}" method="POST">
-    <input type="hidden" name="_skip"  value="${cursor.skip}" />
-    <input type="hidden" name="_query" value="${cursor.query}"/>
+    <input type="hidden" name="_skip"   value="${cursor.skip}" />
+    <input type="hidden" name="_filter" value="${cursor.filter}"/>
     <div class="form-group">
       <label for="incl" class="text-info control-label">Toon vervallen: </label>
       <input type="checkbox" name="_incl" value="1" id="incl" tal:attributes="checked 'checked' if cursor.incl else default"/>

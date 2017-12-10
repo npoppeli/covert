@@ -30,9 +30,8 @@ query_map = {
 class Translator(Visitor):
     """Translate query to form suitable for this storage engine.
 
-    A query is a sequence of conditions, where a condition is a tuple (op, value) or
-    (op, value1, value2), where 'op' is a 2-character string specifying a search operator,
-    and 'value' is a value used in the search.
+    A filter is a sequence of terms or nested clauses (and, or). A term is a tuple (op, value) or
+    (op, value1, value2), where 'op' is a 2-character string specifying a filter operator.
     The translation to MongoDB form is given by 'query_map'. Fields with 'multiple' property
     (list-valued fields) have a normal query condition, since MongoDB does not distinguish
     search scalar field from search list field.
@@ -40,7 +39,7 @@ class Translator(Visitor):
     def  __init__(self, wmap):
         self.wmap = wmap
 
-    def visit_query(self, node):
+    def visit_filter(self, node):
         result = {}
         for term in node.terms:
             result.update(self.visit(term))
@@ -105,19 +104,20 @@ class Item(BareItem):
             collection.create_index(item[0], unique=False)
 
     @classmethod
-    def query(cls, doc):
-        """Create query.
+    def filter(cls, obj):
+        """Create filter from Filter object `obj`.
 
-        Create query from dictionary doc.
+        In the view methods, filters are specified as instance of the Filter class.
+        Fields with 'multiple' property (list-valued fields) have a normal query condition.
 
         Arguments:
-            doc (dict): dictionary specifying a search query.
+            obj (Filter): Fikter object.
 
         Returns:
             dict: query in MongoDB form.
         """
         translator = Translator(cls.wmap)
-        return translator.visit(doc)
+        return translator.visit(obj)
 
     @classmethod
     def max(cls, field):
@@ -145,7 +145,7 @@ class Item(BareItem):
         Returns:
             int: number of matching items.
         """
-        cursor = setting.store_db[cls.name].find(filter=cls.query(doc))
+        cursor = setting.store_db[cls.name].find(filter=cls.filter(doc))
         return cursor.count()
 
     @classmethod
@@ -165,9 +165,7 @@ class Item(BareItem):
             list: list of 'cls' instances.
         """
         sort_spec = sort if sort else [('_skey',1)]
-        q = cls.query(doc)
-        if q is None: return []
-        cursor = setting.store_db[cls.name].find(filter=q,
+        cursor = setting.store_db[cls.name].find(filter=cls.filter(doc),
                                                  skip=skip, limit=limit, sort=sort_spec)
         return [cls(item) for item in cursor]
 
@@ -203,7 +201,7 @@ class Item(BareItem):
         Returns:
             'cls' instance.
         """
-        item = setting.store_db[cls.name].find_one(cls.query(doc))
+        item = setting.store_db[cls.name].find_one(cls.filter(doc))
         if item is None:
             return item
         else:

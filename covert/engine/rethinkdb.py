@@ -22,34 +22,34 @@ def report_db_action(result):
 class Translator(Visitor):
     """Translate query to form suitable for this storage engine.
 
-    A query is a sequence of conditions, where a condition is a tuple (op, value) or
-    (op, value1, value2), where 'op' is a 2-character string specifying a search operator,
-    and 'value' is a value used in the search.
-    Fields with 'multiple' property (list-valued fields) have a normal query condition,
-    since RethinkDB does not distinguish search scalar field from search list field.
+    A filter is a sequence of terms or nested clauses (and, or). A term is a tuple (op, value) or
+    (op, value1, value2), where 'op' is a 2-character string specifying a filter operator.
+    Fields with 'multiple' property (list-valued fields) have a normal query condition.
+    RethinkDB makes a distinction between search scalar field  and search list field, so
+    this needs rewriting.
 
     TODO: add possibility to search through array fields
     """
     def  __init__(self, wmap, name):
         self.wmap = wmap
-        self.query = r.table(name)
+        self.chain = r.table(name)
 
-    def visit_query(self, node):
+    def visit_filter(self, node):
         for term in node.terms:
             new_term = self.visit(term)
             for field, cond in new_term.items():
                 operator = cond[0]
                 if operator == '==':
-                    self.query = self.query.filter(r.row[field] == cond[1])
+                    self.chain = self.chain.filter(r.row[field] == cond[1])
                 elif operator == '=~':
-                    self.query = self.query.filter(r.row[field].match(cond[1]))
+                    self.chain = self.chain.filter(r.row[field].match(cond[1]))
                 elif operator == '[]':
-                    self.query = self.query.filter((r.row[field] >= cond[1]) & (r.row[field] <= cond[2]))
+                    self.chain = self.chain.filter((r.row[field] >= cond[1]) & (r.row[field] <= cond[2]))
                 elif operator == '<=':
-                    self.query = self.query.filter(r.row[field] <= cond[1])
+                    self.chain = self.chain.filter(r.row[field] <= cond[1])
                 elif operator == '>=':
-                    self.query = self.query.filter(r.row[field] >= cond[1])
-        return self.query
+                    self.chain = self.chain.filter(r.row[field] >= cond[1])
+        return self.chain
 
     def visit_and(self, node):
         logger.debug('Translator: visit_and not implemented yet')
@@ -110,25 +110,22 @@ class Item(BareItem):
                     table.index_create(el[0]).run(setting.store_connection)
 
     @classmethod
-    def query(cls, doc):
-        """Create query.
+    def filter(cls, obj):
+        """Create filter from Filter object `obj`.
 
-        Create query from dictionary doc.
-        In the view methods, queries are specified as sequences of conditions, where a condition
-        is a tuple (op, value) or (op, value1, value2), where 'op' is a 2-character string
-        specifying a search operator, and 'value' is a value used in the search.
+        In the view methods, filters are specified as instance of the Filter class.
         Fields with 'multiple' property (list-valued fields) have a normal query condition.
         Since RethinkDB differentiates search scalar field and search list field, we must use
-        information from the model to rewrite the query. 
-        
+        information from the model to rewrite the query.
+
         Arguments:
-            doc (dict): dictionary specifying a search query.
+            obj (Filter): Filter object.
 
         Returns:
             query: query in RethinkDB form.
         """
         translator = Translator(cls.wmap, cls.name)
-        return translator.visit(doc)
+        return translator.visit(obj)
 
     @classmethod
     def max(cls, field):
@@ -156,7 +153,7 @@ class Item(BareItem):
         Returns:
             int: number of matching items.
         """
-        cursor = cls.query(doc)
+        cursor = cls.filter(doc)
         return cursor.count().run(setting.store_connection)
 
     @classmethod
@@ -175,7 +172,7 @@ class Item(BareItem):
         Returns:
             list: list of 'cls' instances.
         """
-        cursor = cls.query(doc)
+        cursor = cls.filter(doc)
         if skip:  cursor = cursor.skip(skip)
         if limit: cursor = cursor.limit(limit)
         if sort:
@@ -218,7 +215,7 @@ class Item(BareItem):
         Returns:
             'cls' instance.
         """
-        result = list(r.table(cls.name).filter(cls.query(doc)).run(setting.store_connection))
+        result = list(r.table(cls.name).filter(cls.filter(doc)).run(setting.store_connection))
         if len(result) == 0:
             return None
         else:

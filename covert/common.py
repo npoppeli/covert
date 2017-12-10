@@ -30,7 +30,7 @@ class InternalError(Exception):
     """Internal error exception.
 
       Attributes:
-          messsage (str): human-readable string describing the exception
+          message (str): human-readable string describing the exception
       """
     def __init__(self, message):
         self.message = message
@@ -73,7 +73,7 @@ def read_yaml_file(path, multi=False):
     """Read YAML file.
 
     Arguments:
-        filename (str): name of YAML file
+        path(str)   : name of YAML file
         multi (bool): True if file can contain multiple documents
 
     Returns:
@@ -90,10 +90,11 @@ def write_file(path, text):
     """Write text file.
 
     Arguments:
-        filename (str): name of text file
+        path (str): name of text file
+        text (str): string to be written
 
     Returns:
-        str: content as one string
+        None
     """
     with open(path, 'w') as f:
         f.write(text)
@@ -150,7 +151,7 @@ def read_json_file(path):
     """Read JSON file.
 
     Arguments:
-        filename (str): name of JSON file
+        path (str): name of JSON file
 
     Returns:
         list|dict: list of documents or single document
