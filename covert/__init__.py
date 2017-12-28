@@ -35,8 +35,7 @@ Classes:
 
 from .           import setting
 from .atom       import EMPTY_DATE, EMPTY_DATETIME, EMPTY_TIME, define_atom
-from .common     import read_yaml_file, read_file, logger, SUCCESS, FAIL, ERROR,\
-                        show_dict, encode_dict, decode_dict
+from .common     import *
 from .config     import read_config, parse_cmdline, kernel_init, add_argument
 from .controller import http_server, SwitchRouter, MapRouter, PageRouter, JSONRouter
 from .layout     import add_template_type

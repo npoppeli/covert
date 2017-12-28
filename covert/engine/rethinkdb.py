@@ -8,7 +8,7 @@ The Item class encapsulates the details of the storage engine.
 from datetime import datetime
 import rethinkdb as r
 from ..common import SUCCESS, ERROR, FAIL, logger, InternalError
-from ..model import BareItem, mapdoc, Visitor
+from ..model import BareItem, mapdoc, Visitor, Filter
 from .. import setting
 from bson.objectid import ObjectId
 
@@ -122,8 +122,10 @@ class Item(BareItem):
             obj (Filter): Filter object.
 
         Returns:
-            query: query in RethinkDB form.
+            selection: filter in RethinkDB form.
         """
+        if setting.debug and not isinstance(obj, Filter):
+            raise ValueError('Wrong argument for Item.filter()')
         translator = Translator(cls.wmap, cls.name)
         return translator.visit(obj)
 
@@ -142,37 +144,37 @@ class Item(BareItem):
         return result[field]
 
     @classmethod
-    def count(cls, doc):
+    def count(cls, fltr):
         """Count items in collection that match a given query.
 
         Find zero or more items (documents) in collection, and count them.
 
         Arguments:
-            doc (dict): dictionary specifying the query, e.g. {'id': ('==', '1234')}
+            fltr (Filter): instance of Filter class
 
         Returns:
             int: number of matching items.
         """
-        cursor = cls.filter(doc)
+        cursor = cls.filter(fltr)
         return cursor.count().run(setting.store_connection)
 
     @classmethod
-    def find(cls, doc, skip=0, limit=0, sort=None):
+    def find(cls, fltr, skip=0, limit=0, sort=None):
         """Retrieve items from collection.
 
         Find zero or more items in collection, and return these in the
         form of a list of 'cls' instances. Assumption: stored items are valid.
 
         Arguments:
-            doc   (dict): dictionary specifying the query, e.g. {'id': ('==', '1234')}.
-            skip  (int):  number of items to skip.
-            limit (int):  maximum number of items to retrieve.
-            sort  (list): sort specification.
+            fltr  (Filter): instance of Filter class
+            skip  (int):    number of items to skip.
+            limit (int):    maximum number of items to retrieve.
+            sort  (list):   sort specification.
 
         Returns:
             list: list of 'cls' instances.
         """
-        cursor = cls.filter(doc)
+        cursor = cls.filter(fltr)
         if skip:  cursor = cursor.skip(skip)
         if limit: cursor = cursor.limit(limit)
         if sort:

@@ -354,7 +354,7 @@ class BareItem(dict):
         return item
 
 
-# Auxiliary classes: Visitor, Query and friends
+# Auxiliary classes: Visitor, Filter and friends
 class Visitor:
     """Visitor design pattern uses:
     1. instances of Visitor class (or sub-class thereof)
@@ -418,7 +418,8 @@ class Term:
             return "{}({}, {}, {})".\
                    format('Term', repr(self.field), repr(self.operator), repr(self.value1))
 
-# Item reference
+
+# Item references
 def get_objectid(ref):
     """Retrieve objectid from item reference.
 
@@ -448,6 +449,7 @@ def display_reference(ref):
     else:
         return ref.display()
 
+
 class ItemRef:
     """Reference to Item"""
     collection = 'Item'
@@ -473,9 +475,17 @@ class ItemRef:
         """Determine inequality of item references.
 
         Returns:
-        bool: self != other.
+            bool: self != other.
         """
         return self.__class__.__name__ != other.__class__.__name__ or self.refid != other.refid
+
+    def __hash__(self):
+        """Calculate hash value.
+
+        Returns:
+            int: hash value of self.refid.
+        """
+        return self.refid.__hash__()
 
     def __bool__(self):
         """Determine truth value of item reference.
@@ -532,6 +542,7 @@ class ItemRef:
             return item[field]
         else:
             return None
+
 
 class ParsedModel:
     """Result of parsing a model definition.

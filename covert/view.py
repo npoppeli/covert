@@ -17,27 +17,9 @@ from inspect import getmembers, isclass, isfunction
 from itertools import chain
 from urllib.parse import urlencode
 from .common import SUCCESS, write_file, logger
-from .common import decode_dict, encode_dict, show_dict
+from .common import encode_dict, show_dict
 from .model import unflatten, mapdoc, Filter, Term
 from . import setting
-
-def show_value(s):
-    if isinstance(s, list):
-        return "[{}]".format(', '.join([str(el) for el in s]))
-    else:
-        return str(s)
-
-def show_item(label, item):
-    fmt = "{:<15}: {!s:<35}"
-    print(label)
-    print(fmt.format('veld', 'inhoud'))
-    print('-' * 60)
-    for key in sorted(item.keys()):
-        value = show_value(item[key])
-        if key == '_id' or value == '':
-            continue
-        print(fmt.format(key, value))
-    print('\n')
 
 def str2int(s):
     """Convert str to integer, or otherwise 0."""
@@ -324,7 +306,6 @@ class Cursor:
             if key == '_filter': # rebuild filter that was saved in form
                 decoded = b64decode(value.encode())
                 self.filter = pickle.loads(decoded)
-                logger.debug("cursor_init: filter={}".format(self.filter))
             elif key.startswith('_'):
                 setattr(self, key[1:], str2int(value) if key[1:] in self.default else value)
             elif value:
@@ -417,7 +398,7 @@ class RenderTree:
         term (if present) needs to be looked at for possible adjustment.
         """
         cursor = self.cursor
-        initial_post = bool(cursor.form)
+        initial_post = '_skip' not in self.request.params
         if initial_post:
            # translate interval specifications in form
            for key, value in cursor.form.items():
@@ -444,9 +425,7 @@ class RenderTree:
             else: # add term 'active=True' to filter, unless already present
                 if 'active' not in cursor.filter:
                     cursor.filter.add(Term('active', '==', True))
-        logger.debug("move_cursor: filter=%s", cursor.filter)
         count = self.model.count(cursor.filter)
-        logger.debug("move_cursor: count=%d", count)
         cursor.skip = max(0, min(count, cursor.skip+cursor.dir*cursor.limit))
         cursor.prev = cursor.skip>0
         cursor.next = cursor.skip+cursor.limit < count
@@ -458,8 +437,8 @@ class RenderTree:
         item['_prefix'] = prefix+'.' if prefix else ''
         item['_hide'] = hide == 'all'
         item['_hidden'] = [] if hide is None or hide == 'all' else hide
-        # TODO: move lines below to event handler
         self.data.append(item)
+        # TODO: move lines below to event handler
         if 'active' in self.info:
             self.info['active'].append(item['active'])
         else:
@@ -478,7 +457,6 @@ class RenderTree:
         items = self.model.find(self.cursor.filter,
                                 limit=self.cursor.limit, skip=self.cursor.skip)
         if items:
-            # logger.debug('add_items: count={}'.format(len(items)))
             active, recent = [], []
             now, delta = datetime.now(), timedelta(days=10)
             for item in items:
@@ -494,14 +472,7 @@ class RenderTree:
             self.info['active'] = active
             self.info['recent'] = recent
         else:
-            query = []
-            for key, value in self.cursor.query.items():
-                cond = value[0] if isinstance(value, list) else value
-                if len(cond) == 2:
-                    query.append("{} {} {}".format(key, cond[0], cond[1]))
-                else:
-                    query.append("{} {} {}, {}".format(key, cond[0], cond[1], cond[2]))
-            self.message = 'Nothing found for this query: ' + ', '.join(query)
+            self.message = 'Nothing found for this query: ' + str(self.cursor.filter)
 
     def flatten_item(self, nr=0, form=False):
         """Flatten one item in the render tree."""
@@ -576,7 +547,7 @@ class RenderTree:
                             (field_meta['multiple'] or field_meta['auto'] or
                             field_meta['schema'] in ('text', 'memo', 'itemref')):
                             newitem[key] = field
-                    newitem['_keys'] = [k for k in newitem.keys() if not k.startswith('_')]
+                newitem['_keys'] = [k for k in newitem.keys() if not k.startswith('_')]
                 self.data[nr] = newitem
 
     def add_buttons(self, buttons):
@@ -590,6 +561,7 @@ class RenderTree:
         """Add form buttons to render tree.
 
            Arguments:
+             action (str): ...
              method (str): HTTP method.
 
            Returns: None
@@ -619,7 +591,8 @@ class RenderTree:
     def dump(self, name):
         if setting.debug:
             d = self.asdict()
-            write_file(name, show_dict(d))
+            postfix = datetime.now().strftime('_%H%M%S.json')
+            write_file(name+postfix, show_dict(d))
 
 
 class BareItemView:
@@ -676,7 +649,6 @@ class ItemView(BareItemView):
         tree.move_cursor()
         tree.add_items(['show', 'modify', 'delete'])
         tree.add_buttons(self.collection_buttons+self.collection_buttons_extra)
-        # self.tree.dump('showitems0.json')
         tree.flatten_items()
         tree.prune_items(depth=1)
         return tree.asdict()
@@ -685,15 +657,12 @@ class ItemView(BareItemView):
         """Convert request parameters to unflattened dictionary."""
         raw_form = {key:value for key, value in self.request.params.items()
                               if (value or keep_empty) and not key.startswith('_')}
-        # logger.debug("convert_form: raw form=%s", raw_form)
         self.form = unflatten(raw_form)
-        # logger.debug("convert_form: unflattened=%s", self.form)
 
     def extract_item(self, prefix=None, model=None):
         """Convert unflattened form to item."""
         # after unflattening, this is easy
         selection = self.form[prefix.rstrip('.')] if prefix else self.form
-        # logger.debug("extract_item: selection=%s", selection)
         return (model or self.model).convert(selection)
 
     @route('/{id:objectid}', template='show')
@@ -712,7 +681,6 @@ class ItemView(BareItemView):
         tree = self.tree
         tree.add_item(self.model())
         tree.add_search_button('match')
-        # self.tree.dump('search0.json')
         tree.flatten_item()
         tree.prune_item(clear=True, form=True)
         return tree.asdict()

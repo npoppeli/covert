@@ -8,7 +8,7 @@ The Item class encapsulates the details of the storage engine.
 from datetime import datetime
 from pymongo import MongoClient
 from ..common import SUCCESS, ERROR, FAIL, logger, InternalError
-from ..model import BareItem, mapdoc, Visitor
+from ..model import BareItem, mapdoc, Visitor, Filter
 from .. import setting
 from bson.objectid import ObjectId
 
@@ -111,11 +111,13 @@ class Item(BareItem):
         Fields with 'multiple' property (list-valued fields) have a normal query condition.
 
         Arguments:
-            obj (Filter): Fikter object.
+            obj (Filter): Filter object.
 
         Returns:
-            dict: query in MongoDB form.
+            dict: filter in MongoDB form.
         """
+        if setting.debug and not isinstance(obj, Filter):
+            raise ValueError('Wrong argument for Item.filter()')
         translator = Translator(cls.wmap)
         return translator.visit(obj)
 
@@ -134,38 +136,38 @@ class Item(BareItem):
         return cursor[0][field]
 
     @classmethod
-    def count(cls, doc):
+    def count(cls, fltr):
         """Count items in collection that match a given query.
 
         Find zero or more items (documents) in collection, and count them.
 
         Arguments:
-            doc (dict): dictionary specifying the query, e.g. {'id': ('==', '1234')}
+            fltr (Filter): instance of Filter class
 
         Returns:
             int: number of matching items.
         """
-        cursor = setting.store_db[cls.name].find(filter=cls.filter(doc))
+        cursor = setting.store_db[cls.name].find(filter=cls.filter(fltr))
         return cursor.count()
 
     @classmethod
-    def find(cls, doc, skip=0, limit=0, sort=None):
+    def find(cls, fltr, skip=0, limit=0, sort=None):
         """Retrieve items from collection.
 
         Find zero or more items in collection, and return these in the
         form of a list of 'cls' instances. Assumption: stored items are valid.
 
         Arguments:
-            doc   (dict): dictionary specifying the query, e.g. {'id': ('==', '1234')}.
-            skip  (int):  number of items to skip.
-            limit (int):  maximum number of items to retrieve.
-            sort  (list): sort specification.
+            fltr  (Filter): instance of Filter class
+            skip  (int):    number of items to skip.
+            limit (int):    maximum number of items to retrieve.
+            sort  (list):   sort specification.
 
         Returns:
             list: list of 'cls' instances.
         """
         sort_spec = sort if sort else [('_skey',1)]
-        cursor = setting.store_db[cls.name].find(filter=cls.filter(doc),
+        cursor = setting.store_db[cls.name].find(filter=cls.filter(fltr),
                                                  skip=skip, limit=limit, sort=sort_spec)
         return [cls(item) for item in cursor]
 
