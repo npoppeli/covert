@@ -90,7 +90,7 @@ class Route:
 
     The definitions of all routes in all views are stored in the global variable setting.routes.
     """
-    def __init__(self, pattern, method, templates, regex, cls, name):
+    def __init__(self, pattern, method, params, templates, regex, cls, name, order):
         """Constructor method for Route.
 
         A Route object consists of (1) attributes that uniquely define the route,
@@ -99,28 +99,40 @@ class Route:
         Attributes:
             * pattern   (str):   URL pattern
             * method    (str):   HTTP method
-            * templates (list):  list of template names (length of list >= 1)
+            * params    (list):  list of parameters contained in `pattern`
+            * templates (list):  list of template names (at least 1)
             * regex     (regex): compiled regular expression
             * cls       (class): view class
             * name      (str):   method name
+            * uid       (str):   unique id of route
+            * order     (int):   sequence number of route (in order of definition)
         """
         self.pattern = pattern
         self.method = method
+        self.params = params
         self.templates = templates
         self.regex = regex
         self.cls = cls
         self.name = name
+        self.uid = '{}_{}'.format(cls.__name__.replace('View', '', 1).lower(), name)
+        self.order = order
 
     def __str__(self):
-        return("{0} {1} -> {2}:{3}, templates={4}".
+        return("{} {} -> {}:{}, uid={} templates={}".
                format(self.pattern, self.method, self.cls.__name__, self.name,
-                      ', '.join(self.templates)))
+                      self.uid, ', '.join(self.templates)))
 
 class route:
     """Decorator for methods in a View class.
 
     This decorator adds attributes to methods. Once set, these attributes cannot be changed anymore.
     """
+    counter = 0
+
+    @classmethod
+    def _incr(cls):
+        cls.counter += 1
+
     def __init__(self, pattern, method='GET', template='', icon='', label='', alias=''):
         """Constructor for 'route' decorator.
 
@@ -138,12 +150,14 @@ class route:
         self.label    = label
         self.alias    = alias
     def __call__(self, wrapped):
+        self._incr()
         wrapped.pattern  = self.pattern
         wrapped.method   = self.method
         wrapped.template = self.template
         wrapped.icon     = self.icon
         wrapped.label    = self.label
         wrapped.alias    = self.alias
+        wrapped.order    = self.counter
         return wrapped
 
 # regular expressions used in routes
@@ -160,7 +174,7 @@ def split_route(pattern):
     Split route into components: a combined split on '{' and '}' results in a list of lists,
     and chain.from_iterable transforms this into a flat list.
     Routing arguments should have this form: '{name:pattern}', where pattern is one of the keys
-    of the 'patterns' dictionary (see above).
+    of the `patterns` dictionary (see above).
 
     Arguments:
         pattern (str): URL pattern.
@@ -173,7 +187,7 @@ def split_route(pattern):
 def route2pattern(pattern):
     """Create formatting string from route specifier.
 
-    Remove the pattern specifier from all routing arguments in 'pattern', so that
+    Remove the pattern specifier from all routing arguments in `pattern`, so that
     we get a pattern acceptable to str.format().
 
     Arguments:
@@ -185,6 +199,21 @@ def route2pattern(pattern):
     parts = split_route(pattern)
     parts[1::2] = list(map(lambda p: '{{{0}}}'.format(p.split(':')[0]), parts[1::2]))
     return ''.join(parts)
+
+def route2params(pattern):
+    """Create list of parameter names that occur in `pattern`.
+
+        Arguments:
+        pattern (str): URL pattern.
+
+    Returns:
+        list: list of parameter names.
+    """
+    def split_lookup(s):
+        before, after = s.split(':')
+        return before
+    parts = split_route(pattern)
+    return list(map(split_lookup, parts[1::2]))
 
 def route2regex(pattern):
     """Create regular expression string from route specifier.
@@ -211,10 +240,10 @@ def route2regex(pattern):
 def read_views(module):
     """Read views from module object.
 
-    Read all views from the module object `module`. A view is a class that is a sub-class of
-    BareItemView and has a name ending in 'View'.
+    Read all views from the module object `module`. A view is a class that is
+    a sub-class of BareItemView and has a name ending in 'View'.
     In each view, locate the members that are of 'function' type and have a 'pattern'
-    attribute, indicating they have been decorated with '@route'. These members are
+    attribute, indicating they have been decorated with '@route'. Those members are
     the routes of the application.
 
     Arguments:
@@ -228,15 +257,15 @@ def read_views(module):
             not issubclass(view_class, BareItemView) or
             not (len(class_name) > 4 and class_name.endswith('View'))):
             continue
+        # TODO: this transformation happens in two places, should be one
         view_name = class_name.replace('View', '', 1).lower()
         view_class.view_name = view_name
-        item_buttons_extra = []
-        collection_buttons_extra = []
         for member_name, member in getmembers(view_class, isfunction):
             if hasattr(member, 'pattern'): # this member (method) is a route
                 full_pattern  = '/' + view_name + member.pattern
                 pattern       = route2pattern(full_pattern)
                 regex         = route2regex(full_pattern)
+                params        = route2params(full_pattern)
                 templates     = [] # each route has one or more templates
                 for name in member.template.split(';'):
                     template_name = view_name+'_' + name
@@ -252,7 +281,6 @@ def read_views(module):
                         logger.debug('Attempt to redefine icon for %s', member_name)
                     else:
                         setting.icons[member_name] = member.icon
-                        item_buttons_extra.append(member_name)
                 if member.label:
                     if member_name in setting.labels:
                         logger.debug('Attempt to redefine label for %s', member_name)
@@ -260,12 +288,11 @@ def read_views(module):
                         setting.labels[member_name] = member.label
                 for method in member.method.split(','):
                     setting.patterns[view_name+'_'+member_name] = pattern
-                    setting.routes.append(Route(pattern, method, templates,
-                        re.compile(regex), view_class, member_name))
+                    setting.routes.append(Route(pattern, method, params, templates,
+                        re.compile(regex), view_class, member_name, member.order))
                     if member.alias:
-                        setting.routes.append(Route(member.alias, method, templates,
-                            re.compile('^'+member.alias+'$'), view_class, member_name))
-        view_class.item_buttons_extra = item_buttons_extra
+                        setting.routes.append(Route(member.alias, method, params, templates,
+                            re.compile('^'+member.alias+'$'), view_class, member_name, member.order))
     # sorting in reverse alphabetical order ensures words like 'match' and 'index'
     # are not absorbed by {id} or other components of the regex patterns
     setting.routes.sort(key=lambda r: r.pattern, reverse=True)
@@ -324,24 +351,24 @@ class Cursor:
         d['filter'] = b64encode(pickle.dumps(d['filter'])).decode()
         return d
 
-def normal_button(view_name, action, item):
-    """Create render-tree element for normal button."""
+def get_button(view_name, action, item):
+    """Create render-tree element for GET button."""
     return {'label': label_for(action), 'icon': icon_for(action),
             'action': url_for(view_name, action, item), 'method':'GET'}
 
-def form_button(view_name, action, item, button_name):
-    """Create render-tree element for form button."""
+def post_button(view_name, action, item, button_name):
+    """Create render-tree element for POST button."""
     return {'label': label_for(button_name), 'icon': icon_for(button_name),
             'name': button_name,
             'action': url_for(view_name, action, item), 'method':'POST'}
 
 def delete_button(view_name, action, item):
-    """Create render-tree element for delete button."""
+    """Create render-tree element for DELETE button."""
     return {'label': label_for(action), 'icon': icon_for(action),
             'action': url_for(view_name, action, item), 'method':'DELETE'}
 
-def js_button(view_name, action, item):
-    """Create render-tree element for Javascript button."""
+def generic_button(view_name, action, item):
+    """Create render-tree element for generic button."""
     return {'label': label_for(action), 'icon': icon_for(action),
             'name': action}
 
@@ -392,8 +419,8 @@ class RenderTree:
     def move_cursor(self):
         """Move cursor to new position.
 
-        Initially, the filter used in the search is built from the form contents, and an extra
-        condition depending on the value of cursor.incl.
+        Initially, the filter used in the search is built from the form contents,
+        and an extra condition depending on the value of cursor.incl.
         On follow-up posts, the filter is rebuilt from a pickle, and only the 'active'
         term (if present) needs to be looked at for possible adjustment.
         """
@@ -444,7 +471,7 @@ class RenderTree:
         else:
             self.info['active'] = [item['active']]
         now, delta = datetime.now(), timedelta(days=10)
-        recent = now-item['mtime']<delta
+        recent = now-item['mtime'] < delta
         if 'recent' in self.info:
             self.info['recent'].append(recent)
         else:
@@ -461,7 +488,7 @@ class RenderTree:
             now, delta = datetime.now(), timedelta(days=10)
             for item in items:
                 button_list = [(delete_button if button == 'delete' else
-                                normal_button)(self.view_name, button, item) for button in buttons]
+                                get_button)(self.view_name, button, item) for button in buttons]
                 item['_buttons'] = button_list
                 item['_prefix'] = ''
                 item['_hide'] = False
@@ -483,8 +510,10 @@ class RenderTree:
         for key, value in flat_item.items():
             if key.startswith('_'):
                 newitem[key] = value
+                # logger.debug("flatten_item: key='{}' value='{}'".format(key, value))
             else:
                 path = key.split('.')
+                depth = key.count('.')
                 button_list = []
                 if path[-1].isnumeric():
                     field = path[-2]
@@ -493,19 +522,24 @@ class RenderTree:
                     if pos == 1:
                         label = field_meta.label
                         if form:
-                            button_list = [js_button(self.view_name, 'expand', item),
-                                           js_button(self.view_name, 'shrink', item)]
+                            button_list = [generic_button(self.view_name, 'expand', item),
+                                           generic_button(self.view_name, 'shrink', item)]
                     else:
                         label = str(pos)
                 else:
                     field = path[-1]
                     field_meta = item_meta[field]
-                    label  = field_meta.label
+                    if depth == 0:
+                        label = field_meta.label
+                    else:
+                        parent = path[0]
+                        label = '{}.{}'.format(item_meta[parent].label, field_meta.label)
                 proplist = {'label': label, 'enum': field_meta.enum, 'schema': field_meta.schema,
                             'multiple': field_meta.multiple,
                             'formtype': 'hidden' if field_meta.auto else field_meta.formtype,
                             'auto': field_meta.auto, 'control': field_meta.control}
                 newitem[key] = {'value':value, 'meta':proplist, 'buttons':button_list}
+                # logger.debug("flatten_item: key='{}' value='{}' meta={}".format(key, value, proplist))
         newitem['_keys'] = [k for k in newitem.keys() if not k.startswith('_')]
         self.data[nr] = newitem
 
@@ -522,9 +556,10 @@ class RenderTree:
         for key, field in item.items():
             if key.startswith('_'):
                 newitem[key] = field
-            elif (key.count('.') < depth) and key not in hidden and \
+            elif (key.count('.') <= depth) and key not in hidden and \
                 not (form and field['meta']['schema']=='itemref'):
-                if clear: field['value'] = ''
+                if clear:
+                    field['value'] = ''
                 newitem[key] = field
         newitem['_keys'] = [k for k in newitem.keys() if not k.startswith('_')]
         self.data[nr] = newitem
@@ -543,7 +578,7 @@ class RenderTree:
                         newitem[key] = field
                     else:
                         field_meta = field['meta']
-                        if (key.count('.') < depth) and key not in hidden and not \
+                        if (key.count('.') <= depth) and key not in hidden and not \
                             (field_meta['multiple'] or field_meta['auto'] or
                             field_meta['schema'] in ('text', 'memo', 'itemref')):
                             newitem[key] = field
@@ -555,7 +590,7 @@ class RenderTree:
         if self.data:
             item = self.data[0]
             self.buttons = [(delete_button if button == 'delete' else
-                             normal_button)(self.view_name, button, item) for button in buttons]
+                             get_button)(self.view_name, button, item) for button in buttons]
 
     def add_form_buttons(self, action, method=None):
         """Add form buttons to render tree.
@@ -568,7 +603,7 @@ class RenderTree:
         """
         if self.data:
             item = self.data[0]
-            self.buttons = [form_button(self.view_name, action, item, 'ok')]
+            self.buttons = [post_button(self.view_name, action, item, 'ok')]
             if method:
                 self.method = method
 
@@ -576,7 +611,7 @@ class RenderTree:
         """Add search button to render tree."""
         if self.data:
             item = self.data[0]
-            button = form_button(self.view_name, action, item, 'search')
+            button = post_button(self.view_name, action, item, 'search')
             self.buttons = [button]
 
     def asdict(self):
@@ -629,16 +664,20 @@ class ItemView(BareItemView):
     for searching, which is a variation of 'index'.
     """
     model = 'Item'
-    item_buttons = ['index', 'search', 'modify', 'delete']
-    item_buttons_extra = []
-    collection_buttons = ['index', 'search', 'new']
-    collection_buttons_extra = []
+    view_name = 'item'
+
+    def routes(self, params=None):
+        selection = [item for item in sorted(setting.routes, key=lambda r: r.order)
+                     if item.method not in ('PUT', 'POST') and item.uid.startswith(self.view_name)]
+        result = selection if params is None else \
+                 [item for item in selection if set(item.params) == set(params)]
+        return [item.name for item in result]
 
     def show_item(self, item_or_id):
         """Prepare render tree for showing one item."""
         tree = self.tree
         tree.add_item(item_or_id)
-        tree.add_buttons(self.item_buttons+self.item_buttons_extra)
+        tree.add_buttons(self.routes(['id']))
         tree.flatten_item()
         tree.prune_item()
         return tree.asdict()
@@ -647,8 +686,8 @@ class ItemView(BareItemView):
         tree = self.tree
         tree.add_cursor(action)
         tree.move_cursor()
-        tree.add_items(['show', 'modify', 'delete'])
-        tree.add_buttons(self.collection_buttons+self.collection_buttons_extra)
+        tree.add_items(self.routes(['id'])[0:3])
+        tree.add_buttons(self.routes([]))
         tree.flatten_items()
         tree.prune_items(depth=1)
         return tree.asdict()

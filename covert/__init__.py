@@ -41,4 +41,4 @@ from .controller import http_server, SwitchRouter, MapRouter, PageRouter, JSONRo
 from .layout     import add_template_type
 from .model      import ItemRef, Visitor, Filter, And, Or, Term
 from .view       import route, BareItemView, ItemView, url_for
-from .view       import route2pattern, route2regex, RenderTree, normal_button
+from .view       import route2pattern, route2regex, RenderTree, get_button

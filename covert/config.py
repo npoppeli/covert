@@ -164,21 +164,23 @@ def kernel_init():
     if setting.tables:
         # print all routes (tabular)
         print('Application has {0} routes'.format(len(setting.routes)))
-        fmt = "{:<30}: {:<10} {:<15} {:<15} {:<30}"
-        print(fmt.format('pattern', 'method', 'view', 'route', 'templates'))
-        print('-' * 90)
-        for route in setting.routes:
-            print(fmt.format(route.pattern, route.method, route.cls.__name__, route.name,
-                           ', '.join(route.templates)))
+        fmt = "{:>5} {:<30}: {:<10} {:<15} {:<20} {:<15} {:<30}"
+        print(fmt.format('order', 'pattern', 'method', 'view', 'name', 'params', 'templates'))
+        print('-' * 120)
+        for route in sorted(setting.routes, key=lambda r: r.order):
+            print(fmt.format(route.order, route.pattern, route.method,
+                             route.cls.__name__, route.name,
+                             ', '.join(route.params), ', '.join(route.templates)))
         print('')
         # print all models (tabular)
         print('Application has {0} models'.format(len(setting.models)))
+        ref_classes = []
         for name in sorted(setting.models.keys()):
             if name.endswith('Ref'):
-                print('Reference class', name)
+                ref_classes.append(name)
             else:
                 model = setting.models[name]
-                print('{0}\n{1}'.format(name, '-'*len(name)))
+                print('{0}\n{1}'.format(name, '='*len(name)))
                 fmt = "{:<15}: {:<20} {:<10} {!s:<10} {!s:<10} {!s:<10} {!s:<10}"
                 print(fmt.format('name', 'label', 'schema', 'optional',
                                  'multiple', 'auto', 'formtype'))
@@ -188,3 +190,5 @@ def kernel_init():
                     print(fmt.format(field_name, meta.label, meta.schema, meta.optional,
                                      meta.multiple, meta.auto, meta.formtype))
             print('')
+        if ref_classes:
+            print('Reference classes:', ', '.join(ref_classes))
