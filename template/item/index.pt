@@ -25,14 +25,13 @@
     </div>
   </form>
 </div>
-<!--! title -->
-<div tal:define="title this['title']">
-  <p class="class">${title}</p>
+<div>
+  <p class="class">${this['title']}</p>
 </div>
 <!--! data -->
 <div tal:condition="len(this['data'])>0">
   <table class='table table-bordered table-condensed'
-    tal:define="data this['data']; top data[0]; fields top['_keys']; info this['info']">
+    tal:define="data this['data']; top data[0]; fields top['_keys']; computed this['computed']">
   <thead>
   <tr>
     <th tal:repeat="field fields">${top[field]['meta']['label']}</th>
@@ -41,15 +40,15 @@
   </thead>
   <tbody>
    <tr tal:repeat="item data"
-       tal:attributes="id 'id'+str(repeat.item.index); class 'success' if info['recent'][repeat.item.index] else (default if info['active'][repeat.item.index] else 'text-muted')">
+       tal:attributes="id 'id'+str(repeat.item.index); class 'success' if computed['recent'][repeat.item.index] else (default if item['active']['value'] else 'text-muted')">
      <span tal:repeat="field fields" tal:omit-tag="">
        <td tal:define="value item[field]['value']" tal:switch="isinstance(value, tuple)">
-         <span tal:case="True" tal:omit-tag=""><a href="${value[1]}">${value[0]}</a>&nbsp;</span>
+         <span tal:case="True" tal:omit-tag=""><a href="${value[2]}">${value[1]}</a>&nbsp;</span>
          <span tal:case="False" tal:replace="value"></span>
        </td>
      </span>
      <td class="text-nowrap">
-       <a tal:repeat="button item['_buttons']" href="${button['action']}"
+       <a tal:repeat="button item['_buttons']" href="${button['action']}" target="_blank"
           data-bind="${'id'+str(repeat.item.index)}" data-method="${button['method']}">
        <button class="btn btn-default btn-xs"><span class="${button['icon']}"></span></button></a>
      </td>

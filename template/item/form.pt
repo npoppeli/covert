@@ -1,6 +1,6 @@
 <!--! title -->
-<div tal:define="title this['title']">
-  <p class="class">${title}</p>
+<div>
+  <p class="text-bold">${this['title']}</p>
 </div>
 <!--! data -->
 <form class="form-horizontal" action="${this['buttons'][0]['action']}" method="POST">
@@ -17,10 +17,9 @@
       </div>
       <div class="form-group" tal:define="fields item['_keys']"
            tal:repeat="key [key for key in fields if item[key]['meta']['formtype'] != 'hidden']">
-        <label tal:define="label item[key]['meta']['label']"
-               for="${key}" class="col-sm-3 control-label">${label}</label>
+        <label for="${key}" class="col-sm-3 control-label">${item[key]['meta']['label']}</label>
         <div class="col-sm-7"
-             tal:define="field item[key]; meta field['meta']; value field['value']; control meta['control']"
+             tal:define="meta item[key]['meta']; value item[key]['value']; control meta['control']"
              tal:switch="control">
           <div class="form-control" tal:case="'radio'">
             <span tal:repeat="option meta['enum']" tal:omit-tag="">

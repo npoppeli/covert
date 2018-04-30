@@ -1,22 +1,22 @@
 <!--! title -->
-<div tal:define="title this['title']">
-  <p class="class">${title}</p>
+<div>
+  <p class="text-bold">${this['title']}</p>
 </div>
 <!--! data -->
 <table class='table table-bordered'
-       tal:define="item this['data'][0]; fields item['_keys']; info this['info']">
-  <tbody id="item01" tal:attributes="class default if info['active'] else 'text-muted'">
+       tal:define="item this['data'][0]; fields item['_keys']; computed this['computed']">
+  <tbody id="item01" tal:attributes="class default if item['active']['value'] else 'text-muted'">
     <span tal:repeat="key fields" tal:omit-tag="">
       <tr tal:condition="not item[key]['meta']['auto']">
         <td class="text-left text-bold">${item[key]['meta']['label']}</td>
-        <td tal:define="value item[key]['value']">
+        <td tal:define="value item[key]['value']; meta item[key]['meta']">
           <span tal:switch="isinstance(value, tuple)" tal:omit-tag="">
             <span tal:case="True" tal:omit-tag="">
               <span tal:condition="value[0]">(${value[0]})</span>
               <a href="${value[2]}">${value[1]}</a>
               <span tal:condition="value[3]">(${value[3]})</span>
             </span>
-            <span tal:case="False" tal:replace="value if value else ''"></span>
+            <span tal:case="False" tal:replace="structure: value"></span>
           </span>
         </td>
       </tr>
@@ -25,7 +25,8 @@
 </table>
 <!--! auto fields -->
 <div tal:define="item this['data'][0]">
-  <p class="text-muted small">Gemaakt op: ${item['ctime']['value']}. Gewijzigd op: ${item['mtime']['value']}.</p>
+  <p class="text-muted small">Gemaakt op: ${item['ctime']['value']}.
+    Gewijzigd op: ${item['mtime']['value']}.</p>
 </div>
 <!--! message -->
 <div tal:condition="this['message']">
