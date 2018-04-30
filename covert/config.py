@@ -103,6 +103,7 @@ def kernel_init():
     Returns:
         None
     """
+
     # initialize item storage
     if setting.dbtype == 'mongodb':
         from .engine.mongodb import init_storage
@@ -125,6 +126,10 @@ def kernel_init():
             _ = import_module(name)
         else:
             logger.info('{} should be Python module'.format(setting.config['prelude']))
+
+    # read icons
+    if 'icons' in setting.config:
+        setting.icons.update(setting.config['icons'])
 
     # read templates
     read_templates()
