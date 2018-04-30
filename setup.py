@@ -4,7 +4,7 @@ from setuptools import setup
 
 setup(
     name='covert',
-    version='0.8',
+    version='0.9',
     author='Nico Poppelier',
     author_email='n.poppelier@xs4all.nl',
     license='MIT',
