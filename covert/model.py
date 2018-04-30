@@ -736,6 +736,6 @@ def read_models(model_defs):
         class_dict['_validate'] = Schema(schema, required=True, extra=True)
         model_class = type(model_name, (Item,), class_dict)
         model_class.create_collection()
-        model_class.create_index(class_dict['index'])
+        model_class.create_index(index)
         # logger.debug('Adding model class %s', model_name)
         setting.models[model_name] = model_class
