@@ -21,7 +21,7 @@ Functions:
 
 
 Classes:
-    * SwitchRouter:   WSGI front-end application that dispatches to WSGI applications for
+    * CondRouter:   WSGI front-end application that dispatches to WSGI applications for
     *                 static files, HTML fragment, HTML page and JSON
     * MapRouter:      WSGI application that dispatches on the basis of PATH_INFO
     * PageRouter:     sub-class of MapRouter for HTML pages
@@ -37,7 +37,7 @@ from .           import setting
 from .atom       import EMPTY_DATE, EMPTY_DATETIME, EMPTY_TIME, define_atom
 from .common     import *
 from .config     import read_config, parse_cmdline, kernel_init, add_argument
-from .controller import http_server, SwitchRouter, MapRouter, PageRouter, JSONRouter
+from .controller import http_server, CondRouter, MapRouter, PageRouter, JSONRouter
 from .layout     import add_template_type
 from .model      import ItemRef, Visitor, Filter, And, Or, Term
 from .view       import route, BareItemView, ItemView, url_for
