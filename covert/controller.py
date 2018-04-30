@@ -7,9 +7,11 @@ depending on the request parameters.
 The mapping router creates a response object based on route patterns.
 """
 
-import html, sys, traceback, waitress
+import html, re, sys, traceback, waitress
 from datetime import datetime
-from webob import BaseRequest as Request, Response # performance of BaseRequest is better
+# we use BaseRequest instead of Request because of performance reasons
+from webob import BaseRequest as Request, Response
+from webob.static import DirectoryApp
 from collections import deque
 from . import setting
 from .common import encode_dict, logger
@@ -24,13 +26,6 @@ def not_found(environ, start_response):
     """Function that can be called by WSGI dispatcher if no URL matches"""
     start_response('404 Not Found', [('Content-Type', 'text/plain')])
     return ['Not Found']
-
-def bad_request(environ, start_response):
-    """Function that can be called by WSGI dispatcher if no application
-    is available for the type of request
-    """
-    start_response('400 Not Found', [('Content-Type', 'text/plain')])
-    return ['Bad request']
 
 def exception_report(exc, ashtml=True):
     """Generate exception traceback, as plain text or HTML
@@ -54,78 +49,83 @@ def exception_report(exc, ashtml=True):
         tail = ["{0}: {1}".format(exc_type.__name__, str(exc_value))]
     return '\n'.join(head+body+tail)
 
-class SwitchRouter:
+# Auxiliary functions for CondRouter
+regex_is_file = re.compile('/\w+\.\w+')
+def is_file_request(request):
+    return regex_is_file.match(request.path_info)
+
+def is_page_request(request):
+    return not request.is_xhr
+
+def is_fragment_request(request):
+    return request.is_xhr and 'text/html' in request.accept
+
+def is_json_request(request):
+    return request.is_xhr and 'application/json' in request.accept
+
+
+class CondRouter:
     """WSGI application that serves as front-end to one or more web applications.
 
-    This WSGI application checks PATH_INFO and the 'X-Requested-With' request header to determine
-    what the operating mode is: mount point with its own application (e.g. static file), complete
-    HTML page, HTML fragment, XML document or JSON document. Each operating mode is handled by a
-    different WSGI application. These applications should be registered by calling static(),
-    page(), fragment(), xml() and json() methods.
+    This WSGI application checks various options of the request to determine what the appropriate
+    WSGI application is for further processing. The name of this class is taken from the 'cond'
+    expression in LISP.
+
+    Possibilities are: attach application to mount point (e.g. static file), complete HTML page,
+    HTML fragment, or JSON document. These applications should be registered by calling the
+    mount(), page(), fragment(), and json() methods.
     """
-    # Operating modes
-    MOUNT_MODE   = 0 # mount point with its own application
-    PAGE_MODE    = 1 # complete HTML page
-    FRAG_MODE    = 2 # HTML fragment
-    XML_MODE     = 3 # XML document
-    JSON_MODE    = 4 # JSON document
-    UNKNOWN_MODE = 5 # unknown
 
-    mode_name = ['MOUNT', 'PAGE', 'FRAGMENT', 'XML', 'JSON']
+    def __init__(self, empty_root=True, index_page=''):
+        self.empty_root = empty_root
+        self.index_page = index_page
+        self.routes = []
+        if not empty_root:
+            static_app = DirectoryApp(setting.content, index_page=None)
+            self.routes.append((is_file_request, 'FILE', static_app))
 
-    def __init__(self):
-        self._app = {self.PAGE_MODE   : bad_request,
-                     self.FRAG_MODE   : bad_request,
-                     self.XML_MODE    : bad_request,
-                     self.JSON_MODE   : bad_request,
-                     self.UNKNOWN_MODE: bad_request}
+    def add(self, cond, mode, app):
+        self.routes.append((cond, mode, app))
 
     def mount(self, app, path):
-        self._app[path] = app
+        def condition(request):
+            return '/'.join(request.path_info.split('/')[0:2]) == path
+        self.add(condition, 'MOUNT', app)
 
     def page(self, app):
-        self._app[self.PAGE_MODE] = app
+        self.add(is_page_request, 'PAGE', app)
 
     def fragment(self, app):
-        self._app[self.FRAG_MODE] = app
-
-    def xml(self, app):
-        self._app[self.XML_MODE] = app
+        self.add(is_fragment_request, 'FRAGMENT', app)
 
     def json(self, app):
-        self._app[self.JSON_MODE] = app
+        self.add(is_json_request, 'JSON', app)
 
     def __call__(self, environ, start_response):
         request = Request(environ)
         req_method = request.params.get('_method', request.method).upper()
-        path0 = '/'.join(request.path_info.split('/')[0:2])
-        if path0 in self._app:
-            mode = self.MOUNT_MODE
-            app = self._app[path0]
-            request.path_info = request.path_info.replace(path0, '', 1)
-        elif request.headers.get('X-Requested-With', '') == 'XMLHttpRequest': # jQuery.ajax()
-            if 'application/json' in request.accept:
-                mode = self.JSON_MODE
-            elif 'text/html' in request.accept:
-                mode = self.FRAG_MODE
-            else:
-                mode = self.UNKNOWN_MODE
-            app = self._app[mode]
-        else:
-            mode = self.PAGE_MODE
-            app = self._app[mode]
+        date_time = datetime.strftime(datetime.now(), "%Y-%m-%d %H:%M:%S")
+        # path rewrite in case of index page
+        if request.path_info == '/' and self.index_page:
+            request.path_info = self.index_page
+        # check available routes, where each route is a tuple (condition, mode, app)
+        mode, app = '', not_found
+        for route in self.routes:
+            if route[0](request): # first route with 'True' condition is our target
+                mode, app = route[1], route[2]
+                break
+        if mode == 'MOUNT': # remove mount point from path_info
+            path_info = request.path_info
+            request.path_info = path_info[path_info.find('/', 1):]
         try:
             response = request.get_response(app)
-            dt = datetime.strftime(datetime.now(), "%Y-%m-%d %H:%M:%S")
-            logger.debug('{} "{} {}" {} {}'.\
-                         format(dt, request.method, request.path_info,
-                                response.status, response.content_length))
+            logger.debug('{} "{} {}" {} {}'.format(date_time, request.method, request.path_info,
+                         response.status, response.content_length))
         except Exception as e:
             response = Response()
             response.text = exception_report(e)
-            logger.error('{}: {} {} results in exception {}\n'.\
-                         format(self.mode_name[mode], req_method, request.path_qs,
-                                exception_report(e, False)))
+            logger.error('{}: {} {} [mode {}] results in exception {}\n'.format(date_time,
+                         req_method, request.path_qs, mode, exception_report(e, False)))
         return response(environ, start_response)
 
 
@@ -134,8 +134,8 @@ class MapRouter:
 
     This application uses a global route map to map a regular expression to a view and a route.
     The route is a method of a view class. The view class is instantiated with two parameters:
-    the request object, and the match dict. Then the route method is called, which is expected to
-    return a render tree, a dictionary containing the content to be serialized and delivered. The
+    the request object, and the match dict. Then the route method is called, which must return
+    a render tree, a dictionary containing the content to be serialized and delivered. The
     render tree is serialized by serialize(). The result of the serialization is processed by
     finalize(). Sub-classes of MapRouter can redefine serialize() and finalize() to achieve
     certain effects.
@@ -143,8 +143,9 @@ class MapRouter:
 
     def __init__(self):
         self.content_type = 'text/html'
-        # keep history inside the router, so that we can perform an internal redirect
-        # external redirect (HTTP "307 Redirect") does not have the POST parameters
+        # TODO: add history handling
+        # Keep history inside the router, so that we can perform an internal redirect.
+        # External redirects (HTTP "307 Redirect") do not contain the POST parameters.
         self.history = deque(maxlen=5)
 
     def serialize(self, result, template):
@@ -186,8 +187,9 @@ class MapRouter:
                     print(result)
                 response.status = 500
         else: # no match in the known routes
-            result = 'nothing found for {} {}'.format(req_method, request.path_qs)
-            logger.warning('{} - {}'.format(controller_name, result))
+            result = '{}: nothing found for {} {}'.\
+                     format(controller_name, req_method, request.path_qs)
+            logger.warning(result)
             response.status = 404
         # encode to UTF8 and return according to WSGI protocol
         response.charset = 'utf-8'
@@ -211,7 +213,7 @@ class PageRouter(MapRouter):
 
     def finalize(self, result):
         """remove empty/blank lines and initial whitespace of the other lines"""
-        page = setting.templates[self.template].render(content=result, config=setting.config)
+        page = setting.templates[self.template].render(content=result)
         lines = [line.lstrip() for line in page.splitlines() if line and not line.isspace()]
         return '\n'.join(lines)
 
