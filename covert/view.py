@@ -29,29 +29,9 @@ def str2int(s):
         number = 0
     return number
 
-setting.icons = {
-    'show'   : 'fa fa-eye',
-    'sort'   : 'fa fa-sort-amount-asc',
-    'index'  : 'fa fa-list-alt',
-    'search' : 'fa fa-search',
-    'match'  : 'fa fa-search',
-    'modify' : 'fa fa-pencil',
-    'update' : 'fa fa-pencil',
-    'new'    : 'fa fa-new',
-    'create' : 'fa fa-new',
-    'delete' : 'fa fa-trash-o',
-    'expand' : 'fa fa-plus-square-o',
-    'shrink' : 'fa fa-minus-square-o',
-    'home'   : 'fa fa-home',
-    'info'   : 'fa fa-info-circle',
-    'ok'     : 'fa fa-check',
-    'refresh': 'fa fa-refresh',
-    'cancel' : 'fa fa-times'
-}
-
 def icon_for(name):
     """Return icon for route 'name'."""
-    return setting.icons.get(name, 'fa fa-flash')
+    return setting.icons.get(name, '')
 
 setting.labels = {
      'show'         : 'Show|Toon|Show',
@@ -133,7 +113,7 @@ class route:
     def _incr(cls):
         cls.counter += 1
 
-    def __init__(self, pattern, method='GET', template='', icon='', label='', alias=''):
+    def __init__(self, pattern, method='GET', template='', icon='', label=''):
         """Constructor for 'route' decorator.
 
         Attributes:
@@ -148,7 +128,6 @@ class route:
         self.template = template
         self.icon     = icon
         self.label    = label
-        self.alias    = alias
     def __call__(self, wrapped):
         self._incr()
         wrapped.pattern  = self.pattern
@@ -156,7 +135,6 @@ class route:
         wrapped.template = self.template
         wrapped.icon     = self.icon
         wrapped.label    = self.label
-        wrapped.alias    = self.alias
         wrapped.order    = self.counter
         return wrapped
 
@@ -260,6 +238,7 @@ def read_views(module):
         # TODO: this transformation happens in two places, should be one
         view_name = class_name.replace('View', '', 1).lower()
         view_class.view_name = view_name
+        routes = []
         for member_name, member in getmembers(view_class, isfunction):
             if hasattr(member, 'pattern'): # this member (method) is a route
                 full_pattern  = '/' + view_name + member.pattern
@@ -288,13 +267,16 @@ def read_views(module):
                         setting.labels[member_name] = member.label
                 for method in member.method.split(','):
                     setting.patterns[view_name+'_'+member_name] = pattern
-                    setting.routes.append(Route(pattern, method, params, templates,
+                    routes.append(Route(pattern, method, params, templates,
                         re.compile(regex), view_class, member_name, member.order))
-                    if member.alias:
-                        setting.routes.append(Route(member.alias, method, params, templates,
-                            re.compile('^'+member.alias+'$'), view_class, member_name, member.order))
-    # sorting in reverse alphabetical order ensures words like 'match' and 'index'
-    # are not absorbed by {id} or other components of the regex patterns
+        # sort routes by declaration order and add this to view class
+        view_class._routes = sorted(routes, key=lambda r: r.order)
+        # add routes to setting.routes, which will be sorted at the end
+        setting.routes.extend(routes)
+
+    # All views have been processed, so all routes are known. Now sort the routes in
+    # reverse alphabetical order to ensure words such as 'match' and 'index' are not
+    # absorbed by {id} or other components of the regex patterns
     setting.routes.sort(key=lambda r: r.pattern, reverse=True)
 
 class Cursor:
@@ -383,7 +365,7 @@ class RenderTree:
     attributes are specified by the class attribute 'nodes'. These attributes are used by the
     asdict() method.
     """
-    nodes = ['buttons', 'cursor', 'data', 'info',
+    nodes = ['buttons', 'cursor', 'data', 'computed',
              'message', 'method', 'status', 'style', 'title']
     def __init__(self, request, model, view_name, action):
         """Constructor method for RenderTree.
@@ -402,8 +384,8 @@ class RenderTree:
         # attributes that are used in rendering
         self.buttons = []
         self.cursor = None
-        self.data = []
-        self.info = {}
+        self.data = [] # actual properties of item
+        self.computed = {} # computed properties of item
         self.message = ''
         self.method = ''
         self.poly = True
@@ -466,16 +448,12 @@ class RenderTree:
         item['_hidden'] = [] if hide is None or hide == 'all' else hide
         self.data.append(item)
         # TODO: move lines below to event handler
-        if 'active' in self.info:
-            self.info['active'].append(item['active'])
-        else:
-            self.info['active'] = [item['active']]
         now, delta = datetime.now(), timedelta(days=10)
         recent = now-item['mtime'] < delta
-        if 'recent' in self.info:
-            self.info['recent'].append(recent)
+        if 'recent' in self.computed:
+            self.computed['recent'].append(recent)
         else:
-            self.info['recent'] = [recent]
+            self.computed['recent'] = [recent]
 
     def add_items(self, buttons):
         """Add list of items to render tree."""
@@ -496,8 +474,7 @@ class RenderTree:
                 self.data.append(item)
                 active.append(item['active'])
                 recent.append(now - item['mtime'] < delta)
-            self.info['active'] = active
-            self.info['recent'] = recent
+            self.computed['recent'] = recent
         else:
             self.message = 'Nothing found for this query: ' + str(self.cursor.filter)
 
@@ -554,10 +531,11 @@ class RenderTree:
         hidden = item['_hidden']
         newitem = OrderedDict()
         for key, field in item.items():
+            excluded = (key.count('.') > depth) or (key in hidden) or \
+                       (form and field['meta']['schema'] == 'itemref')
             if key.startswith('_'):
                 newitem[key] = field
-            elif (key.count('.') <= depth) and key not in hidden and \
-                not (form and field['meta']['schema']=='itemref'):
+            elif not excluded:
                 if clear:
                     field['value'] = ''
                 newitem[key] = field
@@ -578,10 +556,10 @@ class RenderTree:
                         newitem[key] = field
                     else:
                         field_meta = field['meta']
-                        if (key.count('.') <= depth) and key not in hidden and not \
-                            (field_meta['multiple'] or field_meta['auto'] or
-                            field_meta['schema'] in ('text', 'memo', 'itemref')):
-                            newitem[key] = field
+                        excluded = (key.count('.') > depth) or (key in hidden) or \
+                                   field_meta['multiple'] or field_meta['auto'] or \
+                                   field_meta['schema'] in ('text', 'memo', 'itemref')
+                        if not excluded: newitem[key] = field
                 newitem['_keys'] = [k for k in newitem.keys() if not k.startswith('_')]
                 self.data[nr] = newitem
 
@@ -667,7 +645,7 @@ class ItemView(BareItemView):
     view_name = 'item'
 
     def routes(self, params=None):
-        selection = [item for item in sorted(setting.routes, key=lambda r: r.order)
+        selection = [item for item in self._routes
                      if item.method not in ('PUT', 'POST') and item.uid.startswith(self.view_name)]
         result = selection if params is None else \
                  [item for item in selection if set(item.params) == set(params)]
