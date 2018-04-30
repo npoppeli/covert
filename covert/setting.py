@@ -12,7 +12,7 @@ Only in cases where performance matters, save one dictionary lookup with:
 """
 
 # version number of package
-__version__ = '0.8'
+__version__ = '0.9'
 
 # configuration
 content     = '' # relative path to static content
@@ -21,6 +21,7 @@ layout      = '' # relative layout to template directory
 site        = '' # site directory
 models      = {}
 views       = {}
+icons       = {}
 language    = ''
 languages   = ['en', 'nl', 'sv']
 config      = {} # configuration dictionary
