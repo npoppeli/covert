@@ -11,11 +11,6 @@ config.py
   - https://flufli18n.readthedocs.io/en/latest/docs/using.html
   - http://pylonsbook.com/en/1.1/internationalization-and-localization.html
 
-layout.py
----------
-* migrate to Bootstrap 4 (now 3.3.7)
-* migrate to jQuery 3 (now 1.10.2)
-
 model.py
 --------
 * embedding in show panels
@@ -50,8 +45,7 @@ view.py
 * make Itemview.prune configurable (Itemview.clip(), 2 modes)
 * itemlist with clickable column headers to influence sorting
 * Use JavaScript for client-side generation of search queries
-* Use Alpaca (JS) for client-side form handling
-* move boolean vector 'active' and 'modified' to event handler
+* computed properties of render tree should be set by event handler
 * image upload with:
 if form[field].file:
   path = os.path.join(upload_dir, form[field].filename)

@@ -531,14 +531,14 @@ class RenderTree:
         hidden = item['_hidden']
         newitem = OrderedDict()
         for key, field in item.items():
-            excluded = (key.count('.') > depth) or (key in hidden) or \
-                       (form and field['meta']['schema'] == 'itemref')
             if key.startswith('_'):
                 newitem[key] = field
-            elif not excluded:
-                if clear:
-                    field['value'] = ''
-                newitem[key] = field
+            else:
+                excluded = (key.count('.') > depth) or (key in hidden) or \
+                           (form and field['meta']['schema'] == 'itemref')
+                if not excluded:
+                    if clear: field['value'] = ''
+                    newitem[key] = field
         newitem['_keys'] = [k for k in newitem.keys() if not k.startswith('_')]
         self.data[nr] = newitem
 
