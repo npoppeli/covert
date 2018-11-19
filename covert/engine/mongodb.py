@@ -7,7 +7,7 @@ The Item class encapsulates the details of the storage engine.
 
 from datetime import datetime
 from pymongo import MongoClient
-from ..common import SUCCESS, ERROR, FAIL, logger, InternalError
+from ..common import SUCCESS, ERROR, FAIL, logger, InternalError, show_dict
 from ..model import BareItem, mapdoc, Visitor, Filter
 from .. import setting
 from bson.objectid import ObjectId
@@ -117,7 +117,7 @@ class Item(BareItem):
             dict: filter in MongoDB form.
         """
         if setting.debug and not isinstance(obj, Filter):
-            raise ValueError('Wrong argument for Item.filter()')
+            raise ValueError('Argument 2 of Item.filter not a Filter instance')
         translator = Translator(cls.wmap)
         return translator.visit(obj)
 
@@ -273,7 +273,7 @@ class Item(BareItem):
                 reply= {'status':SUCCESS, 'data':str(result.inserted_id), 'message':message}
             else:
                 result = collection.replace_one({'_id':self['_id']}, doc)
-                message = 'nModified={}'.format(result.raw_result['nModified'])
+                message = 'nModified=1'
                 reply = {'status':SUCCESS, 'data':self['id'], 'message':message}
             report_db_action(reply)
             self.notify()
