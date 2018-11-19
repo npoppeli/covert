@@ -39,6 +39,6 @@ from .common     import *
 from .config     import read_config, parse_cmdline, kernel_init, add_argument
 from .controller import http_server, CondRouter, MapRouter, PageRouter, JSONRouter
 from .layout     import add_template_type
-from .model      import ItemRef, Visitor, Filter, And, Or, Term
+from .model      import ItemRef, Visitor, Filter, And, Or, Term, unflatten
 from .view       import route, BareItemView, ItemView, url_for
-from .view       import route2pattern, route2regex, RenderTree, get_button
+from .view       import route2pattern, route2regex, RenderTree, Cursor, get_button
