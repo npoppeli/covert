@@ -15,6 +15,10 @@ reading from/writing to storage, and for converting from/displaying as HTML (see
 
 storage   -> [JSON document] -> read    -> [item] -> display -> [item']         -> HTML page
 HTML form -> [item']         -> convert -> [item] -> write   -> [JSON document] -> storage
+
+Other important transformations are the structure transformations of flattening and unflattening.
+In most cases these transformations do not require knowledge of the model definition, but there
+are two exceptions (described in the code below).
 """
 
 from bisect import bisect_left, bisect_right
@@ -49,7 +53,14 @@ def _flatten(doc, prefix, keys):
             yield from _flatten(value, sub_prefix, keys)
         elif isinstance(value, list):  # list of scalars or documents
             if len(value) == 0:  # empty list
-                yield sub_prefix + '0', ''
+                # inspect schema to determine whether we should add an empty scalar ''
+                # or an empty dict: {key1: '', key2: '', ...}
+                schema = doc.schema[key][0]
+                if isinstance(schema, dict):
+                    for subkey in schema.keys():
+                        yield '{}0.{}'.format(sub_prefix, subkey), ''
+                else:
+                    yield sub_prefix + '0', ''
             elif isinstance(value[0], dict):  # list of documents
                 for sub_key, element in enumerate(value):
                     yield from _flatten(element, sub_prefix+str(sub_key)+'.', keys)
@@ -61,7 +72,7 @@ def _flatten(doc, prefix, keys):
     for key in [el for el in doc.keys() if el not in keys]: # keys not defined in model
         yield key, doc[key]
 
-def unflatten(doc):
+def unflatten(doc, model):
     """Unflatten item (document).
 
     Unflatten item to (re)create hierarchical structure. A flattened document has keys 'a',
@@ -69,15 +80,17 @@ def unflatten(doc):
     the unflattening), and the document is transformed to a list of 2-tuples, sorted on key.
 
     Arguments:
-        doc (dict): flattened document.
+        doc   (dict):  flattened document.
+        model (class): model class of document
 
-    Returns/Yields:
+    Returns:
         dict: unflattened item
     """
     list_rep = [(key.split('.'), doc[key]) for key in sorted(doc.keys())]
-    return _unflatten(list_rep)
+    # logger.debug('\n'.join(["'{}': '{}'".format(elt[0], str(elt[1])) for elt in list_rep]))
+    return _unflatten(list_rep, model.meta)
 
-def _unflatten(list_rep):
+def _unflatten(list_rep, meta):
     """Function for unflattening an item (document).
 
     This function is called by unflatten() to do the actual unflattening.
@@ -91,22 +104,36 @@ def _unflatten(list_rep):
     """
     result = {}
     car_list = [elt[0].pop(0) for elt in list_rep]  # take first element (car) from each key
-    car_set = set(car_list)  # set of (unique) car's is the set of keys of result
+    car_set = set(car_list) # set of (unique) car's is the set of keys of result
     for key in car_set:
+        optional = meta[key].optional if key in meta else False
         begin = bisect_left(car_list, key)
         end = bisect_right(car_list, key)
         children = list_rep[begin:end]
         if len(children) == 1: # recursion terminates here
             child = children[0]
             path = child[0]
-            if not path: # empty list
+            if not path: # scalar
                 result[key] = child[1]
             elif path[0].isnumeric(): # one-item list
-                result[key] = [child[1]]
+                # RHS = [] if key refers to an optional field, and child[1] is empty
+                if optional and not(child[1]):
+                    logger.debug("unflatten: '{}' is optional && value empty '{}'".format(key, child[1]))
+                    result[key] = []
+                else:
+                    logger.debug("unflatten: not an edge case, key='{}' value='{}'".format(key, child[1]))
+                    result[key] = [child[1]]
             else: # one-item dict
                 result[key] = {path[0]:child[1]}
-        else:
-            result[key] = _unflatten(children)
+        else: # recursion => value can be nested dict, list of nested dict's or list of scalars
+            value = _unflatten(children, meta)
+            if isinstance(value, list) and len(value) == 1 and optional and \
+                not any(map(bool, value[0].values())):
+                logger.debug("unflatten: '{}' is optional && value empty dict '{}'".format(key, str(value)))
+                result[key] = []
+            else:
+                logger.debug("unflatten: not an edge case, key='{}' value='{}'".format(key, str(value)))
+                result[key] = value
     # convert a dict with numeric keys to a list
     if car_set and all([key.isnumeric() for key in car_set]):
         return [t[1] for t in sorted(result.items(), key=lambda t: int(t[0]))]
@@ -200,7 +227,7 @@ class BareItem(dict):
     fields = ['id', '_skey', 'ctime', 'mtime', 'active']
     index = [('id', 1), ('_skey', 1)]
     # validation
-    _schema   = {'id':sa.schema, '_skey': sa.schema, 'active': ba.schema,
+    schema    = {'id':sa.schema, '_skey': sa.schema, 'active': ba.schema,
                  'ctime':da.schema, 'mtime':da.schema}
     _validate = None
     _empty    = {'id':'', '_skey': '', 'active':True,
@@ -329,7 +356,7 @@ class BareItem(dict):
         Flatten item (document with hierarchical structure) to flat dictionary.
 
         Returns:
-            dict: fla item.
+            dict: flattened item.
         """
         flat_dict = OrderedDict()
         for key, value in _flatten(self, '', self.fields):
@@ -710,7 +737,7 @@ def read_models(model_defs):
         pm.names.extend(Item.fields)
         index = BareItem.index.copy()
         index.extend(pm.index)
-        schema = BareItem._schema.copy()
+        schema = BareItem.schema.copy()
         schema.update(pm.schema)
         meta = BareItem.meta.copy()
         meta.update(pm.meta)
@@ -730,12 +757,11 @@ def read_models(model_defs):
         class_dict['qmap']      = pm.qmap
         class_dict['fields']    = pm.names
         class_dict['_empty']    = empty
-        class_dict['_schema']   = schema
+        class_dict['schema']   = schema
         class_dict['_format']   = pm.fmt
         class_dict['meta']      = meta
         class_dict['_validate'] = Schema(schema, required=True, extra=True)
         model_class = type(model_name, (Item,), class_dict)
         model_class.create_collection()
         model_class.create_index(index)
-        # logger.debug('Adding model class %s', model_name)
         setting.models[model_name] = model_class

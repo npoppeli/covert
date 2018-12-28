@@ -4,7 +4,9 @@ Version 0.9
 ### Features
 -   API changes: 'info' field of render tree is now called 'computed' (as in Vue);
     SwitchRouter is now called CondRouter and has more flexible interface;
-    icon classes must be set in configuration file
+    icon classes must be set in configuration file;
+    Item.schema is now a visible attribute (was: _schema);
+    flatten() and unflatten() require knowledge of model structure
 -   Updated README and manual
 
 Version 0.8
