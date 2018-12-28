@@ -18,7 +18,7 @@ from itertools import chain
 from urllib.parse import urlencode
 from .common import SUCCESS, write_file, logger
 from .common import encode_dict, show_dict
-from .model import unflatten, mapdoc, Filter, Term
+from .model import unflatten, mapdoc, Filter, Term, Or
 from . import setting
 
 def str2int(s):
@@ -143,7 +143,8 @@ patterns = {
     'alpha'   : r'[a-zA-Z]+',
     'digits'  : r'\d+',
     'ids'     : r'\d+(?:\s+\d+)*',
-    'objectid': r'\w{24}'
+    'objectid': r'\w{24}',
+    'word'    : r'\w{2,20}'
 }
 
 def split_route(pattern):
@@ -285,14 +286,29 @@ class Cursor:
     A cursor object represent the state of browsing through a collection of items.
     In HTML pages the cursor is represented as a form, with several buttons and toggles.
 
-    For a few attributes, default values are defined in the 'default' dictionary.
+    For some attributes, default values are defined in the 'default' dictionary.
     """
-    __slots__ = ['skip', 'limit', 'incl', 'dir',
+    __slots__ = ['skip', 'limit', 'incl', 'dir', 'operator',
                  'filter', 'form', 'prev', 'next', 'action', 'submit']
-    default = {'skip': 0, 'limit': 20, 'incl': 0, 'dir': 0, 'submit': ''}
+    default = {'skip': 0, 'limit': 20, 'incl': 0, 'dir': 0, 'submit': '', 'operator': 'and'}
 
     def __init__(self, request, model):
-        """Constructor method for Cursor.
+        """Constructor method for Cursor. This method scans the request parameters and
+        divides them into three parts:
+        1. form contents (values of query, required)
+        2. operator vector (operators in query, optional)
+        3. cursor (used by the 'index' and 'search' routes)
+
+        Request parameters can be found in the body of a POST request or in the
+        URL string of a GET request:
+
+        field1=value1&field2=value2&field3=value3...
+
+        Characters that cannot be converted to the correct charset are replaced with HTML numeric
+        character references. SPACE is encoded as '+' or '%20'. Letters (A–Z and a–z), numbers (
+        0–9) and the characters '*','-','.' and '_' are left as-is, + is encoded by %2B. All
+        other characters are encoded as %HH hex representation with any non-ASCII characters
+        first encoded as UTF-8 (or other specified encoding)
 
         Attributes:
             * skip      (int):     URL pattern
@@ -300,6 +316,7 @@ class Cursor:
             * incl      (int):     1 if inactive items are included, 0 otherwise
             * dir       (int):     direction of browsing
             * filter    (str):     filter to pass to storage engine
+            * operator  (str):     boolean operator for filter (default: 'and')
             * form      (str):     transformed dictionary
             * prev      (bool):    True if 'previous' button enabled
             * next      (bool):    True if 'next' button enabled
@@ -315,13 +332,15 @@ class Cursor:
             if key == '_filter': # rebuild filter that was saved in form
                 decoded = b64decode(value.encode())
                 self.filter = pickle.loads(decoded)
+            elif key == '_operator':
+                self.operator = value
             elif key.startswith('_'):
                 setattr(self, key[1:], str2int(value) if key[1:] in self.default else value)
             elif value:
                 form[key] = value
-        if initial_post: # flatten list-valued conditions
+        if initial_post: # add operators, and flatten list-valued conditions
             self.form = {key:(value[0] if isinstance(value, list) else value)
-                         for key, value in mapdoc(model.qmap, unflatten(form)).items()}
+                         for key, value in mapdoc(model.qmap, unflatten(form, model)).items()}
 
     def __str__(self):
         d = dict([(key, getattr(self, key, '')) for key in self.__slots__])
@@ -411,6 +430,7 @@ class RenderTree:
         if initial_post:
            # translate interval specifications in form
            for key, value in cursor.form.items():
+               logger.debug("move_cursor: form key='{}' value='{}'".format(key, value))
                if isinstance(value, dict): # not converted by mapdoc
                    convert = self.model.cmap[key]
                    key_set = set(value.keys())
@@ -421,19 +441,29 @@ class RenderTree:
            filter_spec = {} if cursor.incl == 1 else {'active': ('==', True)}
            filter_spec.update(cursor.form)
            # translate filter dictionary to Filter object
-           cursor.filter = Filter()
+           new_filter = Or() if cursor.operator == 'or' else Filter()
            for key, value in filter_spec.items():
+               if key == 'active':
+                   continue
                if len(value) == 3:
-                   cursor.filter.add(Term(key, value[0], value[1], value[2]))
+                   new_filter.add(Term(key, value[0], value[1], value[2]))
                else:
-                   cursor.filter.add(Term(key, value[0], value[1]))
+                   new_filter.add(Term(key, value[0], value[1]))
+           if cursor.operator == 'or':
+               cursor.filter = Filter()
+               cursor.filter.add(new_filter)
+           else:
+               cursor.filter = new_filter
+           if 'active' in filter_spec:
+               cursor.filter.add(Term('active', '==', True))
         else:
-            if cursor.incl == 1: # remove term 'active=True' from filter, if present
+            # cursor.incl == 1: remove term 'active=True' (if present) from filter
+            #             == 0: add term 'active=True' (if not present) to filter
+            if cursor.incl == 1:
                 if 'active' in cursor.filter:
                     del cursor.filter['active']
-            else: # add term 'active=True' to filter, unless already present
-                if 'active' not in cursor.filter:
-                    cursor.filter.add(Term('active', '==', True))
+            elif 'active' not in cursor.filter:
+                cursor.filter.add(Term('active', '==', True))
         count = self.model.count(cursor.filter)
         cursor.skip = max(0, min(count, cursor.skip+cursor.dir*cursor.limit))
         cursor.prev = cursor.skip>0
@@ -449,7 +479,7 @@ class RenderTree:
         self.data.append(item)
         # TODO: move lines below to event handler
         now, delta = datetime.now(), timedelta(days=10)
-        recent = now-item['mtime'] < delta
+        recent = now - item['mtime'] < delta
         if 'recent' in self.computed:
             self.computed['recent'].append(recent)
         else:
@@ -457,12 +487,13 @@ class RenderTree:
 
     def add_items(self, buttons):
         """Add list of items to render tree."""
-        self.data = []
         self.poly = False
         items = self.model.find(self.cursor.filter,
                                 limit=self.cursor.limit, skip=self.cursor.skip)
+        # TODO: move line below to event handler
+        active, recent = [], []
         if items:
-            active, recent = [], []
+            # TODO: move line below to event handler
             now, delta = datetime.now(), timedelta(days=10)
             for item in items:
                 button_list = [(delete_button if button == 'delete' else
@@ -472,11 +503,14 @@ class RenderTree:
                 item['_hide'] = False
                 item['_hidden'] = []
                 self.data.append(item)
+                # TODO: move line below to event handler
                 active.append(item['active'])
                 recent.append(now - item['mtime'] < delta)
-            self.computed['recent'] = recent
         else:
             self.message = 'Nothing found for this query: ' + str(self.cursor.filter)
+        # TODO: move lines below to event handler
+        self.computed['active'] = active
+        self.computed['recent'] = recent
 
     def flatten_item(self, nr=0, form=False):
         """Flatten one item in the render tree."""
@@ -487,7 +521,6 @@ class RenderTree:
         for key, value in flat_item.items():
             if key.startswith('_'):
                 newitem[key] = value
-                # logger.debug("flatten_item: key='{}' value='{}'".format(key, value))
             else:
                 path = key.split('.')
                 depth = key.count('.')
@@ -516,7 +549,6 @@ class RenderTree:
                             'formtype': 'hidden' if field_meta.auto else field_meta.formtype,
                             'auto': field_meta.auto, 'control': field_meta.control}
                 newitem[key] = {'value':value, 'meta':proplist, 'buttons':button_list}
-                # logger.debug("flatten_item: key='{}' value='{}' meta={}".format(key, value, proplist))
         newitem['_keys'] = [k for k in newitem.keys() if not k.startswith('_')]
         self.data[nr] = newitem
 
@@ -674,11 +706,11 @@ class ItemView(BareItemView):
         """Convert request parameters to unflattened dictionary."""
         raw_form = {key:value for key, value in self.request.params.items()
                               if (value or keep_empty) and not key.startswith('_')}
-        self.form = unflatten(raw_form)
+        self.form = unflatten(raw_form, self.model)
 
     def extract_item(self, prefix=None, model=None):
         """Convert unflattened form to item."""
-        # after unflattening, this is easy
+        # The first step is easy, thanks to unflattening.
         selection = self.form[prefix.rstrip('.')] if prefix else self.form
         return (model or self.model).convert(selection)
 
