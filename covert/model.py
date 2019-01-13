@@ -395,7 +395,11 @@ class Visitor:
         else:
             return None
 
+INDENT = '   '
+
 class Clause:
+    OP = ''
+    
     def __init__(self, *terms):
         self.terms = []
         if terms:
@@ -417,18 +421,23 @@ class Clause:
             if position >= 0:
                 del self.terms[position]
 
+    def format(self, level=0):
+        result = [t.format(level=level+1) for t in self.terms]
+        result.insert(0, level*INDENT + self.OP)
+        return '\n'.join(result)
+
     def __repr__(self):
         return "{}({})".\
             format(self.__class__.__name__, ', '.join([repr(t) for t in self.terms]))
 
 class Filter(Clause):
-    pass
+    OP = 'En'
 
 class And(Clause):
-    pass
+    OP = 'En'
 
 class Or(Clause):
-    pass
+    OP = 'Of'
 
 class Term:
     def __init__(self, field, operator, value1, value2=None):
@@ -436,6 +445,14 @@ class Term:
         self.operator = operator
         self.value1 = value1
         self.value2 = value2
+
+    def format(self, level):
+        if self.value2:
+            return "{}{} {} {} {}".\
+                   format(level*INDENT, self.field, self.operator, repr(self.value1), repr(self.value2))
+        else:
+            return "{}{} {} {}".\
+                   format(level*INDENT, self.field, self.operator, repr(self.value1))
 
     def __repr__(self):
         if self.value2:
