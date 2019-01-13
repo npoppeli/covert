@@ -20,7 +20,7 @@ except ImportError:
     from yaml import Loader
 
 # Logging
-# basicConfig add a StreamHandler with default Formatter to the root logger. This function
+# basicConfig adds a StreamHandler with default Formatter to the root logger. This function
 # does nothing if the root logger already has handlers configured for it.
 logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
 logger = logging.getLogger('waitress')
