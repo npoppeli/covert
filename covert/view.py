@@ -50,6 +50,7 @@ setting.labels = {
      'info'         : 'Info|Info|Info',
      'ok'           : 'OK|OK|OK',
      'refresh'      : 'Refresh|Ververs|Fylla på',
+     'return'       : 'Return|Terug|Retur',
      'cancel'       : 'Cancel|Annuleer|Upphäva'
 }
 
@@ -384,7 +385,7 @@ class RenderTree:
     attributes are specified by the class attribute 'nodes'. These attributes are used by the
     asdict() method.
     """
-    nodes = ['buttons', 'cursor', 'data', 'computed',
+    nodes = ['buttons', 'cursor', 'data', 'computed', 'cookies',
              'message', 'method', 'status', 'style', 'title']
     def __init__(self, request, model, view_name, action):
         """Constructor method for RenderTree.
@@ -394,12 +395,15 @@ class RenderTree:
             * model     (Item):    model class
             * view_name (str):     name of view class
             * action    (str):     name of route (view method)
+            * cookies   (list):    list of cookies to be set in the response object, where
+                                   one cookie is a tuple (name, value, path, expires)
         """
         # attributes for request handling
         self.request = request
         self.model = model
         self.view_name = view_name
         self.action = action
+        self.cookies = []
         # attributes that are used in rendering
         self.buttons = []
         self.cursor = None
@@ -430,7 +434,6 @@ class RenderTree:
         if initial_post:
            # translate interval specifications in form
            for key, value in cursor.form.items():
-               logger.debug("move_cursor: form key='{}' value='{}'".format(key, value))
                if isinstance(value, dict): # not converted by mapdoc
                    convert = self.model.cmap[key]
                    key_set = set(value.keys())
@@ -507,7 +510,9 @@ class RenderTree:
                 active.append(item['active'])
                 recent.append(now - item['mtime'] < delta)
         else:
-            self.message = 'Nothing found for this query: ' + str(self.cursor.filter)
+            origin = self.request.cookies.get('search-origin', 'onbekend')
+            self.add_return_button(origin)
+            self.message += 'Geen resultaten voor zoekopdracht:\n{}'.format(self.cursor.filter.format())
         # TODO: move lines below to event handler
         self.computed['active'] = active
         self.computed['recent'] = recent
@@ -599,8 +604,9 @@ class RenderTree:
         """Add buttons (normal and delete) to render tree."""
         if self.data:
             item = self.data[0]
-            self.buttons = [(delete_button if button == 'delete' else
-                             get_button)(self.view_name, button, item) for button in buttons]
+            for button in buttons:
+                factory = delete_button if button == 'delete' else get_button
+                self.buttons.append(factory(self.view_name, button, item))
 
     def add_form_buttons(self, action, method=None):
         """Add form buttons to render tree.
@@ -613,7 +619,7 @@ class RenderTree:
         """
         if self.data:
             item = self.data[0]
-            self.buttons = [post_button(self.view_name, action, item, 'ok')]
+            self.buttons.append(post_button(self.view_name, action, item, 'ok'))
             if method:
                 self.method = method
 
@@ -622,7 +628,13 @@ class RenderTree:
         if self.data:
             item = self.data[0]
             button = post_button(self.view_name, action, item, 'search')
-            self.buttons = [button]
+            self.buttons.append(button)
+
+    def add_return_button(self, location):
+        """Add return button to render tree."""
+        button = {'label': label_for('return'), 'icon': icon_for('return'),
+                  'action': location, 'method': 'GET'}
+        self.buttons.append(button)
 
     def asdict(self):
         """Create dictionary representation of render tree."""
@@ -700,6 +712,7 @@ class ItemView(BareItemView):
         tree.add_buttons(self.routes([]))
         tree.flatten_items()
         tree.prune_items(depth=1)
+        tree.dump('show_items')
         return tree.asdict()
 
     def convert_form(self, keep_empty=False):
@@ -732,6 +745,8 @@ class ItemView(BareItemView):
         tree.add_search_button('match')
         tree.flatten_item()
         tree.prune_item(clear=True, form=True)
+        tree.cookies.append(('search-origin', self.request.referer, '/', 60))
+        tree.message += '\nVerwezen vanaf pagina '+self.request.referer
         return tree.asdict()
 
     @route('/match', method='GET,POST', template='index')
