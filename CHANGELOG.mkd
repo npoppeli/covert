@@ -7,6 +7,11 @@ Version 0.9
     icon classes must be set in configuration file;
     Item.schema is now a visible attribute (was: _schema);
     flatten() and unflatten() require knowledge of model structure
+    added Item.follow() and Item.take() methods
+    added count field to Cursor class
+    added operator vector to Cursor, and operator variants written in letters (HTTP safe)
+    add cookie support to ItemView and MapRouter classes
+    add Item.project() method (for data analysis purposes)
 -   Updated README and manual
 
 Version 0.8

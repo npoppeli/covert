@@ -259,13 +259,15 @@ def read_views(module):
                         templates.append('default')
                 if member.icon:
                     if member_name in setting.icons:
-                        logger.debug('Attempt to redefine icon for %s', member_name)
+                        logger.debug("Attempt to redefine icon for '%s''", member_name)
                     else:
+                        # logger.debug("New icon '%s' for '%s'", member.icon, member_name)
                         setting.icons[member_name] = member.icon
                 if member.label:
                     if member_name in setting.labels:
-                        logger.debug('Attempt to redefine label for %s', member_name)
+                        logger.debug("Attempt to redefine label for '%s'", member_name)
                     else:
+                        # logger.debug("New label '%s' for '%s'", member.label, member_name)
                         setting.labels[member_name] = member.label
                 for method in member.method.split(','):
                     setting.patterns[view_name+'_'+member_name] = pattern
@@ -289,9 +291,9 @@ class Cursor:
 
     For some attributes, default values are defined in the 'default' dictionary.
     """
-    __slots__ = ['skip', 'limit', 'incl', 'dir', 'operator',
+    __slots__ = ['skip', 'limit', 'incl', 'dir', 'operator', 'count',
                  'filter', 'form', 'prev', 'next', 'action', 'submit']
-    default = {'skip': 0, 'limit': 20, 'incl': 0, 'dir': 0, 'submit': '', 'operator': 'and'}
+    default = {'skip': 0, 'limit': 20, 'incl': 0, 'dir': 0, 'count': 0, 'submit': ''}
 
     def __init__(self, request, model):
         """Constructor method for Cursor. This method scans the request parameters and
@@ -312,12 +314,13 @@ class Cursor:
         first encoded as UTF-8 (or other specified encoding)
 
         Attributes:
-            * skip      (int):     URL pattern
-            * limit     (int):     HTTP method
+            * skip      (int):     skip this number of items in query
+            * limit     (int):     retrieve no more than this numbers of items
+            * count     (int):     total number of items in query
             * incl      (int):     1 if inactive items are included, 0 otherwise
             * dir       (int):     direction of browsing
             * filter    (str):     filter to pass to storage engine
-            * operator  (str):     boolean operator for filter (default: 'and')
+            * operator  (dict):    boolean operators for filter
             * form      (str):     transformed dictionary
             * prev      (bool):    True if 'previous' button enabled
             * next      (bool):    True if 'next' button enabled
@@ -328,20 +331,32 @@ class Cursor:
         for key, value in self.default.items():
             setattr(self, key, value)
         self.form = {}
+        self.operator = {}
         form = {}
         for key, value in request.params.items():
             if key == '_filter': # rebuild filter that was saved in form
                 decoded = b64decode(value.encode())
                 self.filter = pickle.loads(decoded)
-            elif key == '_operator':
-                self.operator = value
+            elif key =='_skey':
+                form[key] = value
+            elif key.startswith('*'): # operator
+                self.operator[key[1:]] = value
             elif key.startswith('_'):
                 setattr(self, key[1:], str2int(value) if key[1:] in self.default else value)
             elif value:
                 form[key] = value
-        if initial_post: # add operators, and flatten list-valued conditions
-            self.form = {key:(value[0] if isinstance(value, list) else value)
-                         for key, value in mapdoc(model.qmap, unflatten(form, model)).items()}
+        if initial_post: # add operators
+            logger.debug('cursor.form: initial post, populate self.form')
+            for key, value in mapdoc(model.qmap, unflatten(form, model)).items():
+                # if value is a list, use the first element
+                operator_value = value[0] if isinstance(value, list) else value
+                if key in self.operator: # operator-value tuple with explicit operator
+                    self.form[key] = (self.operator[key], operator_value[1])
+                elif isinstance(value, dict): # not converted by mapdoc
+                    self.form[key] = operator_value
+                else: # operator-value tuple with default operator
+                    self.form[key] = (operator_value[0], operator_value[1])
+                logger.debug('cursor.form: {} -> {}'.format(key, str(self.form[key])))
 
     def __str__(self):
         d = dict([(key, getattr(self, key, '')) for key in self.__slots__])
@@ -374,6 +389,29 @@ def generic_button(view_name, action, item):
     return {'label': label_for(action), 'icon': icon_for(action),
             'name': action}
 
+class Cookie:
+    """Instances of this class define basic cookies as constituents of the render tree.
+
+    Attributes:
+        * see constructor method
+    """
+
+    __slots__ = ('name', 'value', 'path', 'expires')
+
+    def __init__(self, name, value, path, expires=0):
+        """Initialize cookie.
+
+        Arguments:
+            name    (str):     name of cookie (see Webob documentation)
+            value   (str):     value of cookie (ibid)
+            path    (str):     path for cookie (ibid)
+            expires (integer): max-age of cookie (ibid)
+        """
+        self.name    = name
+        self.value   = value
+        self.path    = path
+        self.expires = expires
+
 class RenderTree:
     """Tree representation of information created by a route.
 
@@ -395,8 +433,7 @@ class RenderTree:
             * model     (Item):    model class
             * view_name (str):     name of view class
             * action    (str):     name of route (view method)
-            * cookies   (list):    list of cookies to be set in the response object, where
-                                   one cookie is a tuple (name, value, path, expires)
+            * cookies   (list):    list of cookies to be set in the response object
         """
         # attributes for request handling
         self.request = request
@@ -438,13 +475,13 @@ class RenderTree:
                    convert = self.model.cmap[key]
                    key_set = set(value.keys())
                    if  key_set == {'from', 'to'}:
-                       cursor.form[key] = ('[]', convert(value['from']), convert(value['to']))
+                       cursor.form[key] = ('in', convert(value['from']), convert(value['to']))
                    elif key_set == {'from'}:
                        cursor.form[key] = ('==', convert(value['from']))
            filter_spec = {} if cursor.incl == 1 else {'active': ('==', True)}
            filter_spec.update(cursor.form)
            # translate filter dictionary to Filter object
-           new_filter = Or() if cursor.operator == 'or' else Filter()
+           new_filter = Filter()
            for key, value in filter_spec.items():
                if key == 'active':
                    continue
@@ -452,11 +489,7 @@ class RenderTree:
                    new_filter.add(Term(key, value[0], value[1], value[2]))
                else:
                    new_filter.add(Term(key, value[0], value[1]))
-           if cursor.operator == 'or':
-               cursor.filter = Filter()
-               cursor.filter.add(new_filter)
-           else:
-               cursor.filter = new_filter
+           cursor.filter = new_filter
            if 'active' in filter_spec:
                cursor.filter.add(Term('active', '==', True))
         else:
@@ -467,10 +500,10 @@ class RenderTree:
                     del cursor.filter['active']
             elif 'active' not in cursor.filter:
                 cursor.filter.add(Term('active', '==', True))
-        count = self.model.count(cursor.filter)
-        cursor.skip = max(0, min(count, cursor.skip+cursor.dir*cursor.limit))
+        cursor.count = self.model.count(cursor.filter)
+        cursor.skip = max(0, min(cursor.count, cursor.skip+cursor.dir*cursor.limit))
         cursor.prev = cursor.skip>0
-        cursor.next = cursor.skip+cursor.limit < count
+        cursor.next = cursor.skip+cursor.limit < cursor.count
 
     def add_item(self, oid_or_item, prefix='', hide=None):
         """Add item to render tree."""
@@ -530,7 +563,7 @@ class RenderTree:
                 path = key.split('.')
                 depth = key.count('.')
                 button_list = []
-                if path[-1].isnumeric():
+                if path[-1].isnumeric(): # TODO: add button also for source.[012].relations
                     field = path[-2]
                     field_meta = item_meta[field]
                     pos = int(path[-1])+1
@@ -687,6 +720,7 @@ class ItemView(BareItemView):
     """
     model = 'Item'
     view_name = 'item'
+    grid_buttons = 3
 
     def routes(self, params=None):
         selection = [item for item in self._routes
@@ -708,11 +742,11 @@ class ItemView(BareItemView):
         tree = self.tree
         tree.add_cursor(action)
         tree.move_cursor()
-        tree.add_items(self.routes(['id'])[0:3])
+        routes = self.routes(['id'])[0:self.grid_buttons]
+        tree.add_items(routes)
         tree.add_buttons(self.routes([]))
         tree.flatten_items()
         tree.prune_items(depth=1)
-        tree.dump('show_items')
         return tree.asdict()
 
     def convert_form(self, keep_empty=False):
@@ -745,8 +779,7 @@ class ItemView(BareItemView):
         tree.add_search_button('match')
         tree.flatten_item()
         tree.prune_item(clear=True, form=True)
-        tree.cookies.append(('search-origin', self.request.referer, '/', 60))
-        tree.message += '\nVerwezen vanaf pagina '+self.request.referer
+        tree.cookies.append(Cookie('search-origin', self.request.referer, path='/', expires=120))
         return tree.asdict()
 
     @route('/match', method='GET,POST', template='index')

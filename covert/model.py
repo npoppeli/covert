@@ -144,7 +144,9 @@ def mapdoc(fnmap, doc):
     """Map item (document) by applying functions in function map.
 
     Map item (dictionary) by applying the functions in the function map 'fnmap'.
-    The keys of this map are the field names for a particular model.
+    The keys of this map are the field names for a particular model. The function
+    maps are sparse, i.e. do not contain mapping functions for every field in the model.
+    Missing mapping functions are implied to be the identity function.
 
     Arguments:
         fnmap (dict): dictionary of mapping functions.
@@ -154,8 +156,12 @@ def mapdoc(fnmap, doc):
         dict: transformed item (document).
     """
     result = {}
+    # logger.debug('mapdoc: fnmap keys={} doc={}'.format(fnmap.keys(), str(doc)))
     for key, value in doc.items():
         if key in fnmap: # apply mapping function
+            if fnmap[key] is None:
+                # logger.debug('mapdoc: key={} fn=None'.format(key))
+                continue
             if isinstance(value, dict): # embedded document
                 result[key] = mapdoc(fnmap, value)
             elif isinstance(value, list): # list of scalars or documents
@@ -194,7 +200,7 @@ class Field:
             enum     (list):  range of allowed values for enumerated type
             optional (bool):  True if field is optional
             multiple (bool):  True if field is multiple (list)
-            auto     (bool):  True if field is auto(matic)
+            auto     (bool):  True if field is automatic
             atomic   (bool):  True if field is atomic
         """
         self.label    = label
@@ -220,30 +226,31 @@ class BareItem(dict):
         * mtime  (datetime): modification time (automatic)
     """
     # basics
-    ba = atom_map['boolean']
-    sa = atom_map['string']
-    da = atom_map['datetime']
+    bool_atom     = atom_map['boolean']
+    string_atom   = atom_map['string']
+    datetime_atom = atom_map['datetime']
     name = 'BareItem'
     fields = ['id', '_skey', 'ctime', 'mtime', 'active']
     index = [('id', 1), ('_skey', 1)]
     # validation
-    schema    = {'id':sa.schema, '_skey': sa.schema, 'active': ba.schema,
-                 'ctime':da.schema, 'mtime':da.schema}
+    schema    = {'id':string_atom.schema, '_skey': string_atom.schema, 'active': bool_atom.schema,
+                 'ctime':datetime_atom.schema, 'mtime':datetime_atom.schema}
     _validate = None
     _empty    = {'id':'', '_skey': '', 'active':True,
                  'ctime':EMPTY_DATETIME, 'mtime':EMPTY_DATETIME}
-    # transformation
-    cmap = {'ctime':da.convert, 'mtime':da.convert, 'active': ba.convert}
-    dmap = {'ctime':da.display, 'mtime':da.display, 'active': ba.display}
-    qmap = {'ctime':da.query,   'mtime':da.query,   'active': ba.query  }
+    # transformation maps
+    cmap = {'ctime':datetime_atom.convert, 'mtime':datetime_atom.convert, 'active': bool_atom.convert}
+    dmap = {'ctime':datetime_atom.display, 'mtime':datetime_atom.display, 'active': bool_atom.display}
+    qmap = {'ctime':datetime_atom.query,   'mtime':datetime_atom.query,   'active': bool_atom.query,
+            '_skey': string_atom.query}
     rmap = {}
     wmap = {}
     # metadata
     meta = OrderedDict()
-    meta['id']     = Field(label='Id',       schema='string',   formtype='hidden',  auto=True)
-    meta['_skey']  = Field(label='Sort by',  schema='string',   formtype='hidden',  auto=True)
-    meta['active'] = Field(label='Actief',   schema='boolean',  formtype='boolean', auto=False,
-                           enum=ba.enum, control=ba.control)
+    meta['id']     = Field(label='Id',      schema='string',  formtype='hidden',  auto=True)
+    meta['_skey']  = Field(label='Sort by', schema='string',  formtype='hidden',  auto=True)
+    meta['active'] = Field(label='Actief',  schema='boolean', formtype='boolean', auto=False,
+                           enum=bool_atom.enum, control=bool_atom.control)
     meta['ctime']  = Field(label='Created',  schema='datetime', formtype='hidden',  auto=True)
     meta['mtime']  = Field(label='Modified', schema='datetime', formtype='hidden',  auto=True)
 
@@ -380,6 +387,57 @@ class BareItem(dict):
         item.update(clone)
         return item
 
+    def follow(self, key):
+        """Retrieve item(s) referenced by itemref field from storage.
+
+        Returns:
+            Item  : item, if not multiple field
+            [Item]: list of items, if multiple field
+            None  : all other cases
+        """
+        if key not in self.fields:
+            return None
+        meta = self.meta[key]
+        if meta.schema == 'itemref':
+            if meta.multiple:
+                return [ref.lookup() for ref in self[key]]
+            else:
+                return self[key].lookup()
+        else:
+            return None
+
+    def take(self, *arg):
+        """Retrieve item(s) referenced by itemref field from storage.
+           Use case 1: item.take('key', value)
+           Use case 2: item.take('refkey', 'key', value)
+
+        Returns:
+            list of scalars: when 2 arguments are given
+            [Item]         : when 3 arguments are given
+            None           : all other cases
+        """
+        if len(arg) == 2:
+            key, value = arg[0], arg[1]
+            if not (key in self and self.meta[key].multiple):
+                return None
+            if callable(value):
+                return [v for v in self[key] if value(v)]
+            else:
+                return [v for v in self[key] if v == value]
+        elif len(arg) == 3:
+            refkey, key, value = arg[0], arg[1], arg[2]
+            if refkey not in self:
+                return None
+            meta = self.meta[refkey]
+            if not (meta.multiple and meta.schema == 'itemref'):
+                return None
+            referred = self.follow(refkey)
+            if callable(value):
+                return [r for r in referred if value(r[key])]
+            else:
+                return [r for r in referred if r[key] == value]
+        else:
+            return None
 
 # Auxiliary classes: Visitor, Filter and friends
 class Visitor:
@@ -399,7 +457,8 @@ INDENT = '   '
 
 class Clause:
     OP = ''
-    
+    __slots__ = ['terms']
+
     def __init__(self, *terms):
         self.terms = []
         if terms:
@@ -440,6 +499,8 @@ class Or(Clause):
     OP = 'Of'
 
 class Term:
+    __slots__ = ['field', 'operator', 'value1', 'value2']
+
     def __init__(self, field, operator, value1, value2=None):
         self.field = field
         self.operator = operator
@@ -448,13 +509,13 @@ class Term:
 
     def format(self, level):
         if self.value2:
-            return "{}{} {} {} {}".\
-                   format(level*INDENT, self.field, self.operator, repr(self.value1), repr(self.value2))
+            return "{}{} {} {}:{}".\
+                   format(level*INDENT, self.field, self.operator, str(self.value1), str(self.value2))
         else:
             return "{}{} {} {}".\
-                   format(level*INDENT, self.field, self.operator, repr(self.value1))
+                   format(level*INDENT, self.field, self.operator, str(self.value1))
 
-    def __repr__(self):
+    def __str__(self):
         if self.value2:
             return "{}({}, {}, {}, {})".\
                    format('Term', repr(self.field), repr(self.operator), repr(self.value1), repr(self.value2))
