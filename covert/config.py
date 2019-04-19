@@ -87,12 +87,13 @@ def read_config():
     # in debugging mode, print some configuration parameters
     if setting.debug:
         logger.setLevel(logging.DEBUG)
-    logger.debug("Debug option is {}".format(setting.debug))
-    logger.debug("Verbose option is {}".format(setting.verbose))
-    logger.debug("Changes are{}written to the database".format(' *not* ' if setting.nostore else ' '))
-    logger.debug("Static content is in directory {}".format(setting.content))
-    logger.debug("User interface is in the '{}' language".format(setting.language))
-    logger.debug("Web server listens to {}:{}'".format(setting.host, setting.port))
+    if setting.debug >= 2:
+        logger.debug("Debug option is {}".format(setting.debug))
+        logger.debug("Verbose option is {}".format(setting.verbose))
+        logger.debug("Changes are{}written to the database".format(' *not* ' if setting.nostore else ' '))
+        logger.debug("Static content is in directory {}".format(setting.content))
+        logger.debug("User interface is in the '{}' language".format(setting.language))
+        logger.debug("Web server listens to {}:{}".format(setting.host, setting.port))
 
 def kernel_init():
     """Initialize kernel.
@@ -117,7 +118,8 @@ def kernel_init():
         mkdir(setting.media)
         logger.debug("Created new folder for media storage: {}".format(setting.media))
     setting.store_mdb = HashFS(setting.media)
-    logger.debug("Initialized content-addressable media storage")
+    if setting.debug >= 2:
+        logger.debug("Initialized content-addressable media storage")
 
     # execute prelude (if present)
     if 'prelude' in setting.config:
@@ -146,7 +148,6 @@ def kernel_init():
             for class_name, model_class in getmembers(mod, isclass):
                 if class_name in ['BareItem', 'Item', 'ItemRef']:
                     continue
-                logger.debug('Adding/replacing class %s', class_name)
                 setting.models[class_name] = model_class
         elif extension == '.yml':
             models = read_yaml_file(item)
