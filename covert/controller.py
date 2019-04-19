@@ -179,7 +179,8 @@ class MapRouter:
                 result = route_method()
                 template = route_templates[result.get('style', 0)]
                 for cookie in result['cookies']:
-                    response.set_cookie(cookie[0], value=cookie[1], path=cookie[2], max_age=cookie[3])
+                    response.set_cookie(cookie.name, value=cookie.value,
+                                        path=cookie.path, max_age=cookie.expires)
                 result = self.serialize(result, template)
                 response.cache_control.max_age = 0
             except Exception as e:
