@@ -14,7 +14,7 @@ from datetime import datetime, date, time
 from .common import InternalError
 
 class Atom:
-    """Instance of this class define the atomic constituents of items.
+    """Instances of this class define the atomic constituents of items.
 
     Each item stored in the database is built from atoms or atomic constituents.
     The standard atoms are: integer, float, boolean, date, time, datetime and text (3 types).
