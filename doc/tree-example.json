@@ -1,0 +1,35 @@
+{
+  "title":"", "message":"",   "method":"", "style":0, "status":"",
+  "info":{"recent":[false],"active":[true]},
+  "cursor":null,
+  "data":[
+    {
+      "__buttons":[], "__prefix":"", "__hide":false, "__hidden":[],
+      "firstname":{"meta":"PROPLIST", "buttons":[],"value":"Adrianus"},
+      "prefix":{"meta":"PROPLIST", "buttons":[], "value":"van"},
+      "lastname":{"meta":"PROPLIST","buttons":[],"value":"Aalst"},
+      "birthdate":{"meta":"PROPLIST","buttons":[],"value":"1809-02-27"},
+      "birthplace":{"meta":"PROPLIST","buttons":[],"value":"Raamsdonk"},
+      "deathdate":{"meta":"PROPLIST","buttons":[],"value":"0001-01-01"},
+      "deathplace":{"meta":"PROPLIST","buttons":[],"value":"onbekend"},
+      "gender":{"meta":"PROPLIST","buttons":[],"value":"m"},
+      "family":{"meta":"PROPLIST","buttons":[],"value":["","G. van Aalst x A. Poppelier","/family/575c0693e842790d2a631f62","1804"]},
+      "marriages.0":{"meta":"PROPLIST","buttons":[],"value":""},
+      "religion":{"meta":"PROPLIST","buttons":[],"value":"RK"},
+      "notes.0":{"meta":"PROPLIST","buttons":[],"value":"test"},
+      "sources.0":{"meta":"PROPLIST","buttons":[],"value":""},
+      "pid":{"meta":"PROPLIST","buttons":[],"value":"186"},
+      "id":{"meta":"PROPLIST","buttons":[],"value":"OID"},
+      "ctime":{"meta":"PROPLIST","buttons":[],"value":"2016-06-11T14:39:46"},
+      "mtime":{"meta":"PROPLIST","buttons":[],"value":"2016-09-27T08:00:35"},
+      "active":{"meta":"PROPLIST","buttons":[],"value":"ja"}
+    },
+  ],
+  "buttons":[
+    {"action":"/person/index","method":"GET","label":"Blader","icon":"fa fa-list-alt"},
+    {"action":"/person/search","method":"GET","label":"Zoek","icon":"fa fa-search"},
+    {"action":"/person/OID/modify","method":"GET","label":"Wijzig","icon":"fa fa-pencil"},
+    {"action":"/person/OID","method":"DELETE","label":"Verwijder","icon":"fa fa-trash-o"},
+    {"action":"/person/OID/diagram","method":"GET","label":"Boom","icon":"fa fa-tree"},
+    {"action":"/person/OID/marriages/new","method":"GET","label":"Huwelijk","icon":"fa fa-venus-mars"}]
+}
