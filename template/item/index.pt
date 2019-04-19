@@ -4,11 +4,7 @@
     <input type="hidden" name="_skip"   value="${cursor.skip}" />
     <input type="hidden" name="_filter" value="${cursor.filter}"/>
     <div class="form-group">
-      <label for="incl" class="text-info control-label">Toon vervallen: </label>
-      <input type="checkbox" name="_incl" value="1" id="incl" tal:attributes="checked 'checked' if cursor.incl else default"/>
-    </div>
-    <div class="form-group">
-      <label for="limit" class="text-info control-label">Aantal items: </label>
+      <label for="limit" class="text-info control-label">&nbsp;Item ${1+cursor.skip} van ${cursor.count}. Items tonen: </label>
       <select class="form-control input-sm" name="_limit" id="limit">
         <option tal:attributes="selected 'selected' if cursor.limit==5  else default">5</option>
         <option tal:attributes="selected 'selected' if cursor.limit==10 else default">10</option>
@@ -23,10 +19,14 @@
       <button class="btn btn-default btn-sm" type="submit" name="_dir" value="1"
           tal:attributes="disabled 'disabled' if not cursor.next else default"><span class="fa fa-chevron-right"></span></button>
     </div>
+    <div class="form-group">
+      <label for="incl" class="text-info control-label">Toon vervallen: </label>
+      <input type="checkbox" name="_incl" value="1" id="incl" tal:attributes="checked 'checked' if cursor.incl else default"/>
+    </div>
   </form>
 </div>
 <div>
-  <p class="class">${this['title']}</p>
+  <p class="lead">${this['title']}</p>
 </div>
 <!--! data -->
 <div tal:condition="len(this['data'])>0">
