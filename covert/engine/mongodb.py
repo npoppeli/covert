@@ -6,8 +6,9 @@ The Item class encapsulates the details of the storage engine.
 """
 
 from datetime import datetime
+from time import clock
 from pymongo import MongoClient
-from ..common import SUCCESS, ERROR, FAIL, logger, InternalError, show_dict
+from ..common import SUCCESS, ERROR, FAIL, logger, InternalError
 from ..model import BareItem, mapdoc, Visitor, Filter
 from .. import setting
 from bson.objectid import ObjectId
@@ -21,10 +22,21 @@ def report_db_action(result):
 
 query_map = {
     '==': lambda x, y: x,
+    'eq': lambda x, y: x,
     '=~': lambda x, y: {'$regex': x},
+    're': lambda x, y: {'$regex': x},
     '[]': lambda x, y: {'$gte': x, '$lte': y},
+    'in': lambda x, y: {'$gte': x, '$lte': y},
+    '!=': lambda x, y: {'$ne': x},
+    '<>': lambda x, y: {'$ne': x},
+    '<' : lambda x, y: {'$lt': x},
+    'lt': lambda x, y: {'$lt': x},
+    '>' : lambda x, y: {'$gt': x},
+    'gt': lambda x, y: {'$gt': x},
     '<=': lambda x, y: {'$lte': x},
-    '>=': lambda x, y: {'$gte': x}
+    'le': lambda x, y: {'$lte': x},
+    '>=': lambda x, y: {'$gte': x},
+    'ge': lambda x, y: {'$gte': x}
 }
 
 class Translator(Visitor):
@@ -69,7 +81,8 @@ def init_storage():
     """Initialize storage engine."""
     setting.store_connection = MongoClient()
     setting.store_db = setting.store_connection[setting.store_dbname]
-    logger.debug("Create MongoDB connection, set database to '{}'".format(setting.store_dbname))
+    if setting.debug >= 2:
+        logger.debug("Create MongoDB connection, set database to '{}'".format(setting.store_dbname))
 
 class Item(BareItem):
     """Class for reading and writing objects from/to this storage engine.
@@ -116,6 +129,8 @@ class Item(BareItem):
         Returns:
             dict: filter in MongoDB form.
         """
+        if obj is None:
+            return None
         if setting.debug and not isinstance(obj, Filter):
             raise ValueError('Argument 2 of Item.filter not a Filter instance')
         translator = Translator(cls.wmap)
@@ -159,9 +174,9 @@ class Item(BareItem):
 
         Arguments:
             fltr  (Filter): instance of Filter class
-            skip  (int):    number of items to skip.
-            limit (int):    maximum number of items to retrieve.
-            sort  (list):   sort specification.
+            skip  (int)   : number of items to skip.
+            limit (int)   : maximum number of items to retrieve.
+            sort  (list)  : sort specification.
 
         Returns:
             list: list of 'cls' instances.
@@ -170,6 +185,35 @@ class Item(BareItem):
         cursor = setting.store_db[cls.name].find(filter=cls.filter(fltr),
                                                  skip=skip, limit=limit, sort=sort_spec)
         return [cls(item) for item in cursor]
+
+    @classmethod
+    def project(cls, field, fltr, sort=None, bare=False):
+        """Retrieve items from collection, and return selection of fields.
+
+        Find zero or more items in collection, and return these in the
+        form of a list of tuples. Assumption: stored items are valid.
+
+        Arguments:
+            fltr  (Filter)      : instance of Filter class
+            field (string, list): name(s) of field(s) to include.
+            sort  (list)        : sort specification.
+            bare  (bool)        : if True, return only bare values.
+
+        Returns:
+            list: list of field values, tuples or dictionaries
+        """
+        mono = isinstance(field, str)
+        sort_spec = sort if sort else [('_skey',1)]
+        proj_spec = {field: 1} if mono else dict.fromkeys(field, 1)
+        cursor = setting.store_db[cls.name].find(filter=cls.filter(fltr),
+                                                 projection=proj_spec, sort=sort_spec)
+        if bare:
+            if mono:
+                return [doc[field] for doc in cursor]
+            else:
+                return [tuple(doc[f] for f in field) for doc in cursor]
+        else:
+            return list(cursor)
 
     @classmethod
     def lookup(cls, oid):

@@ -39,15 +39,21 @@ class Translator(Visitor):
             new_term = self.visit(term)
             for field, cond in new_term.items():
                 operator = cond[0]
-                if operator == '==':
+                if operator   in ('==', 'eq'):
                     self.chain = self.chain.filter(r.row[field] == cond[1])
-                elif operator == '=~':
+                elif operator in ('<>', '!='):
+                    self.chain = self.chain.filter(r.row[field] != cond[1])
+                elif operator in ('=~', 're'):
                     self.chain = self.chain.filter(r.row[field].match(cond[1]))
-                elif operator == '[]':
+                elif operator in ('[]', 'in'):
                     self.chain = self.chain.filter((r.row[field] >= cond[1]) & (r.row[field] <= cond[2]))
-                elif operator == '<=':
+                elif operator in ('<', 'lt'):
+                    self.chain = self.chain.filter(r.row[field] < cond[1])
+                elif operator in ('<=', 'le'):
                     self.chain = self.chain.filter(r.row[field] <= cond[1])
-                elif operator == '>=':
+                elif operator in ('>', 'gt'):
+                    self.chain = self.chain.filter(r.row[field] > cond[1])
+                elif operator in ('>=', 'ge'):
                     self.chain = self.chain.filter(r.row[field] >= cond[1])
         return self.chain
 
@@ -72,7 +78,8 @@ def init_storage():
     """Initialize storage engine."""
     setting.store_connection = r.connect(db=setting.store_dbname).repl()
     setting.store_db = r.db(setting.store_dbname)
-    logger.debug("Create RethinkDB connection, set database to '{}'".format(setting.store_dbname))
+    if setting.debug >= 2:
+        logger.debug("Create RethinkDB connection, set database to '{}'".format(setting.store_dbname))
 
 class Item(BareItem):
     """Class for reading and writing objects from/to this storage engine.
@@ -124,6 +131,8 @@ class Item(BareItem):
         Returns:
             selection: filter in RethinkDB form.
         """
+        if obj is None:
+            return None
         if setting.debug and not isinstance(obj, Filter):
             raise ValueError('Wrong argument for Item.filter()')
         translator = Translator(cls.wmap, cls.name)
@@ -184,6 +193,42 @@ class Item(BareItem):
         cursor = cursor.order_by(*sort_spec)
         result = cursor.run(setting.store_connection)
         return [cls(item) for item in result]
+
+    @classmethod
+    def project(cls, field, fltr, sort=None, bare=False):
+        """Retrieve items from collection, and return selection of fields.
+
+        Find zero or more items in collection, and return these in the
+        form of a list of tuples. Assumption: stored items are valid.
+
+        Arguments:
+            fltr  (Filter)      : instance of Filter class
+            field (string, list): name(s) of field(s) to include.
+            sort  (list)        : sort specification.
+            bare  (bool)        : if True, return only bare values.
+
+        Returns:
+            list: list of field values, tuples or dictionaries
+        """
+        mono = isinstance(field, str)
+        cursor = cls.filter(fltr)
+        if sort:
+            sort_spec = [r.asc(el[0]) if el[1] == 1 else r.desc(el[0]) for el in sort]
+        else:
+            sort_spec = [r.asc('_skey')]
+        if mono:
+            cursor = cursor.pluck(field)
+        else:
+            cursor = cursor.pluck(*field)
+        cursor = cursor.order_by(*sort_spec)
+        result = cursor.run(setting.store_connection)
+        if bare:
+            if mono:
+                return [doc[field] for doc in result]
+            else:
+                return [tuple(doc[f] for f in field) for doc in result]
+        else:
+            return list(result)
 
     @classmethod
     def lookup(cls, oid):
