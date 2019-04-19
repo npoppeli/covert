@@ -35,8 +35,10 @@ def add_template_type(extension, factory):
     if extension in template_factory:
         logger.debug('Cannot redefine template type %s', extension)
     else:
-        logger.debug('Define new template type %s', extension)
         template_factory[extension] = factory
+        if setting.debug >= 2:
+            logger.debug('Define new template type %s', extension)
+
 
 try:
     from chameleon import PageTemplateFile
@@ -54,8 +56,9 @@ def read_templates():
         None
     """
     template_types = list(template_factory.keys())
-    logger.debug('Scanning for templates in {0}'.format(setting.layout))
-    logger.debug('Template types: {0}'.format(' '.join(template_types)))
+    if setting.debug >= 2:
+        logger.debug('Scanning for templates in {0}'.format(setting.layout))
+        logger.debug('Template types: {0}'.format(' '.join(template_types)))
     for (dirpath, __, filenames) in walk(setting.layout):
         prefix = relpath(dirpath, setting.layout)
         for filename in filenames:
