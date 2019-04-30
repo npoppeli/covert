@@ -489,41 +489,6 @@ class Clause:
         return "{}({})".\
             format(self.__class__.__name__, ', '.join([repr(t) for t in self.terms]))
 
-class Filter(Clause):
-    OP = 'En'
-
-class And(Clause):
-    OP = 'En'
-
-class Or(Clause):
-    OP = 'Of'
-
-class Term:
-    __slots__ = ['field', 'operator', 'value1', 'value2']
-
-    def __init__(self, field, operator, value1, value2=None):
-        self.field = field
-        self.operator = operator
-        self.value1 = value1
-        self.value2 = value2
-
-    def format(self, level):
-        if self.value2:
-            return "{}{} {} {}:{}".\
-                   format(level*INDENT, self.field, self.operator, str(self.value1), str(self.value2))
-        else:
-            return "{}{} {} {}".\
-                   format(level*INDENT, self.field, self.operator, str(self.value1))
-
-    def __str__(self):
-        if self.value2:
-            return "{}({}, {}, {}, {})".\
-                   format('Term', repr(self.field), repr(self.operator), repr(self.value1), repr(self.value2))
-        else:
-            return "{}({}, {}, {})".\
-                   format('Term', repr(self.field), repr(self.operator), repr(self.value1))
-
-
 # Item references
 def get_objectid(ref):
     """Retrieve objectid from item reference.
