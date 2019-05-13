@@ -25,6 +25,15 @@ except ImportError:
 logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
 logger = logging.getLogger('waitress')
 
+# string handling
+def escape_squote(s):
+    """Escape single quotes in string `s`."""
+    return s.replace("'", chr(92)+'u0027')
+
+def escape_dquote(s):
+    """Escape double quotes in string `s`."""
+    return s.replace("'", chr(92)+'u0022')
+
 # Exceptions
 class InternalError(Exception):
     """Internal error exception.

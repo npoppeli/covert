@@ -1,3 +1,9 @@
+Version 0.10
+------------
+
+### Features
+- API changes: completely new query approach, which affects view.py and the db engines
+
 Version 0.9
 -----------
 

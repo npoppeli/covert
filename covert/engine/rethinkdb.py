@@ -8,7 +8,7 @@ The Item class encapsulates the details of the storage engine.
 from datetime import datetime
 import rethinkdb as r
 from ..common import SUCCESS, ERROR, FAIL, logger, InternalError
-from ..model import BareItem, mapdoc, Visitor, Filter
+from ..model import BareItem, mapdoc, Visitor
 from .. import setting
 from bson.objectid import ObjectId
 
@@ -117,26 +117,24 @@ class Item(BareItem):
                     table.index_create(el[0]).run(setting.store_connection)
 
     @classmethod
-    def filter(cls, obj):
-        """Create filter from Filter object `obj`.
+    def filter(cls, expr):
+        """Create filter from filter expression `expr`.
 
-        In the view methods, filters are specified as instance of the Filter class.
+        In the view methods, filters are specified as Python expressions.
         Fields with 'multiple' property (list-valued fields) have a normal query condition.
         Since RethinkDB differentiates search scalar field and search list field, we must use
         information from the model to rewrite the query.
 
         Arguments:
-            obj (Filter): Filter object.
+            expr (str): Python expression.
 
         Returns:
-            selection: filter in RethinkDB form.
+            selection: RethinkDB sequence
         """
-        if obj is None:
+        if not expr:
             return None
-        if setting.debug and not isinstance(obj, Filter):
-            raise ValueError('Wrong argument for Item.filter()')
         translator = Translator(cls.wmap, cls.name)
-        return translator.visit(obj)
+        return translator.visit(expr)
 
     @classmethod
     def max(cls, field):
@@ -159,7 +157,7 @@ class Item(BareItem):
         Find zero or more items (documents) in collection, and count them.
 
         Arguments:
-            fltr (Filter): instance of Filter class
+            fltr (str): Python expression.
 
         Returns:
             int: number of matching items.
@@ -175,10 +173,10 @@ class Item(BareItem):
         form of a list of 'cls' instances. Assumption: stored items are valid.
 
         Arguments:
-            fltr  (Filter): instance of Filter class
-            skip  (int):    number of items to skip.
-            limit (int):    maximum number of items to retrieve.
-            sort  (list):   sort specification.
+            fltr  (str) : Python expressions.
+            skip  (int) : number of items to skip.
+            limit (int) : maximum number of items to retrieve.
+            sort  (list): sort specification.
 
         Returns:
             list: list of 'cls' instances.
@@ -202,7 +200,7 @@ class Item(BareItem):
         form of a list of tuples. Assumption: stored items are valid.
 
         Arguments:
-            fltr  (Filter)      : instance of Filter class
+            fltr  (str)         : Python expression.
             field (string, list): name(s) of field(s) to include.
             sort  (list)        : sort specification.
             bare  (bool)        : if True, return only bare values.

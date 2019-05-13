@@ -5,11 +5,11 @@ This module defines the Item class and an initialization function for the storag
 The Item class encapsulates the details of the storage engine.
 """
 
+import ast, sys
 from datetime import datetime
-from time import clock
 from pymongo import MongoClient
 from ..common import SUCCESS, ERROR, FAIL, logger, InternalError
-from ..model import BareItem, mapdoc, Visitor, Filter
+from ..model import BareItem, mapdoc
 from .. import setting
 from bson.objectid import ObjectId
 
@@ -20,62 +20,66 @@ def report_db_action(result):
     if setting.debug > 1:
         logger.debug(message)
 
-query_map = {
-    '==': lambda x, y: x,
-    'eq': lambda x, y: x,
-    '=~': lambda x, y: {'$regex': x},
-    're': lambda x, y: {'$regex': x},
-    '[]': lambda x, y: {'$gte': x, '$lte': y},
-    'in': lambda x, y: {'$gte': x, '$lte': y},
-    '!=': lambda x, y: {'$ne': x},
-    '<>': lambda x, y: {'$ne': x},
-    '<' : lambda x, y: {'$lt': x},
-    'lt': lambda x, y: {'$lt': x},
-    '>' : lambda x, y: {'$gt': x},
-    'gt': lambda x, y: {'$gt': x},
-    '<=': lambda x, y: {'$lte': x},
-    'le': lambda x, y: {'$lte': x},
-    '>=': lambda x, y: {'$gte': x},
-    'ge': lambda x, y: {'$gte': x}
-}
-
-class Translator(Visitor):
+class Translator(ast.NodeVisitor):
     """Translate query to form suitable for this storage engine.
 
-    A filter is a sequence of terms or nested clauses (and, or). A term is a tuple (op, value) or
-    (op, value1, value2), where 'op' is a 2-character string specifying a filter operator.
-    The translation to MongoDB form is given by 'query_map'. Fields with 'multiple' property
-    (list-valued fields) have a normal query condition, since MongoDB does not distinguish
-    search scalar field from search list field.
+    A filter is a restricted form of Python expression. EXPAND ...
+    Field names are written as variables. Constants are always strings.
+    Allowed boolean operators: and, not.
+    Allowed binary operators: ==, ~=, <, <=, >, >=, in, % (=~ in Perl notation).
+    Fields with 'multiple' property (list-valued fields) have a normal query condition,
+    since MongoDB does not distinguish search scalar field from search list field.
     """
-    def  __init__(self, wmap):
+    def  __init__(self, cmap, wmap):
+        self.cmap = cmap
         self.wmap = wmap
 
-    def visit_filter(self, node):
-        result = {}
-        for term in node.terms:
-            result.update(self.visit(term))
-        return result
+    def V_(self, key, value):
+        """Convert string value to real value for database query: wmap(cmap(value))"""
+        v1 = self.cmap[key](value) if value and (key in self.cmap) else value
+        v2 = self.wmap[key](v1) if v1 and (key in self.wmap) else v1
+        return v2
 
-    def visit_and(self, node):
-        result = [self.visit(term) for term in node.terms]
-        return {'$and': result}
-
-    def visit_or(self, node):
-        result = [self.visit(term) for term in node.terms]
-        return {'$or': result}
-
-    def visit_term(self, node):
-        field = node.field
-        operator = node.operator
-        wmap = self.wmap
-        value1 = wmap[field](node.value1) if (node.value1 and field in wmap) else node.value1
-        value2 = wmap[field](node.value2) if (node.value2 and field in wmap) else node.value2
-        if operator in query_map:
-            result = {field: query_map[operator](value1, value2)}
+    # default method
+    def generic_visit(self, n):
+        raise NotImplementedError('Translator: no method for '+n.__class__.__name__)
+    # auxiliaries
+    def visit_elts        (self, n): return [self.visit(elt) for elt in n.elts]
+    def visit_values      (self, n): return [self.visit(elt) for elt in n.values]
+    # simple nodes
+    def visit_And         (self, n): return '$and'
+    def visit_Eq          (self, n): return '$eq'
+    def visit_NotEq       (self, n): return '$ne'
+    def visit_Lt          (self, n): return '$lt'
+    def visit_LtE         (self, n): return '$lte'
+    def visit_Gt          (self, n): return '$gt'
+    def visit_GtE         (self, n): return '$gte'
+    def visit_Expr        (self, n): return self.visit(n.value)
+    def visit_In          (self, n): return '$in'
+    def visit_Mod         (self, n): return '$regex'
+    def visit_Name        (self, n): return n.id
+    def visit_NameConstant(self, n): return n.value
+    def visit_Or          (self, n): return '$or'
+    def visit_Str         (self, n): return n.s
+    def visit_List        (self, n): return self.visit_elts(n)
+    def visit_Tuple       (self, n): return self.visit_elts(n)
+    # complex nodes
+    def visit_BinOp(self, n):
+        key, value = self.visit(n.left), self.visit(n.right)
+        return {key: {self.visit(n.op): self.V_(key, value)}}
+    def visit_BoolOp(self, n):
+        return {self.visit(n.op): self.visit_values(n)}
+    def visit_Compare(self, n):
+        oper = self.visit(n.ops[0])
+        if oper == '$in':
+            arg0 = self.visit(n.comparators[0])
+            arg1 = self.visit(n.comparators[1])
+            key, value1, value2 = self.visit(n.left), arg0, arg1
+            return {key: {'$gte': self.V_(key, value1), '$lte': self.V_(key, value2)}}
         else:
-            result = {field: {operator: value1}}
-        return result
+            arg0 = self.visit(n.comparators[0])
+            key, value = self.visit(n.left), arg0
+            return {key: {oper: self.V_(key, value)}}
 
 def init_storage():
     """Initialize storage engine."""
@@ -117,24 +121,34 @@ class Item(BareItem):
             collection.create_index(item[0], unique=False)
 
     @classmethod
-    def filter(cls, obj):
-        """Create filter from Filter object `obj`.
+    def filter(cls, expr):
+        """Create filter from filter expression `expr`.
 
-        In the view methods, filters are specified as instance of the Filter class.
+        In the view methods, filters are specified as Python expressions.
         Fields with 'multiple' property (list-valued fields) have a normal query condition.
 
         Arguments:
-            obj (Filter): Filter object.
+            expr (str): Python expression.
 
         Returns:
-            dict: filter in MongoDB form.
+            dict: query document in MongoDB form.
         """
-        if obj is None:
+        if not expr:
             return None
-        if setting.debug and not isinstance(obj, Filter):
-            raise ValueError('Argument 2 of Item.filter not a Filter instance')
-        translator = Translator(cls.wmap)
-        return translator.visit(obj)
+        try:
+            root = compile(expr, '', 'eval', ast.PyCF_ONLY_AST)
+        except SyntaxError as e:
+            logger.debug("Item.filter: expr={}".format(expr))
+            logger.debug("Exception '{}'".format(e))
+            raise
+        translator = Translator(cls.cmap, cls.wmap)
+        try:
+            result = translator.visit(root.body)
+            return result
+        except NotImplementedError as e:
+            logger.debug("Item.filter: expr={}".format(expr))
+            logger.debug("Item.filter: root={}".format(ast.dump(root)))
+            return None
 
     @classmethod
     def max(cls, field):
@@ -151,50 +165,50 @@ class Item(BareItem):
         return cursor[0][field]
 
     @classmethod
-    def count(cls, fltr):
+    def count(cls, expr):
         """Count items in collection that match a given query.
 
         Find zero or more items (documents) in collection, and count them.
 
         Arguments:
-            fltr (Filter): instance of Filter class
+            expr (str): Python expression.
 
         Returns:
             int: number of matching items.
         """
-        cursor = setting.store_db[cls.name].find(filter=cls.filter(fltr))
+        cursor = setting.store_db[cls.name].find(filter=cls.filter(expr))
         return cursor.count()
 
     @classmethod
-    def find(cls, fltr, skip=0, limit=0, sort=None):
+    def find(cls, expr, skip=0, limit=0, sort=None):
         """Retrieve items from collection.
 
         Find zero or more items in collection, and return these in the
         form of a list of 'cls' instances. Assumption: stored items are valid.
 
         Arguments:
-            fltr  (Filter): instance of Filter class
-            skip  (int)   : number of items to skip.
-            limit (int)   : maximum number of items to retrieve.
-            sort  (list)  : sort specification.
+            expr  (str) : Python expression.
+            skip  (int) : number of items to skip.
+            limit (int) : maximum number of items to retrieve.
+            sort  (list): sort specification.
 
         Returns:
             list: list of 'cls' instances.
         """
         sort_spec = sort if sort else [('_skey',1)]
-        cursor = setting.store_db[cls.name].find(filter=cls.filter(fltr),
+        cursor = setting.store_db[cls.name].find(filter=cls.filter(expr),
                                                  skip=skip, limit=limit, sort=sort_spec)
         return [cls(item) for item in cursor]
 
     @classmethod
-    def project(cls, field, fltr, sort=None, bare=False):
+    def project(cls, field, expr, sort=None, bare=False):
         """Retrieve items from collection, and return selection of fields.
 
         Find zero or more items in collection, and return these in the
         form of a list of tuples. Assumption: stored items are valid.
 
         Arguments:
-            fltr  (Filter)      : instance of Filter class
+            expr  (str)         : Python expression.
             field (string, list): name(s) of field(s) to include.
             sort  (list)        : sort specification.
             bare  (bool)        : if True, return only bare values.
@@ -205,7 +219,7 @@ class Item(BareItem):
         mono = isinstance(field, str)
         sort_spec = sort if sort else [('_skey',1)]
         proj_spec = {field: 1} if mono else dict.fromkeys(field, 1)
-        cursor = setting.store_db[cls.name].find(filter=cls.filter(fltr),
+        cursor = setting.store_db[cls.name].find(filter=cls.filter(expr),
                                                  projection=proj_spec, sort=sort_spec)
         if bare:
             if mono:

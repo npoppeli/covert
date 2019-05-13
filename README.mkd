@@ -21,13 +21,14 @@ with this command: `sudo pip install covert`.
 ### Dependencies
 
 All dependencies are available through pip.
+For development Mercurial is needed as well.
 
 #### Required
 
 - *WebOb*
 - *Waitress*
 - *Chameleon*
-- *MongoDB* or *RethinkDB*
+- either *MongoDB* (with *PyMongo*) or *RethinkDB*
 
 About
 -----

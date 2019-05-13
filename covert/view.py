@@ -9,16 +9,15 @@ In the present implementation, form validation is performed on the server. Alter
 do form validation in the client, using Parsley.js (jQuery) for example.
 """
 
-from base64 import b64decode, b64encode
-import pickle, re
+import re
 from collections import OrderedDict
 from datetime import datetime, timedelta
 from inspect import getmembers, isclass, isfunction
 from itertools import chain
 from urllib.parse import urlencode
 from .common import SUCCESS, write_file, logger
-from .common import encode_dict, show_dict
-from .model import unflatten, mapdoc, Filter, Term, Or
+from .common import encode_dict, show_dict, escape_squote
+from .model import unflatten, mapdoc
 from . import setting
 
 def str2int(s):
@@ -332,11 +331,11 @@ class Cursor:
             setattr(self, key, value)
         self.form = {}
         self.operator = {}
+        self.filter = ''
         form = {}
         for key, value in request.params.items():
-            if key == '_filter': # rebuild filter that was saved in form
-                decoded = b64decode(value.encode())
-                self.filter = pickle.loads(decoded)
+            if key == '_filter': # (re)use filter that is included in request
+                self.filter = value
             elif key =='_skey':
                 form[key] = value
             elif key.startswith('*'): # operator
@@ -345,8 +344,7 @@ class Cursor:
                 setattr(self, key[1:], str2int(value) if key[1:] in self.default else value)
             elif value:
                 form[key] = value
-        if initial_post: # add operators
-            logger.debug('cursor.form: initial post, populate self.form')
+        if initial_post:
             for key, value in mapdoc(model.qmap, unflatten(form, model)).items():
                 # if value is a list, use the first element
                 operator_value = value[0] if isinstance(value, list) else value
@@ -356,16 +354,13 @@ class Cursor:
                     self.form[key] = operator_value
                 else: # operator-value tuple with default operator
                     self.form[key] = (operator_value[0], operator_value[1])
-                logger.debug('cursor.form: {} -> {}'.format(key, str(self.form[key])))
 
     def __str__(self):
         d = dict([(key, getattr(self, key, '')) for key in self.__slots__])
-        d['filter'] = b64encode(pickle.dumps(d['filter'])).decode()
         return encode_dict(d)
 
     def asdict(self):
         d = dict([(key, getattr(self, key, '')) for key in self.__slots__])
-        d['filter'] = b64encode(pickle.dumps(d['filter'])).decode()
         return d
 
 def get_button(view_name, action, item):
@@ -411,6 +406,13 @@ class Cookie:
         self.value   = value
         self.path    = path
         self.expires = expires
+
+regex_active = re.compile("\(active\s*=\s*'.+?'\)")
+regex_andand = re.compile('and\s*and')
+
+def remove_active(s):
+    """Remove term active == 'foo' from filter expression `s`"""
+    return regex_andand.sub(' and ', regex_active.sub('', s))
 
 class RenderTree:
     """Tree representation of information created by a route.
@@ -468,7 +470,7 @@ class RenderTree:
         """
         cursor = self.cursor
         initial_post = '_skip' not in self.request.params
-        if initial_post:
+        if initial_post and not cursor.filter:
            # translate interval specifications in form
            for key, value in cursor.form.items():
                if isinstance(value, dict): # not converted by mapdoc
@@ -478,28 +480,26 @@ class RenderTree:
                        cursor.form[key] = ('in', convert(value['from']), convert(value['to']))
                    elif key_set == {'from'}:
                        cursor.form[key] = ('==', convert(value['from']))
-           filter_spec = {} if cursor.incl == 1 else {'active': ('==', True)}
+           filter_spec = {} if cursor.incl == 1 else {'active': ('==', '1')}
            filter_spec.update(cursor.form)
-           # translate filter dictionary to Filter object
-           new_filter = Filter()
+           # translate filter dictionary to expression
+           terms = []
            for key, value in filter_spec.items():
-               if key == 'active':
-                   continue
                if len(value) == 3:
-                   new_filter.add(Term(key, value[0], value[1], value[2]))
+                   terms.append("({} {} ('{}', '{}'))".format(key, value[0], value[1], value[2]))
                else:
-                   new_filter.add(Term(key, value[0], value[1]))
-           cursor.filter = new_filter
-           if 'active' in filter_spec:
-               cursor.filter.add(Term('active', '==', True))
+                   terms.append("({} {} '{}')".format(key, value[0], escape_squote(value[1])))
+           cursor.filter = ' and '.join(terms)
+           # logger.debug('move_cursor (initial): filter=|{}|'.format(cursor.filter))
         else:
             # cursor.incl == 1: remove term 'active=True' (if present) from filter
             #             == 0: add term 'active=True' (if not present) to filter
             if cursor.incl == 1:
                 if 'active' in cursor.filter:
-                    del cursor.filter['active']
+                    cursor.filter = remove_active(cursor.filter)
             elif 'active' not in cursor.filter:
-                cursor.filter.add(Term('active', '==', True))
+                cursor.filter += " and (active == '1')"
+            # logger.debug('move_cursor (follow-up): filter=|{}|'.format(cursor.filter))
         cursor.count = self.model.count(cursor.filter)
         cursor.skip = max(0, min(cursor.count, cursor.skip+cursor.dir*cursor.limit))
         cursor.prev = cursor.skip>0
@@ -545,7 +545,7 @@ class RenderTree:
         else:
             origin = self.request.cookies.get('search-origin', 'onbekend')
             self.add_return_button(origin)
-            self.message += 'Geen resultaten voor zoekopdracht:\n{}'.format(self.cursor.filter.format())
+            self.message += 'Geen resultaten voor zoekopdracht:\n{}'.format(self.cursor.filter)
         # TODO: move lines below to event handler
         self.computed['active'] = active
         self.computed['recent'] = recent
@@ -674,7 +674,6 @@ class RenderTree:
         result = dict([(key, getattr(self, key)) for key in self.nodes])
         if result.get('cursor', None):
             result['cursor'] = result['cursor'].asdict()
-            result['cursor']['filter'] = encode_dict(result['cursor']['filter'])
         result['data'] = [item for item in result['data'] if not item['_hide']]
         return result
 
