@@ -3,7 +3,7 @@
   <p class="text-bold">${this['title']}</p>
 </div>
 <!--! data -->
-<table class='table table-bordered'
+<table class='table table-bordered table-sm'
        tal:define="item this['data'][0]; fields item['_keys']; computed this['computed']">
   <tbody id="item01" tal:attributes="class default if item['active']['value'] else 'text-muted'">
     <span tal:repeat="key fields" tal:omit-tag="">
@@ -26,7 +26,8 @@
 <!--! auto fields -->
 <div tal:define="item this['data'][0]">
   <p class="text-muted small">Gemaakt op: ${item['ctime']['value']}.
-    Gewijzigd op: ${item['mtime']['value']}.</p>
+    Gewijzigd op: ${item['mtime']['value']}.
+    <span tal:condition="'guid' in item">GUID: ${item['guid']['value']}.</span></p>
 </div>
 <!--! message -->
 <div tal:condition="this['message']">

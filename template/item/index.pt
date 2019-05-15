@@ -2,6 +2,7 @@
 <div style="margin-bottom:20px">
   <form tal:define="cursor this['cursor']" class="form-inline" action="${cursor.action}" method="POST">
     <input type="hidden" name="_skip"   value="${cursor.skip}" />
+    <input type="hidden" name="_count"  value="${cursor.count}" />
     <input type="hidden" name="_filter" value="${cursor.filter}"/>
     <div class="form-group">
       <label for="limit" class="text-info control-label">&nbsp;Item ${1+cursor.skip} van ${cursor.count}. Items tonen: </label>
@@ -13,10 +14,10 @@
       </select>
     </div>
     <div class="form-group">
-      <button class="btn btn-default btn-sm" type="submit" name="_dir" value="-1"
+      <button class="btn btn-light btn-sm" type="submit" name="_dir" value="-1"
           tal:attributes="disabled 'disabled' if not cursor.prev else default"><span class="fa fa-chevron-left"></span></button>
-      <button class="btn btn-default btn-sm" type="submit" name="_dir" value="0"><span class="fa fa-refresh"></span></button>
-      <button class="btn btn-default btn-sm" type="submit" name="_dir" value="1"
+      <button class="btn btn-light btn-sm" type="submit" name="_dir" value="0"><span class="fa fa-refresh"></span></button>
+      <button class="btn btn-light btn-sm" type="submit" name="_dir" value="1"
           tal:attributes="disabled 'disabled' if not cursor.next else default"><span class="fa fa-chevron-right"></span></button>
     </div>
     <div class="form-group">
@@ -25,14 +26,16 @@
     </div>
   </form>
 </div>
+<div class="w-100"></div> <!-- break to new row -->
 <div>
   <p class="lead">${this['title']}</p>
 </div>
 <!--! data -->
+<div class="w-100"></div> <!-- break to new row -->
 <div tal:condition="len(this['data'])>0">
-  <table class='table table-bordered table-condensed'
+  <table class='table table-sm'
     tal:define="data this['data']; top data[0]; fields top['_keys']; computed this['computed']">
-  <thead>
+  <thead class="thead-light">
   <tr>
     <th tal:repeat="field fields">${top[field]['meta']['label']}</th>
     <th>&nbsp;</th>
@@ -47,21 +50,24 @@
          <span tal:case="False" tal:replace="value"></span>
        </td>
      </span>
-     <td class="text-nowrap">
+     <td class="text-nowrap" style="width:140px">
        <a tal:repeat="button item['_buttons']" href="${button['action']}" target="_blank"
           data-bind="${'id'+str(repeat.item.index)}" data-method="${button['method']}">
-       <button class="btn btn-default btn-xs"><span class="${button['icon']}"></span></button></a>
+       <button class="btn btn-light btn-xs py-0"><span class="${button['icon']}"></span></button></a>
      </td>
      </tr>
   </tbody>
   </table>
 </div>
 <!--! message -->
+<div class="w-100"></div> <!-- break to new row -->
 <div tal:condition="this['message']">
-  <p><span tal:content="structure this['message']"></span></p>
+  <pre class="text-info col-sm-6" tal:content="structure this['message'].replace('\n','<br/>').replace(' ', '&nbsp;')">
+  </pre>
 </div>
 <!--! buttons -->
+<div class="w-100"></div> <!-- break to new row -->
 <div>
   <a tal:repeat="button this['buttons']" href="${button['action']}" data-method="${button['method']}">
-    <button class="btn btn-primary btn-sm"><span class="${button['icon']}"></span>${button['label']}</button></a>&nbsp;
+    <button class="btn btn-primary btn-sm py-0"><span class="${button['icon']}"></span>${button['label']}</button></a>&nbsp;
 </div>

@@ -3,19 +3,19 @@
   <p class="text-bold">${this['title']}</p>
 </div>
 <!--! data -->
-<form class="form-horizontal" action="${this['buttons'][0]['action']}" method="POST">
-  <fieldset>
+<form action="${this['buttons'][0]['action']}" method="POST">
+  <fieldset class="data">
     <input tal:condition="this['method']" type="hidden" name="_method" value="${this['method']}"/>
     <div tal:repeat="item this['data']" tal:omit-tag="">
       <span tal:define="fields item['_keys']"
             tal:repeat="key [key for key in fields if item[key]['meta']['formtype'] == 'hidden']" tal:omit-tag="">
         <input type="hidden" name="${key}" value="${item[key]['value']}"/>
       </span>
-      <div class="form-group" tal:define="prefix item['_prefix']" tal:condition="prefix">
+      <div class="form-row" tal:define="prefix item['_prefix']" tal:condition="prefix">
         <label class="col-sm-3 control-label">&nbsp;</label>
         <div class="col-sm-7"><p class="form-control-static">${prefix}</p></div>
       </div>
-      <div class="form-group" tal:define="fields item['_keys']"
+      <div class="form-row" tal:define="fields item['_keys']"
            tal:repeat="key [key for key in fields if item[key]['meta']['formtype'] != 'hidden']">
         <label for="${key}" class="col-sm-3 control-label">${item[key]['meta']['label']}</label>
         <div class="col-sm-7"
@@ -40,6 +40,7 @@
     </div>
   </fieldset>
 <!--! buttons -->
+<div class="w-100"></div> <!-- break to new row -->
   <div>
     <button tal:repeat="button this['buttons']" class="btn btn-primary btn-sm"
             type="submit" name="_submit" value="${button['name']}">
@@ -47,6 +48,7 @@
   </div>
 </form>
 <!--! message -->
+<div class="w-100"></div> <!-- break to new row -->
 <div tal:condition="this['message']">
   <p><span tal:content="structure this['message']"></p>
 </div>
