@@ -118,10 +118,10 @@ def _unflatten(list_rep, meta):
             elif path[0].isnumeric(): # one-item list
                 # RHS = [] if key refers to an optional field, and child[1] is empty
                 if optional and not(child[1]):
-                    logger.debug("unflatten: '{}' is optional && value empty '{}'".format(key, child[1]))
+                    # logger.debug("unflatten: '{}' is optional && value empty '{}'".format(key, child[1]))
                     result[key] = []
                 else:
-                    logger.debug("unflatten: not an edge case, key='{}' value='{}'".format(key, child[1]))
+                    # logger.debug("unflatten: not an edge case, key='{}' value='{}'".format(key, child[1]))
                     result[key] = [child[1]]
             else: # one-item dict
                 result[key] = {path[0]:child[1]}
@@ -129,10 +129,10 @@ def _unflatten(list_rep, meta):
             value = _unflatten(children, meta)
             if isinstance(value, list) and len(value) == 1 and optional and \
                 not any(map(bool, value[0].values())):
-                logger.debug("unflatten: '{}' is optional && value empty dict '{}'".format(key, str(value)))
+                # logger.debug("unflatten: '{}' is optional && value empty dict '{}'".format(key, str(value)))
                 result[key] = []
             else:
-                logger.debug("unflatten: not an edge case, key='{}' value='{}'".format(key, str(value)))
+                # logger.debug("unflatten: not an edge case, key='{}' value='{}'".format(key, str(value)))
                 result[key] = value
     # convert a dict with numeric keys to a list
     if car_set and all([key.isnumeric() for key in car_set]):
