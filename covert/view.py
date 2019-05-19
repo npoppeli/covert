@@ -488,7 +488,7 @@ class RenderTree:
                if len(value) == 3:
                    terms.append("({} {} ('{}', '{}'))".format(key, value[0], value[1], value[2]))
                else:
-                   terms.append("({} {} '{}')".format(key, value[0], escape_squote(value[1])))
+                   terms.append("({} {} '{}')".format(key, value[0], escape_squote(str(value[1]))))
            cursor.filter = ' and '.join(terms)
            # logger.debug('move_cursor (initial): filter=|{}|'.format(cursor.filter))
         else:
