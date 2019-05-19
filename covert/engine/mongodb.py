@@ -59,6 +59,7 @@ class Translator(ast.NodeVisitor):
     def visit_Mod         (self, n): return '$regex'
     def visit_Name        (self, n): return n.id
     def visit_NameConstant(self, n): return n.value
+    def visit_Num         (self, n): return n.n
     def visit_Or          (self, n): return '$or'
     def visit_Str         (self, n): return n.s
     def visit_List        (self, n): return self.visit_elts(n)
@@ -70,16 +71,13 @@ class Translator(ast.NodeVisitor):
     def visit_BoolOp(self, n):
         return {self.visit(n.op): self.visit_values(n)}
     def visit_Compare(self, n):
-        oper = self.visit(n.ops[0])
+        key, oper = self.visit(n.left), self.visit(n.ops[0])
         if oper == '$in':
-            arg0 = self.visit(n.comparators[0])
-            arg1 = self.visit(n.comparators[1])
-            key, value1, value2 = self.visit(n.left), arg0, arg1
+            value1, value2 = self.visit(n.comparators[0])
             return {key: {'$gte': self.V_(key, value1), '$lte': self.V_(key, value2)}}
         else:
-            arg0 = self.visit(n.comparators[0])
-            key, value = self.visit(n.left), arg0
-            return {key: {oper: self.V_(key, value)}}
+            value1 = self.visit(n.comparators[0])
+            return {key: {oper: self.V_(key, value1)}}
 
 def init_storage():
     """Initialize storage engine."""
@@ -145,7 +143,8 @@ class Item(BareItem):
         try:
             result = translator.visit(root.body)
             return result
-        except NotImplementedError as e:
+        except Exception as e:
+            logger.debug(str(e))
             logger.debug("Item.filter: expr={}".format(expr))
             logger.debug("Item.filter: root={}".format(ast.dump(root)))
             return None
