@@ -11,7 +11,7 @@ ISO 8601 datetime notation:
 """
 
 from datetime import datetime, date, time
-from .common import InternalError
+from .common import InternalError, escape_squote
 
 class Atom:
     """Instances of this class define the atomic constituents of items.
@@ -25,10 +25,10 @@ class Atom:
     """
 
     __slots__ = ('schema', 'convert', 'display', 'query', 'formtype', 'control',
-                 'default', 'read', 'write', 'enum')
+                 'default', 'read', 'write', 'enum', 'expr')
 
     def __init__(self, schema, convert, display, query, formtype, control,
-                 default='', read=None, write=None, enum=None):
+                 default='', read=None, write=None, enum=None, expr=None):
         """Initialize atom.
 
         Arguments:
@@ -44,6 +44,7 @@ class Atom:
         self.convert  = convert
         self.display  = display
         self.query    = query
+        self.expr     = expr
         self.formtype = formtype
         self.control  = control
         self.default  = default
@@ -95,11 +96,25 @@ def date_display(x):
     return '????-??-??' if x.year == MINYEAR\
     else '{0:04d}-{1:02d}-{2:02d}'.format(x.year, x.month, x.day)
 
+def date_expr(x):
+    return "'" + date_display(x) + "'"
+
+def datetime_display(x):
+    return '{0:04d}-{1:02d}-{2:02d}T{3:02d}:{4:02d}:{5:02d}'.\
+      format(x.year, x.month, x.day, x.hour, x.minute, x.second)
+
+def datetime_expr(x):
+    return "'" + datetime_display(x) + "'"
+
+def str_display(x):
+    return "'" + escape_squote(x) + "'"
+
 define_atom('date',
             schema   = date,
             convert  = date_convert,
             display  = date_display,
             query    = lambda x: ('==', date_convert(x)),
+            expr     = date_expr,
             read     = lambda x: x.date(),
             write    = lambda x: datetime.combine(x, MIDNIGHT),
             default  = EMPTY_DATE,
@@ -113,9 +128,9 @@ def datetime_convert(x):
 define_atom('datetime',
             schema   = datetime,
             convert  = datetime_convert,
-            display  = lambda x: '{0:04d}-{1:02d}-{2:02d}T{3:02d}:{4:02d}:{5:02d}'.\
-                       format(x.year, x.month, x.day, x.hour, x.minute, x.second),
+            display  = datetime_display,
             query    = lambda x: ('==', datetime_convert(x)),
+            expr     = datetime_expr,
             default  = EMPTY_DATETIME,
             formtype = 'datetime',
             control  = 'input'
@@ -126,6 +141,7 @@ define_atom('float',
             convert  = float,
             display  = lambda x: '{0:.2}'.format(x),
             query    = lambda x: ('==', float(x)),
+            expr     = str,
             default  = 0.0,
             formtype = 'number',
             control  = 'input'
@@ -136,6 +152,7 @@ define_atom('integer',
             convert  = int,
             display  = str,
             query    = lambda x: ('==', int(x)),
+            expr     = str,
             default  = 0,
             formtype = 'number',
             control  = 'input'
@@ -146,6 +163,7 @@ define_atom('memo',
             convert  = identity,
             display  = identity,
             query    = lambda x: ('%', x),
+            expr     = str_display,
             default  = '',
             formtype = 'memo',
             control  = 'textarea'
@@ -156,6 +174,7 @@ define_atom('string',
             convert  = identity,
             display  = identity,
             query    = lambda x: ('%', x),
+            expr     = str_display,
             default  = '',
             formtype = 'text',
             control  = 'input'
@@ -166,17 +185,27 @@ define_atom('text',
             convert  = identity,
             display  = identity,
             query    = lambda x: ('%', x),
+            expr     = str_display,
             default  = '',
             formtype = 'text',
             control  = 'textarea'
             )
 
-time_convert = lambda x: datetime.strptime(x, "%H:%M:%S")
+def time_convert(x):
+    return datetime.strptime(x, "%H:%M:%S")
+
+def time_display(x):
+    return '{0:02d}:{1:02d}:{2:02d}'.format(x.hour, x.minute, x.second)
+
+def time_expr(x):
+    return "'" + time_display(x) + "'"
+
 define_atom('time',
             schema   = time,
             convert  = time_convert,
-            display  = lambda x: '{0:02d}:{1:02d}:{2:02d}'.format(x.hour, x.minute, x.second),
+            display  = time_display,
             query    = lambda x: ('==', time_convert(x)),
+            expr     = time_display,
             default  = EMPTY_TIME,
             formtype = 'datetime',
             control  = 'input'
@@ -187,6 +216,7 @@ define_atom('url',
             convert  = identity,
             display  = identity,
             query    = lambda x: ('=~', x),
+            expr     = str_display,
             default  = '',
             formtype = 'url',
             control  = 'input'

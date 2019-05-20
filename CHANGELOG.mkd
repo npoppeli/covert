@@ -3,6 +3,7 @@ Version 0.10
 
 ### Features
 - API changes: completely new query approach, which affects view.py and the db engines
+- templates: upgraded to Bootstrap 4.3.1, Fontawesome 5.8.2, Jquery 3.3.1
 
 Version 0.9
 -----------

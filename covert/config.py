@@ -195,6 +195,8 @@ def kernel_init():
                     meta = model.meta[field_name]
                     print(fmt.format(field_name, meta.label, meta.schema, meta.optional,
                                      meta.multiple, meta.auto, meta.formtype))
+                print('qmap:', str(model.qmap))
+                print('emap:', str(model.emap))
             print('')
         if ref_classes:
             print('Reference classes:', ', '.join(ref_classes))

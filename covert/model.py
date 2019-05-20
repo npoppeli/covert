@@ -243,6 +243,8 @@ class BareItem(dict):
     dmap = {'ctime':datetime_atom.display, 'mtime':datetime_atom.display, 'active': bool_atom.display}
     qmap = {'ctime':datetime_atom.query,   'mtime':datetime_atom.query,   'active': bool_atom.query,
             '_skey': string_atom.query}
+    emap = {'ctime':datetime_atom.expr,    'mtime':datetime_atom.expr,    'active': bool_atom.expr,
+            '_skey': string_atom.expr}
     rmap = {}
     wmap = {}
     # metadata
@@ -453,41 +455,6 @@ class Visitor:
         else:
             return None
 
-INDENT = '   '
-
-class Clause:
-    OP = ''
-    __slots__ = ['terms']
-
-    def __init__(self, *terms):
-        self.terms = []
-        if terms:
-            self.terms.extend(terms)
-
-    def add(self, term):
-        self.terms.append(term)
-
-    def __contains__(self, key):
-        return any([t.field == key for t in self.terms if isinstance(t, Term)])
-
-    def __delitem__(self, key):
-        if key in self:
-            position = -1
-            for n, term in enumerate(self.terms):
-                if isinstance(term, Term) and term.field == key:
-                    position = n
-                    break
-            if position >= 0:
-                del self.terms[position]
-
-    def format(self, level=0):
-        result = [t.format(level=level+1) for t in self.terms]
-        result.insert(0, level*INDENT + self.OP)
-        return '\n'.join(result)
-
-    def __repr__(self):
-        return "{}({})".\
-            format(self.__class__.__name__, ', '.join([repr(t) for t in self.terms]))
 
 # Item references
 def get_objectid(ref):
@@ -625,10 +592,11 @@ class ParsedModel:
         empty  (dict):        empty item
         schema (dict):        schema for validation
         rmap   (dict):        read map
-        wmap   (dict):        write map
+        wmap   (dict):        write map, associated with read map
         dmap   (dict):        display map
-        cmap   (dict):        convert map
+        cmap   (dict):        convert map, associated with display map
         qmap   (dict):        query map (variation on 'cmap')
+        emap   (dict):        expression map, associated with query map
     """
 
     def __init__(self):
@@ -638,7 +606,9 @@ class ParsedModel:
         self.meta = OrderedDict()
         self.empty = {}
         self.schema = {}
-        self.rmap, self.wmap, self.dmap, self.cmap, self.qmap = {}, {}, {}, {}, {}
+        self.rmap, self.wmap = {}, {}
+        self.dmap, self.cmap = {}, {}
+        self.qmap, self.emap = {}, {}
 
 def parse_model_def(model_def, model_defs):
     """Parse definition of one model.
@@ -691,11 +661,13 @@ def parse_model_def(model_def, model_defs):
             pm.rmap[field_name] = dict
             pm.wmap[field_name] = dict
             pm.qmap[field_name] = None
+            pm.emap[field_name] = None
             pm.cmap.update(embedded.cmap)
             pm.dmap.update(embedded.dmap)
             pm.rmap.update(embedded.rmap)
             pm.wmap.update(embedded.wmap)
             pm.qmap.update(embedded.qmap)
+            pm.emap.update(embedded.emap)
             for name in embedded.names: # necessary for preserving order
                 pm.meta[name] = embedded.meta[name]
         elif field_type[0] == '^': # reference to model
@@ -708,6 +680,7 @@ def parse_model_def(model_def, model_defs):
             pm.rmap[field_name] = ref_class
             pm.wmap[field_name] = get_objectid
             pm.qmap[field_name] = None
+            pm.emap[field_name] = None
             empty_ref = ref_class(None)
             if multiple_field:
                 pm.empty[field_name] = [] if optional_field else [empty_ref]
@@ -725,6 +698,7 @@ def parse_model_def(model_def, model_defs):
             if atom.read:    pm.rmap[field_name] = atom.read
             if atom.write:   pm.wmap[field_name] = atom.write
             if atom.query:   pm.qmap[field_name] = atom.query
+            if atom.expr:    pm.emap[field_name] = atom.expr
             if multiple_field:
                 pm.empty[field_name] = [] if optional_field else [atom.default]
             elif not optional_field:
@@ -789,6 +763,7 @@ def read_models(model_defs):
         pm.cmap.update(BareItem.cmap)
         pm.dmap.update(BareItem.dmap)
         pm.qmap.update(BareItem.qmap)
+        pm.emap.update(BareItem.emap)
         pm.rmap.update(BareItem.rmap)
         pm.wmap.update(BareItem.wmap)
         class_dict['name']      = model_name
@@ -798,6 +773,7 @@ def read_models(model_defs):
         class_dict['rmap']      = pm.rmap
         class_dict['wmap']      = pm.wmap
         class_dict['qmap']      = pm.qmap
+        class_dict['emap']      = pm.emap
         class_dict['fields']    = pm.names
         class_dict['_empty']    = empty
         class_dict['schema']   = schema

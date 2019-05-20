@@ -16,7 +16,7 @@ from inspect import getmembers, isclass, isfunction
 from itertools import chain
 from urllib.parse import urlencode
 from .common import SUCCESS, write_file, logger
-from .common import encode_dict, show_dict, escape_squote
+from .common import encode_dict, show_dict
 from .model import unflatten, mapdoc
 from . import setting
 
@@ -471,7 +471,8 @@ class RenderTree:
         cursor = self.cursor
         initial_post = '_skip' not in self.request.params
         if initial_post and not cursor.filter:
-           # translate interval specifications in form
+           # cursor.form contains query specifications, with real
+           # values, i.e. values converted by mapdoc(model.qmap, <form>)
            for key, value in cursor.form.items():
                if isinstance(value, dict): # not converted by mapdoc
                    convert = self.model.cmap[key]
@@ -485,12 +486,16 @@ class RenderTree:
            # translate filter dictionary to expression
            terms = []
            for key, value in filter_spec.items():
+               emap = self.model.emap.get(key, None)
                if len(value) == 3:
-                   terms.append("({} {} ('{}', '{}'))".format(key, value[0], value[1], value[2]))
+                   v1, v2 = (emap(value[1]), emap(value[2])) if emap else (value[1], value[2])
+                   term = "({} {} ({}, {}))".format(key, value[0], v1, v2)
                else:
-                   terms.append("({} {} '{}')".format(key, value[0], escape_squote(str(value[1]))))
+                   v1 = emap(value[1]) if emap else value[1]
+                   term = "({} {} {})".format(key, value[0], v1)
+               terms.append(term)
            cursor.filter = ' and '.join(terms)
-           # logger.debug('move_cursor (initial): filter=|{}|'.format(cursor.filter))
+           logger.debug("cursor.filter = {}".format(cursor.filter))
         else:
             # cursor.incl == 1: remove term 'active=True' (if present) from filter
             #             == 0: add term 'active=True' (if not present) to filter
