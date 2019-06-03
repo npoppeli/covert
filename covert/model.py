@@ -397,14 +397,13 @@ class BareItem(dict):
             [Item]: list of items, if multiple field
             None  : all other cases
         """
-        if key not in self.fields:
-            return None
-        meta = self.meta[key]
-        if meta.schema == 'itemref':
-            if meta.multiple:
-                return [ref.lookup() for ref in self[key]]
+        if key in self.fields:
+            meta = self.meta[key]
+            if meta.schema == 'itemref':
+                return [r.lookup() for r in self[key]] if meta.multiple else \
+                        self[key].lookup()
             else:
-                return self[key].lookup()
+                return None
         else:
             return None
 
@@ -438,20 +437,6 @@ class BareItem(dict):
                 return [r for r in referred if value(r[key])]
             else:
                 return [r for r in referred if r[key] == value]
-        else:
-            return None
-
-# Auxiliary classes: Visitor, Filter and friends
-class Visitor:
-    """Visitor design pattern uses:
-    1. instances of Visitor class (or sub-class thereof)
-    2. dynamic method determination.
-    """
-    def visit(self, obj, **kwarg):
-        name = 'visit_' + obj.__class__.__name__.lower()
-        method = getattr(self, name, None)
-        if method:
-            return method(obj, **kwarg)
         else:
             return None
 
@@ -558,29 +543,38 @@ class ItemRef:
         item = model.lookup(self.refid)
         return '', str(item), '/{}/{}'.format(self.collection.lower(), self.refid), ''
 
-    def lookup(self):
+    def lookup(self, field=None):
         """Retrieve item referenced by itemref object from storage.
+        Return entire item if field is None, else only the field `field`.
 
         Returns:
-            Item: item retrieved from storage.
-        """
-        model = setting.models[self.collection]
-        return model.lookup(self.refid)
-
-    def lookup_field(self, field):
-        """Retrieve one field from item referenced by itemref object from storage.
-
-        Returns:
-            Any: field in item retrieved from storage, None if not available.
+            - if field is None: item retrieved from storage, None if non-existent
+            - otherwise: one field from this item
         """
         model = setting.models[self.collection]
         item = model.lookup(self.refid)
-        if item and field in item:
-            return item[field]
+        if item:
+            return item.get(field, None) if field else item
         else:
             return None
 
 
+# Auxiliary classes: Visitor
+class Visitor:
+    """Visitor design pattern uses:
+    1. instances of Visitor class (or sub-class thereof)
+    2. dynamic method determination.
+    """
+    def visit(self, obj, **kwarg):
+        name = 'visit_' + obj.__class__.__name__.lower()
+        method = getattr(self, name, None)
+        if method:
+            return method(obj, **kwarg)
+        else:
+            return None
+
+
+# Model parsing
 class ParsedModel:
     """Result of parsing a model definition.
 
