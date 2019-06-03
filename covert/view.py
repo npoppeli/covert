@@ -345,7 +345,11 @@ class Cursor:
             elif value:
                 form[key] = value
         if initial_post:
-            for key, value in mapdoc(model.qmap, unflatten(form, model)).items():
+            unfl_form = unflatten(form, model)
+            logger.debug("cursor_init: unfl. form={}".format(unfl_form))
+            qmap_form = mapdoc(model.qmap, unfl_form)
+            logger.debug("cursor_init: qmap. form={}".format(qmap_form))
+            for key, value in qmap_form.items():
                 # if value is a list, use the first element
                 operator_value = value[0] if isinstance(value, list) else value
                 if key in self.operator: # operator-value tuple with explicit operator
