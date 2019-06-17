@@ -166,7 +166,7 @@ class Item(BareItem):
         return cursor.count().run(setting.store_connection)
 
     @classmethod
-    def find(cls, fltr, skip=0, limit=0, sort=None):
+    def find(cls, fltr=None, skip=0, limit=0, sort=None):
         """Retrieve items from collection.
 
         Find zero or more items in collection, and return these in the

@@ -179,7 +179,7 @@ class Item(BareItem):
         return cursor.count()
 
     @classmethod
-    def find(cls, expr, skip=0, limit=0, sort=None):
+    def find(cls, expr=None, skip=0, limit=0, sort=None):
         """Retrieve items from collection.
 
         Find zero or more items in collection, and return these in the
