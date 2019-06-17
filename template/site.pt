@@ -26,7 +26,7 @@
         </div>
       </div>
       <div class="row">
-        <div tal:replace="structure content"></div>
+        <div tal:replace="structure this['content']"></div>
       </div>
     </div>
   </body>

@@ -7,7 +7,7 @@ depending on the request parameters.
 The mapping router creates a response object based on route patterns.
 """
 
-import html, re, sys, traceback, waitress
+import re, sys, traceback, waitress
 from datetime import datetime
 # we use BaseRequest instead of Request because of performance reasons
 from webob import BaseRequest as Request, Response
@@ -32,22 +32,22 @@ def exception_report(exc, ashtml=True):
 
     Arguments:
         exc    (Exception): exception object
-        ashtml (bool):      render as HTML (True) or plain text (False)
+        ashtml (bool)     : render as HTML (True) or plain text (False)
 
     Returns:
         str: exception report as plain or HTML text
     """
     exc_type, exc_value, exc_trace = sys.exc_info()
     if ashtml:
-        head = ["<h2>Internal error</h2>", "<p>Traceback (most recent call last:</p>"]
-        body = ["<p>{0}</p>".format(l.replace("\n", "<br/>"))
-                for l in traceback.format_tb(exc_trace)]
-        tail = ["<div><pre>{0}: {1}</pre></div>".format(exc_type.__name__, html.escape(str(exc_value)))]
-    else:
-        head = ["Internal error. ", "Traceback (most recent call last:"]
+        head = 'Traceback (most recent call last)'
         body = traceback.format_tb(exc_trace)
-        tail = ["{0}: {1}".format(exc_type.__name__, str(exc_value))]
-    return '\n'.join(head+body+tail)
+        tail = '{0}: {1}'.format(exc_type.__name__, str(exc_value))
+        return setting.templates['error'].render(this={'head':head, 'body':body, 'tail':tail})
+    else:
+        head = ['Internal error. ', 'Traceback (most recent call last)']
+        body = traceback.format_tb(exc_trace)
+        tail = ['{0}: {1}'.format(exc_type.__name__, str(exc_value))]
+        return '\n'.join(head+body+tail)
 
 # Auxiliary functions for CondRouter
 regex_is_file = re.compile('/\w+\.\w+')
@@ -178,7 +178,7 @@ class MapRouter:
                 route_method = getattr(view_obj, route_name)
                 result = route_method()
                 template = route_templates[result.get('style', 0)]
-                for cookie in result['cookies']:
+                for cookie in result.get('cookies', []):
                     response.set_cookie(cookie.name, value=cookie.value,
                                         path=cookie.path, max_age=cookie.expires)
                 result = self.serialize(result, template)
@@ -215,8 +215,9 @@ class PageRouter(MapRouter):
         self.template = name
 
     def finalize(self, result):
-        """remove empty/blank lines and initial whitespace of the other lines"""
-        page = setting.templates[self.template].render(content=result)
+        """Add finishing touches to the result. This includes whitespace removal."""
+        render_tree = {'content': result, 'debug': setting.debug, 'verbose': setting.verbose}
+        page = setting.templates[self.template].render(this=render_tree)
         lines = [line.lstrip() for line in page.splitlines() if line and not line.isspace()]
         return '\n'.join(lines)
 
