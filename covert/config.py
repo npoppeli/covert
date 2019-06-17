@@ -5,14 +5,14 @@ Attributes:
     config_default (dict): default values for configuration options
 """
 
-import argparse, logging, sys
+import argparse, logging, sys, gettext
 from importlib import import_module
 from inspect import getmembers, isclass
 from os import getcwd, mkdir
 from os.path import join, exists, isfile, splitext
 from . import setting
 from .model import read_models
-from .view import read_views
+from .view import read_views, Button
 from .layout import read_templates
 from .common import read_yaml_file, InternalError, logger
 from .engine.hashfs import HashFS
@@ -20,6 +20,7 @@ from .engine.hashfs import HashFS
 extra_arguments = {}
 
 def add_argument(name, **options):
+    global extra_arguments
     extra_arguments[name] = options
 
 def parse_cmdline():
@@ -80,20 +81,26 @@ def read_config():
     setting.media   = join(setting.site, config['media'])
     setting.store_dbname  = config['dbname']
     setting.dbtype  = config['dbtype']
+
+    # I18N
     setting.language = config['language'] if config['language'] in setting.languages\
                        else config_default['language']
+    if setting.language != 'en':  # switch to application language
+        app_trans = gettext.translation('covert', localedir=setting.locales, languages=[setting.language])
+        app_trans.install()
+        logger.debug("' *not* ' is written", _(' *not* '))
     # keep original configuration
     setting.config = config
     # in debugging mode, print some configuration parameters
     if setting.debug:
         logger.setLevel(logging.DEBUG)
     if setting.debug >= 2:
-        logger.debug("Debug option is {}".format(setting.debug))
-        logger.debug("Verbose option is {}".format(setting.verbose))
-        logger.debug("Changes are{}written to the database".format(' *not* ' if setting.nostore else ' '))
-        logger.debug("Static content is in directory {}".format(setting.content))
-        logger.debug("User interface is in the '{}' language".format(setting.language))
-        logger.debug("Web server listens to {}:{}".format(setting.host, setting.port))
+        logger.debug(_("Debug option is {}").format(setting.debug))
+        logger.debug(_("Verbose option is {}").format(setting.verbose))
+        logger.debug(_("Changes are{}written to the database").format(_(' *not* ') if setting.nostore else ' '))
+        logger.debug(_("Static content is in directory {}").format(setting.content))
+        logger.debug(_("User interface is in the '{}' language").format(setting.language))
+        logger.debug(_("Web server listens to {}:{}").format(setting.host, setting.port))
 
 def kernel_init():
     """Initialize kernel.
@@ -104,30 +111,29 @@ def kernel_init():
     Returns:
         None
     """
-
     # initialize item storage
     if setting.dbtype == 'mongodb':
         from .engine.mongodb import init_storage
     elif setting.dbtype == 'rethinkdb':
         from .engine.rethinkdb import init_storage
     else:
-        raise InternalError('Unknown storage engine: only MongoDB and RethinkDB are supported')
+        raise InternalError(_('Unknown storage engine: only MongoDB and RethinkDB are supported'))
     init_storage()
     # initialize media storage
     if not exists(setting.media):
         mkdir(setting.media)
-        logger.debug("Created new folder for media storage: {}".format(setting.media))
+        logger.debug(_('Created new folder for media storage: {}').format(setting.media))
     setting.store_mdb = HashFS(setting.media)
     if setting.debug >= 2:
-        logger.debug("Initialized content-addressable media storage")
+        logger.debug(_('Initialized content-addressable media storage'))
 
     # execute prelude (if present)
     if 'prelude' in setting.config:
         name, extension =  splitext(setting.config['prelude'])
         if extension == '.py':
-            _ = import_module(name)
+            module_ = import_module(name)
         else:
-            logger.info('{} should be Python module'.format(setting.config['prelude']))
+            logger.info(_('{} should be Python module').format(setting.config['prelude']))
 
     # read icons
     if 'icons' in setting.config:
@@ -153,33 +159,44 @@ def kernel_init():
             models = read_yaml_file(item)
             read_models(models)
         else:
-            logger.info('{} should be in YAML or Python form'.format(item))
+            logger.info(_('{} should be in YAML or Python form').format(item))
 
     # import views
     name, extension = splitext(setting.config['views'])
     mod = import_module(name)
     read_views(mod)
 
-    # I18N
-    label_index = setting.languages.index(setting.language)
-    for name in setting.labels.keys():
-        parts = setting.labels[name].split('|')
-        setting.labels[name] = parts[label_index]
+    # now that we have the routes, labels and icons, we can create the buttons
+    for route in setting.routes:
+        button = Button(route.uid,
+                        action=route.pattern, method=route.method,
+                        vars=route.vars, name=route.name, param=route.param,
+                        plabel=route.plabel, ptype=route.ptype, order=route.order)
+        setting.buttons[route.uid] = button
 
     # print information about models and views
     if setting.tables:
         # print all routes (tabular)
-        print('Application has {0} routes'.format(len(setting.routes)))
-        fmt = "{:>5} {:<30}: {:<10} {:<15} {:<20} {:<15} {:<30}"
-        print(fmt.format('order', 'pattern', 'method', 'view', 'name', 'params', 'templates'))
+        print(_('Application has {0} routes').format(len(setting.routes)))
+        fmt = "{:>5} {:<30} {:<10} {:<15} {:<20} {:<15} {:<30}"
+        print(fmt.format('order', 'pattern', 'method', 'view', 'name', 'vars', 'templates'))
         print('-' * 120)
         for route in sorted(setting.routes, key=lambda r: r.order):
             print(fmt.format(route.order, route.pattern, route.method,
                              route.cls.__name__, route.name,
-                             ', '.join(route.params), ', '.join(route.templates)))
+                             ', '.join(route.vars), ', '.join(route.templates)))
+        print('')
+        # print all buttons (tabular)
+        print(_('Application has {0} buttons').format(len(setting.buttons)))
+        fmt = "{:<25} {:<15} {:<25} {:<35} {:<10} {:<15} {:<10}"
+        print(fmt.format('uid', 'label', 'icon', 'action', 'method', 'vars', 'name'))
+        print('-' * 130)
+        for button in setting.buttons.values():
+            print(fmt.format(button.uid, button.label, button.icon, button.action,
+                             button.method, ', '.join(button.vars), button.name))
         print('')
         # print all models (tabular)
-        print('Application has {0} models'.format(len(setting.models)))
+        print(_('Application has {0} models').format(len(setting.models)))
         ref_classes = []
         for name in sorted(setting.models.keys()):
             if name.endswith('Ref'):
@@ -187,7 +204,7 @@ def kernel_init():
             else:
                 model = setting.models[name]
                 print('{0}\n{1}'.format(name, '='*len(name)))
-                fmt = "{:<15}: {:<20} {:<10} {!s:<10} {!s:<10} {!s:<10} {!s:<10}"
+                fmt = "{:<15} {:<20} {:<10} {!s:<10} {!s:<10} {!s:<10} {!s:<10}"
                 print(fmt.format('name', 'label', 'schema', 'optional',
                                  'multiple', 'auto', 'formtype'))
                 print('-'*90)
@@ -195,8 +212,6 @@ def kernel_init():
                     meta = model.meta[field_name]
                     print(fmt.format(field_name, meta.label, meta.schema, meta.optional,
                                      meta.multiple, meta.auto, meta.formtype))
-                print('qmap:', str(model.qmap))
-                print('emap:', str(model.emap))
+                # print('qmap:', str(model.qmap))
+                # print('emap:', str(model.emap))
             print('')
-        if ref_classes:
-            print('Reference classes:', ', '.join(ref_classes))

@@ -12,13 +12,6 @@ genders = ['?', 'v', 'm'] must be I18N
 define_atom('boolean', ...) also I18N
 MINYEAR = 1400 (not midnight) to avoid complaints from RethinkDB
 
-config.py
----------
-* I18N the right way
-  - http://inventwithpython.com/blog/2014/12/20/translate-your-python-3-program-with-the-gettext-module/
-  - https://flufli18n.readthedocs.io/en/latest/docs/using.html
-  - http://pylonsbook.com/en/1.1/internationalization-and-localization.html
-
 model.py
 --------
 * embedding in show panels
@@ -45,7 +38,6 @@ JavaScript with server interaction.
 
 view.py
 -------
-* I18N of setting.labels and messages
 * authorization determines icon and button states (enabled, disabled)
 * delete button is enabled if authorized and item is active
 * collection_buttons_extra: where to set them?

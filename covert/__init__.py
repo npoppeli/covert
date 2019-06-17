@@ -41,4 +41,4 @@ from .controller import http_server, CondRouter, MapRouter, PageRouter, JSONRout
 from .layout     import add_template_type
 from .model      import ItemRef, Visitor, unflatten
 from .view       import route, BareItemView, ItemView, url_for
-from .view       import route2pattern, route2regex, RenderTree, Cursor, get_button
+from .view       import route2pattern, route2regex, RenderTree, Cursor, Button

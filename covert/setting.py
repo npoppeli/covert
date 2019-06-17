@@ -12,12 +12,13 @@ Only in cases where performance matters, save one dictionary lookup with:
 """
 
 # version number of package
-__version__ = '0.10'
+__version__ = '0.11'
 
 # configuration
-content     = '' # relative path to static content
-media       = '' # relative path to media storage
-layout      = '' # relative layout to template directory
+content     = '' # path to static content
+media       = '' # path to media storage
+layout      = '' # path to layout (template) directory
+locales     = '' # path to locales directory
 site        = '' # site directory
 models      = {}
 views       = {}
@@ -40,9 +41,10 @@ store_db         = None    # item database
 store_dbname     = ''      # name of item database
 store_mdb        = None    # media database (CAS)
 
-# routes
+# routes and buttons
 routes    = []
 patterns  = {}
 templates = {}
 labels    = {}
 icons     = {}
+buttons   = {}

@@ -56,7 +56,7 @@ def read_templates():
         None
     """
     template_types = list(template_factory.keys())
-    if setting.debug >= 2:
+    if setting.debug > 1:
         logger.debug('Scanning for templates in {0}'.format(setting.layout))
         logger.debug('Template types: {0}'.format(' '.join(template_types)))
     for (dirpath, __, filenames) in walk(setting.layout):
@@ -71,7 +71,7 @@ def read_templates():
                 file_path = join(dirpath, filename)
                 try:
                     setting.templates[template_name] = template_factory[extension](file_path)
-                    if setting.tables:
+                    if setting.tables and setting.debug > 1:
                         logger.debug("Template {} is in file {}".format(template_name, relpath(file_path, setting.layout)))
                 except Exception as e:
                     logger.error("Error in template '{0}' in file {1}".format(template_name, file_path))

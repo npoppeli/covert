@@ -9,8 +9,9 @@ Waitress package is one of the dependencies, we can re-use the logger object of 
 The Waitress logger does not define handlers itself. It inherits the handler from the root logger.
 """
 
-import logging
-import json
+import gettext, json, logging
+from os.path import dirname, join
+from . import setting
 from urllib.parse import urlparse, urljoin
 from webob.exc import HTTPTemporaryRedirect
 from yaml import load, load_all
@@ -25,7 +26,13 @@ except ImportError:
 logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
 logger = logging.getLogger('waitress')
 
-# string handling
+# TODO: I18N
+setting.locales = join(dirname(setting.__file__), 'locales')
+translator = gettext.translation('covert', localedir=setting.locales, languages=['en'])
+translator.install()
+logger.debug("Installed 'en' translation catalog from path", setting.locales)
+
+# String handling
 def escape_squote(s):
     """Escape single quotes in string `s`."""
     return s.replace("'", chr(92)+'u0027')
@@ -33,6 +40,21 @@ def escape_squote(s):
 def escape_dquote(s):
     """Escape double quotes in string `s`."""
     return s.replace("'", chr(92)+'u0022')
+
+def str2int(s):
+    """Convert str to integer, or otherwise 0."""
+    try:
+        number = int(s)
+    except:
+        number = 0
+    return number
+
+# TODO: future extension
+# Permissions (privileges)
+CATEGORY_CREATE = 0
+CATEGORY_READ   = 1
+CATEGORY_UPDATE = 2
+CATEGORY_DELETE = 3
 
 # Exceptions
 class InternalError(Exception):

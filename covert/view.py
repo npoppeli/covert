@@ -15,62 +15,124 @@ from datetime import datetime, timedelta
 from inspect import getmembers, isclass, isfunction
 from itertools import chain
 from urllib.parse import urlencode
-from .common import SUCCESS, write_file, logger
-from .common import encode_dict, show_dict
+from .common import SUCCESS, write_file, logger, str2int
+from .common import encode_dict, show_dict, CATEGORY_READ
 from .model import unflatten, mapdoc
 from . import setting
-
-def str2int(s):
-    """Convert str to integer, or otherwise 0."""
-    try:
-        number = int(s)
-    except:
-        number = 0
-    return number
 
 def icon_for(name):
     """Return icon for route 'name'."""
     return setting.icons.get(name, '')
 
 setting.labels = {
-     'show'         : 'Show|Toon|Show',
-     'sort'         : 'Sort|Sorteer|Sortera',
-     'index'        : 'Browse|Blader|Bläddra',
-     'search'       : 'Search|Zoek|Sök',
-     'match'        : 'Match|Resultaat|Resultat',
-     'modify'       : 'Modify|Wijzig|Ändra',
-     'update'       : 'Update|Wijzig|Ändra',
-     'new'          : 'New|Nieuw|Ny',
-     'create'       : 'Create|Maak|Skapa',
-     'delete'       : 'Delete|Verwijder|Radera',
-     'expand'       : 'Expand|Vergroot|Utbreda',
-     'shrink'       : 'Shrink|Verklein|Krympa',
-     'home'         : 'Home|Begin|Hem',
-     'info'         : 'Info|Info|Info',
-     'ok'           : 'OK|OK|OK',
-     'refresh'      : 'Refresh|Ververs|Fylla på',
-     'return'       : 'Return|Terug|Retur',
-     'cancel'       : 'Cancel|Annuleer|Upphäva'
+     'show'   : _('Show'),
+     'sort'   : _('Sort'),
+     'index'  : _('Browse'),
+     'search' : _('Search'),
+     'match'  : _('Match'),
+     'modify' : _('Modify'),
+     'update' : _('Update'),
+     'new'    : _('New'),
+     'create' : _('Create'),
+     'delete' : _('Delete'),
+     'expand' : _('Expand'),
+     'shrink' : _('Shrink'),
+     'home'   : _('Home'),
+     'info'   : _('Info'),
+     'ok'     : _('OK'),
+     'refresh': _('Refresh'),
+     'return' : _('Return'),
+     'cancel' : _('Cancel')
 }
+
+# show:    Show	    Toon	    Show
+# sort:    Sort	    Sorteer	    Sortera
+# index:   Browse	Blader	    Bläddra
+# search:  Search	Zoek	    Sök
+# match:   Match	Resultaat	Resultat
+# modify:  Modify	Wijzig	    Ändra
+# update:  Update	Wijzig	    Ändra
+# new:     New	    Nieuw	    Ny
+# create:  Create	Maak	    Skapa
+# delete:  Delete	Verwijder	Radera
+# push:    Push	    Verleng	    Utbreda
+# pop:     Pop	    Verklein	Krympa
+# home:    Home	    Begin	    Hem
+# info:    Info	    Info	    Info
+# ok:      OK	    OK	        OK
+# refresh: Refresh	Ververs	    Fylla på
+# return:  Return	Terug	    Retur
+# cancel:  Cancel	Annuleer	Upphäva
+
 
 def label_for(name):
     """Return label for route 'name'."""
     return setting.labels.get(name, 'unknown')
 
-def url_for(view, name, item, query=None):
+def url_for(name, item, query=None):
     """Return URL for route 'name'."""
-    url = setting.patterns[view+'_'+name].format(**item)
+    url = setting.patterns[name].format(**item)
     if query:
         url += '?' + urlencode(query)
     return url
 
-# Routes
+
+# Routes and buttons
+class Button:
+    """Representation of a button.
+
+    A button is a callable object. When a button is 'called', it expects one argument,
+    namely an instance of the Item class. This Item instance is used to fill in some parts
+    of the URL that should be called when the button is clicked.
+    """
+    __slots__ = ('uid', 'label', 'icon', 'action', 'method', 'vars',
+                 'name', 'param', 'plabel', 'ptype', 'order')
+
+    def __init__(self, view_uid, action, vars=[], method='GET', name='',
+                 param='', plabel='', ptype='', order=0):
+        """Constructor method for Button.
+
+        Attributes:
+            * view_uid (str) : unique id of view/method combination
+            * action   (str) : URL pattern for view method
+            * vars     (list): list of variable names of this route
+            * method   (str) : HTTP method
+            * name     (str) : button name, e.g. for submit buttons in forms
+            * param    (str) : name of query parameter
+            * plabel   (str) : label of query parameter
+            * ptype    (str) : type of query parameter
+            * order    (int) : sequence number of corresponding route (in order of definition)
+        """
+        key = view_uid.split('_', 1)[1]
+        self.uid       = view_uid
+        self.label     = label_for(key)
+        self.icon      = icon_for(key)
+        self.action    = action
+        self.vars      = vars
+        self.method    = method
+        self.name      = name
+        self.param     = param
+        self.plabel    = plabel
+        self.ptype     = ptype
+        self.order     = order
+
+    def __str__(self):
+        d = dict([(key, getattr(self, key, '')) for key in self.__slots__])
+        return str(d)
+
+    def __call__(self, item):
+        self.action = url_for(self.uid, item)
+        d = dict([(key, getattr(self, key, '')) for key in self.__slots__])
+        return d
+
+
 class Route:
     """Route definition.
 
     The definitions of all routes in all views are stored in the global variable setting.routes.
     """
-    def __init__(self, pattern, method, params, templates, regex, cls, name, order):
+    def __init__(self, pattern, method, vars, templates, regex, cls, name, order,
+                 param, plabel, ptype, category=CATEGORY_READ):
         """Constructor method for Route.
 
         A Route object consists of (1) attributes that uniquely define the route,
@@ -79,23 +141,31 @@ class Route:
         Attributes:
             * pattern   (str):   URL pattern
             * method    (str):   HTTP method
-            * params    (list):  list of parameters contained in `pattern`
+            * vars      (list):  list of variables contained in `pattern`
             * templates (list):  list of template names (at least 1)
             * regex     (regex): compiled regular expression
             * cls       (class): view class
             * name      (str):   method name
             * uid       (str):   unique id of route
             * order     (int):   sequence number of route (in order of definition)
+            * param     (str):   query parameter for this route
+            * plabel    (str):   label for this query parameter
+            * ptype     (str):   type of this parameter (as in "<input type='value'>")
+            * category  (int):   category used to determine permissions (CRUD)
         """
-        self.pattern = pattern
-        self.method = method
-        self.params = params
+        self.pattern   = pattern
+        self.method    = method
+        self.vars      = vars
         self.templates = templates
-        self.regex = regex
-        self.cls = cls
-        self.name = name
-        self.uid = '{}_{}'.format(cls.__name__.replace('View', '', 1).lower(), name)
-        self.order = order
+        self.regex     = regex
+        self.cls       = cls
+        self.name      = name
+        self.uid       = '{}_{}'.format(cls.__name__.replace('View', '', 1).lower(), name)
+        self.order     = order
+        self.param     = param
+        self.plabel    = plabel
+        self.ptype     = ptype
+        self.category  = category
 
     def __str__(self):
         return("{} {} -> {}:{}, uid={} templates={}".
@@ -113,7 +183,8 @@ class route:
     def _incr(cls):
         cls.counter += 1
 
-    def __init__(self, pattern, method='GET', template='', icon='', label=''):
+    def __init__(self, pattern, method='GET', template='', icon='', label='',
+                 param='', plabel='', ptype='', category=CATEGORY_READ):
         """Constructor for 'route' decorator.
 
         Attributes:
@@ -122,12 +193,21 @@ class route:
             * template (str): name(s) of template(s) that render(s) the result of the view
             * icon     (str): icon name for this route
             * label    (str): label for this route
+            * param    (str): query parameter for this route
+            * plabel   (str): label for this query parameter
+            * ptype    (str): type of this parameter (as in "<input type='value'>")
+            * category (int): category used to determine permissions (CRUD)
         """
-        self.pattern  = pattern
-        self.method   = method
-        self.template = template
-        self.icon     = icon
-        self.label    = label
+        self.pattern   = pattern
+        self.method    = method
+        self.template  = template
+        self.icon      = icon
+        self.label     = label
+        self.param     = param
+        self.plabel    = plabel
+        self.ptype     = ptype
+        self.category  = category
+
     def __call__(self, wrapped):
         self._incr()
         wrapped.pattern  = self.pattern
@@ -135,7 +215,11 @@ class route:
         wrapped.template = self.template
         wrapped.icon     = self.icon
         wrapped.label    = self.label
+        wrapped.param    = self.param
+        wrapped.plabel   = self.plabel
+        wrapped.ptype    = self.ptype
         wrapped.order    = self.counter
+        wrapped.category = self.category
         return wrapped
 
 # regular expressions used in routes
@@ -179,14 +263,14 @@ def route2pattern(pattern):
     parts[1::2] = list(map(lambda p: '{{{0}}}'.format(p.split(':')[0]), parts[1::2]))
     return ''.join(parts)
 
-def route2params(pattern):
-    """Create list of parameter names that occur in `pattern`.
+def route2vars(pattern):
+    """Create list of variable names that occur in `pattern`.
 
         Arguments:
         pattern (str): URL pattern.
 
     Returns:
-        list: list of parameter names.
+        list: list of variable names.
     """
     def split_lookup(s):
         before, after = s.split(':')
@@ -231,6 +315,8 @@ def read_views(module):
     Returns:
         None
     """
+    for key, value in setting.labels.items():
+        setting.labels[key] = _(value)
     for class_name, view_class in getmembers(module, isclass):
         if (class_name in ['BareItemView', 'ItemView'] or
             not issubclass(view_class, BareItemView) or
@@ -242,11 +328,12 @@ def read_views(module):
         routes = []
         for member_name, member in getmembers(view_class, isfunction):
             if hasattr(member, 'pattern'): # this member (method) is a route
-                full_pattern  = '/' + view_name + member.pattern
-                pattern       = route2pattern(full_pattern)
-                regex         = route2regex(full_pattern)
-                params        = route2params(full_pattern)
-                templates     = [] # each route has one or more templates
+                route_name   = view_name + '_' + member_name
+                full_pattern = '/' + view_name + member.pattern
+                pattern      = route2pattern(full_pattern)
+                regex        = route2regex(full_pattern)
+                vars         = route2vars(full_pattern)
+                templates    = [] # each route has one or more templates
                 for name in member.template.split(';'):
                     template_name = view_name+'_' + name
                     parent_name   = 'item_'       + name
@@ -269,9 +356,10 @@ def read_views(module):
                         # logger.debug("New label '%s' for '%s'", member.label, member_name)
                         setting.labels[member_name] = member.label
                 for method in member.method.split(','):
-                    setting.patterns[view_name+'_'+member_name] = pattern
-                    routes.append(Route(pattern, method, params, templates,
-                        re.compile(regex), view_class, member_name, member.order))
+                    setting.patterns[route_name] = pattern
+                    routes.append(Route(pattern, method, vars, templates, re.compile(regex),
+                                        view_class, member_name, member.order,
+                                        member.param, member.plabel, member.ptype))
         # sort routes by declaration order and add this to view class
         view_class._routes = sorted(routes, key=lambda r: r.order)
         # add routes to setting.routes, which will be sorted at the end
@@ -290,8 +378,8 @@ class Cursor:
 
     For some attributes, default values are defined in the 'default' dictionary.
     """
-    __slots__ = ['skip', 'limit', 'incl', 'dir', 'operator', 'count',
-                 'filter', 'form', 'prev', 'next', 'action', 'submit']
+    __slots__ = ('skip', 'limit', 'incl', 'dir', 'operator', 'count',
+                 'filter', 'form', 'prev', 'next', 'action', 'submit')
     default = {'skip': 0, 'limit': 20, 'incl': 0, 'dir': 0, 'count': 0, 'submit': ''}
 
     def __init__(self, request, model):
@@ -363,30 +451,10 @@ class Cursor:
         d = dict([(key, getattr(self, key, '')) for key in self.__slots__])
         return encode_dict(d)
 
-    def asdict(self):
+    def __call__(self):
         d = dict([(key, getattr(self, key, '')) for key in self.__slots__])
         return d
 
-def get_button(view_name, action, item):
-    """Create render-tree element for GET button."""
-    return {'label': label_for(action), 'icon': icon_for(action),
-            'action': url_for(view_name, action, item), 'method':'GET'}
-
-def post_button(view_name, action, item, button_name):
-    """Create render-tree element for POST button."""
-    return {'label': label_for(button_name), 'icon': icon_for(button_name),
-            'name': button_name,
-            'action': url_for(view_name, action, item), 'method':'POST'}
-
-def delete_button(view_name, action, item):
-    """Create render-tree element for DELETE button."""
-    return {'label': label_for(action), 'icon': icon_for(action),
-            'action': url_for(view_name, action, item), 'method':'DELETE'}
-
-def generic_button(view_name, action, item):
-    """Create render-tree element for generic button."""
-    return {'label': label_for(action), 'icon': icon_for(action),
-            'name': action}
 
 class Cookie:
     """Instances of this class define basic cookies as constituents of the render tree.
@@ -427,7 +495,7 @@ class RenderTree:
 
     Some elements of the render tree are temporary (needed for the request handling). The other
     attributes are specified by the class attribute 'nodes'. These attributes are used by the
-    asdict() method.
+    __call__() method.
     """
     nodes = ['buttons', 'cursor', 'data', 'computed', 'cookies',
              'message', 'method', 'status', 'style', 'title']
@@ -462,7 +530,7 @@ class RenderTree:
     def add_cursor(self, action):
         """Add cursor object to render tree."""
         self.cursor = Cursor(self.request, self.model)
-        self.cursor.action = url_for(self.view_name, action, {})
+        self.cursor.action = url_for(self.view_name+'_'+action, {})
 
     def move_cursor(self):
         """Move cursor to new position.
@@ -541,9 +609,9 @@ class RenderTree:
             # TODO: move line below to event handler
             now, delta = datetime.now(), timedelta(days=10)
             for item in items:
-                button_list = [(delete_button if button == 'delete' else
-                                get_button)(self.view_name, button, item) for button in buttons]
-                item['_buttons'] = button_list
+                item['_buttons'] = []
+                for button in buttons:
+                    item['_buttons'].append(button(item))
                 item['_prefix'] = ''
                 item['_hide'] = False
                 item['_hidden'] = []
@@ -568,34 +636,35 @@ class RenderTree:
         for key, value in flat_item.items():
             if key.startswith('_'):
                 newitem[key] = value
-            else:
-                path = key.split('.')
-                depth = key.count('.')
-                button_list = []
-                if path[-1].isnumeric(): # TODO: add button also for source.[012].relations
-                    field = path[-2]
-                    field_meta = item_meta[field]
-                    pos = int(path[-1])+1
-                    if pos == 1:
-                        label = field_meta.label
-                        if form:
-                            button_list = [generic_button(self.view_name, 'expand', item),
-                                           generic_button(self.view_name, 'shrink', item)]
-                    else:
-                        label = str(pos)
+                continue
+            path, depth = key.split('.'), key.count('.')
+            button_list = []
+            if path[-1].isnumeric(): # TODO: add button also for source.[012].relations
+                field = path[-2]
+                field_meta = item_meta[field]
+                pos = int(path[-1])+1
+                if pos == 1:
+                    label = field_meta.label
+                    if form:
+                        push_button = Button(self.view_name+'_push', action='', name='push')
+                        pop_button  = Button(self.view_name+'_pop' , action='', name='pop' )
+                        button_list.append(push_button(item))
+                        button_list.append(pop_button(item))
                 else:
-                    field = path[-1]
-                    field_meta = item_meta[field]
-                    if depth == 0:
-                        label = field_meta.label
-                    else:
-                        parent = path[0]
-                        label = '{}.{}'.format(item_meta[parent].label, field_meta.label)
-                proplist = {'label': label, 'enum': field_meta.enum, 'schema': field_meta.schema,
-                            'multiple': field_meta.multiple,
-                            'formtype': 'hidden' if field_meta.auto else field_meta.formtype,
-                            'auto': field_meta.auto, 'control': field_meta.control}
-                newitem[key] = {'value':value, 'meta':proplist, 'buttons':button_list}
+                    label = str(pos)
+            else:
+                field = path[-1]
+                field_meta = item_meta[field]
+                if depth == 0:
+                    label = field_meta.label
+                else:
+                    parent = path[0]
+                    label = '{}.{}'.format(item_meta[parent].label, field_meta.label)
+            proplist = {'label': label, 'enum': field_meta.enum, 'schema': field_meta.schema,
+                        'multiple': field_meta.multiple,
+                        'formtype': 'hidden' if field_meta.auto else field_meta.formtype,
+                        'auto': field_meta.auto, 'control': field_meta.control}
+            newitem[key] = {'value':value, 'meta':proplist, 'buttons':button_list}
         newitem['_keys'] = [k for k in newitem.keys() if not k.startswith('_')]
         self.data[nr] = newitem
 
@@ -647,8 +716,7 @@ class RenderTree:
         if self.data:
             item = self.data[0]
             for button in buttons:
-                factory = delete_button if button == 'delete' else get_button
-                self.buttons.append(factory(self.view_name, button, item))
+               self.buttons.append(button(item))
 
     def add_form_buttons(self, action, method=None):
         """Add form buttons to render tree.
@@ -661,7 +729,9 @@ class RenderTree:
         """
         if self.data:
             item = self.data[0]
-            self.buttons.append(post_button(self.view_name, action, item, 'ok'))
+            # TODO: there is already a button for this action, but we need to change its name
+            post_button = Button(self.view_name+'_ok', action=action, method=method, name='ok')
+            self.buttons.append(post_button(item))
             if method:
                 self.method = method
 
@@ -669,26 +739,27 @@ class RenderTree:
         """Add search button to render tree."""
         if self.data:
             item = self.data[0]
-            button = post_button(self.view_name, action, item, 'search')
-            self.buttons.append(button)
+            # TODO: there is already a button for this action, but we need to change its name
+            search_button = Button(self.view_name+'_match', action=action, name='search')
+            self.buttons.append(search_button(item))
 
     def add_return_button(self, location):
         """Add return button to render tree."""
-        button = {'label': label_for('return'), 'icon': icon_for('return'),
-                  'action': location, 'method': 'GET'}
-        self.buttons.append(button)
+        return_button = Button(self.view_name+'_return', action='return', name='return')
+        return_button.action = location
+        self.buttons.append(return_button)
 
-    def asdict(self):
+    def __call__(self):
         """Create dictionary representation of render tree."""
         result = dict([(key, getattr(self, key)) for key in self.nodes])
         if result.get('cursor', None):
-            result['cursor'] = result['cursor'].asdict()
+            result['cursor'] = result['cursor']()
         result['data'] = [item for item in result['data'] if not item['_hide']]
         return result
 
     def dump(self, name):
         if setting.debug:
-            d = self.asdict()
+            d = self()
             postfix = datetime.now().strftime('_%H%M%S.json')
             write_file(name+postfix, show_dict(d))
 
@@ -728,34 +799,40 @@ class ItemView(BareItemView):
     """
     model = 'Item'
     view_name = 'item'
-    grid_buttons = 3
+    item_buttons = 3
 
-    def routes(self, params=None):
-        selection = [item for item in self._routes
-                     if item.method not in ('PUT', 'POST') and item.uid.startswith(self.view_name)]
-        result = selection if params is None else \
-                 [item for item in selection if set(item.params) == set(params)]
-        return [item.name for item in result]
+    def buttons(self, vars=None):
+        """Make list of buttons for this view."""
+        selection = [button for key, button in setting.buttons.items()
+                     if button.method not in ('PUT', 'POST') and
+                        key.startswith(self.view_name)]
+        if vars:
+            sub_selection = [button for button in selection
+                             if set(button.vars) == set(vars)]
+        else:
+            sub_selection = [button for button in selection
+                             if set(button.vars) == set() and not button.param]
+        return sorted(sub_selection, key=lambda b: b.order)
 
     def show_item(self, item_or_id):
         """Prepare render tree for showing one item."""
         tree = self.tree
         tree.add_item(item_or_id)
-        tree.add_buttons(self.routes(['id']))
+        tree.add_buttons(self.buttons(['id']))
         tree.flatten_item()
         tree.prune_item()
-        return tree.asdict()
+        return tree()
 
     def show_items(self, action):
         tree = self.tree
         tree.add_cursor(action)
         tree.move_cursor()
-        routes = self.routes(['id'])[0:self.grid_buttons]
-        tree.add_items(routes)
-        tree.add_buttons(self.routes([]))
+        buttons = self.buttons(['id'])[0:self.item_buttons]
+        tree.add_items(buttons)
+        tree.add_buttons(self.buttons([]))
         tree.flatten_items()
         tree.prune_items(depth=1)
-        return tree.asdict()
+        return tree()
 
     def convert_form(self, keep_empty=False):
         """Convert request parameters to unflattened dictionary."""
@@ -788,7 +865,7 @@ class ItemView(BareItemView):
         tree.flatten_item()
         tree.prune_item(clear=True, form=True)
         tree.cookies.append(Cookie('search-origin', self.request.referer, path='/', expires=120))
-        return tree.asdict()
+        return tree()
 
     @route('/match', method='GET,POST', template='index')
     def match(self):
@@ -839,7 +916,7 @@ class ItemView(BareItemView):
         tree.add_form_buttons(action, method)
         tree.flatten_items(form=True)
         tree.prune_items(form=True, clear=clear)
-        return tree.asdict()
+        return tree()
 
     @route('/{id:objectid}/modify', template='form')
     def modify(self):

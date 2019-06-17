@@ -52,6 +52,7 @@ class Atom:
         self.write    = write
         self.enum     = enum
 
+
 atom_map = {}
 def define_atom(name, **kwarg):
     """Define new type of atom.
@@ -60,7 +61,7 @@ def define_atom(name, **kwarg):
         name  (str): name of atom type
     """
     if name in atom_map:
-        raise InternalError('Atom {0} is already registered'.format(name))
+        raise InternalError(_('Atom {0} is already registered').format(name))
     else:
         atom_map[name] = Atom(**kwarg)
 
