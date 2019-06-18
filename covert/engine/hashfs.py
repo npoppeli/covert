@@ -110,7 +110,7 @@ class HashFS:
         """
         realpath = self.realpath(file)
         if realpath is None:
-            raise IOError('Could not locate file: {0}'.format(file))
+            raise IOError(_('Could not locate file: {0}').format(file))
         return io.open(realpath, mode)
 
     def delete(self, file):
@@ -205,7 +205,7 @@ class HashFS:
     def unshard(self, path):
         """Unshard path to determine hash value."""
         if not self.haspath(path):
-            raise ValueError("unshard: path '{}' is not subdirectory of root '{}'".\
+            raise ValueError(_("unshard: path '{}' is not subdirectory of root '{}'").\
                              format(path, self.root))
         return os.path.splitext(self.relpath(path))[0].replace(os.sep, '')
 
@@ -247,7 +247,7 @@ class Stream:
             obj = io.open(obj, 'rb')
             pos = None
         else:
-            raise ValueError('Stream: {} is not a valid file path or readable object'.format(obj))
+            raise ValueError(_('Stream: {} is not a valid file path or readable object').format(obj))
         self._obj = obj
         self._pos = pos
 

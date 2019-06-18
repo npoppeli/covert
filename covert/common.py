@@ -27,6 +27,9 @@ logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
 logger = logging.getLogger('waitress')
 
 # TODO: I18N
+# After every update that involves strings:
+#  pybabel extract *.py engine/*.py -o locales/covert.pot
+#  pybabel update -i locales/covert.pot -D 'covert' -d locales
 setting.locales = join(dirname(setting.__file__), 'locales')
 translator = gettext.translation('covert', localedir=setting.locales, languages=['en'])
 translator.install()

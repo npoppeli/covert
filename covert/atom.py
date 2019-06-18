@@ -12,6 +12,8 @@ ISO 8601 datetime notation:
 
 from datetime import datetime, date, time
 from .common import InternalError, escape_squote
+# from . import common as c
+# use c._ for translation
 
 class Atom:
     """Instances of this class define the atomic constituents of items.

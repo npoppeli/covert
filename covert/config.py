@@ -69,7 +69,7 @@ def read_config():
         doc0 = read_yaml_file(config_file)
         config.update(doc0)
     else:
-        logger.error("Current directory does not contain a 'config' file")
+        logger.error(_("Current directory does not contain a 'config' file"))
         sys.exit()
     if 'debug'   in config: setting.debug   = config['debug']
     if 'nostore' in config: setting.nostore = config['nostore']
@@ -88,7 +88,6 @@ def read_config():
     if setting.language != 'en':  # switch to application language
         app_trans = gettext.translation('covert', localedir=setting.locales, languages=[setting.language])
         app_trans.install()
-        logger.debug("' *not* ' is written", _(' *not* '))
     # keep original configuration
     setting.config = config
     # in debugging mode, print some configuration parameters

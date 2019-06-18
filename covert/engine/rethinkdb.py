@@ -77,9 +77,10 @@ class Translator(Visitor):
 def init_storage():
     """Initialize storage engine."""
     setting.store_connection = r.connect(db=setting.store_dbname).repl()
-    setting.store_db = r.db(setting.store_dbname)
+    dbname = setting.store_dbname
+    setting.store_db = r.db(dbname)
     if setting.debug >= 2:
-        logger.debug("Create RethinkDB connection, set database to '{}'".format(setting.store_dbname))
+        logger.debug(_("Create RethinkDB connection, set database to '{}'").format(dbname))
 
 class Item(BareItem):
     """Class for reading and writing objects from/to this storage engine.
@@ -308,7 +309,7 @@ class Item(BareItem):
         if validate:
             validate_result = self.validate(self)
             if validate_result['status'] != SUCCESS:
-                message = "item {}\ndoes not validate because of error\n{}\n".\
+                message = _("item {}\ndoes not validate because of error\n{}\n").\
                     format(self, validate_result['data'])
                 result = {'status':FAIL, 'data':message}
                 report_db_action(result)
@@ -331,7 +332,7 @@ class Item(BareItem):
             self.notify()
             return reply
         except Exception as e:
-            message = 'item {}\nnot written because of error\n{}\n'.format(doc, str(e))
+            message = _('item {}\nnot written because of error\n{}\n').format(doc, str(e))
             reply = {'status':ERROR, 'data':None, 'message':message}
             report_db_action(reply)
             raise InternalError(message)
@@ -361,11 +362,11 @@ class Item(BareItem):
                      'data': item_id, 'message':str(result.replaced)}
             report_db_action(reply)
             if reply['status'] == FAIL:
-                message = 'item {}\nnot updated, replaced={}'.format(self, result.replaced)
+                message = _('item {}\nnot updated, replaced={}').format(self, result.replaced)
                 raise InternalError(message)
             return reply
         except Exception as e:
-            message = 'item {}\nnot updated because of error\n{}\n'.format(self, str(e))
+            message = _('item {}\nnot updated because of error\n{}\n').format(self, str(e))
             reply = {'status':ERROR, 'data':None, 'message':message}
             report_db_action(reply)
             raise InternalError(message)
@@ -394,11 +395,11 @@ class Item(BareItem):
                      'data': item_id, 'message':str(result.replaced)}
             report_db_action(reply)
             if reply['status'] == FAIL:
-                message = 'item {}\nnot updated, replaced={}'.format(self, result.replaced)
+                message = _('item {}\nnot updated, replaced={}').format(self, result.replaced)
                 raise InternalError(message)
             return reply
         except Exception as e:
-            message = 'item {}\nnot written because of error\n{}\n'.format(self, str(e))
+            message = _('item {}\nnot written because of error\n{}\n').format(self, str(e))
             reply = {'status':ERROR, 'data':None, 'message':message}
             report_db_action(reply)
             raise InternalError(message)

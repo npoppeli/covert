@@ -118,10 +118,10 @@ def _unflatten(list_rep, meta):
             elif path[0].isnumeric(): # one-item list
                 # RHS = [] if key refers to an optional field, and child[1] is empty
                 if optional and not(child[1]):
-                    # logger.debug("unflatten: '{}' is optional && value empty '{}'".format(key, child[1]))
+                    # key is optional && value child[1] empty
                     result[key] = []
                 else:
-                    # logger.debug("unflatten: not an edge case, key='{}' value='{}'".format(key, child[1]))
+                    # not an edge case
                     result[key] = [child[1]]
             else: # one-item dict
                 result[key] = {path[0]:child[1]}
@@ -129,12 +129,12 @@ def _unflatten(list_rep, meta):
             value = _unflatten(children, meta)
             if isinstance(value, list) and len(value) == 1 and optional and \
                 not any(map(bool, value[0].values())):
-                # logger.debug("unflatten: '{}' is optional && value empty dict '{}'".format(key, str(value)))
+                # key is optional && value is empty dictionary
                 result[key] = []
             else:
-                # logger.debug("unflatten: not an edge case, key='{}' value='{}'".format(key, str(value)))
+                # not an edge case
                 result[key] = value
-    # convert a dict with numeric keys to a list
+    # convert a dictionary with numeric keys to a list
     if car_set and all([key.isnumeric() for key in car_set]):
         return [t[1] for t in sorted(result.items(), key=lambda t: int(t[0]))]
     else:
@@ -156,11 +156,9 @@ def mapdoc(fnmap, doc):
         dict: transformed item (document).
     """
     result = {}
-    # logger.debug('mapdoc: fnmap keys={} doc={}'.format(fnmap.keys(), str(doc)))
     for key, value in doc.items():
         if key in fnmap: # apply mapping function
             if fnmap[key] is None:
-                # logger.debug('mapdoc: key={} fn=None'.format(key))
                 continue
             if isinstance(value, dict): # embedded document
                 result[key] = mapdoc(fnmap, value)
@@ -274,7 +272,7 @@ class BareItem(dict):
             try:
                 self.update(mapdoc(self.rmap, doc))
             except Exception as e:
-                logger.error('Error in applying rmap to doc=%s\n%s',
+                logger.error(_('Error in applying rmap to doc=%s\n%s'),
                              doc, exception_report(e, ashtml=False))
 
     _format = 'Item {id}'
@@ -617,7 +615,7 @@ def parse_model_def(model_def, model_defs):
     for line in model_def:
         field_def = line.split()
         if len(field_def) not in (3, 4):
-            raise InternalError("field definition '{0}' should have 3 or 4 components".format(line))
+            raise InternalError(_("Field definition '{0}' should have 3 or 4 components").format(line))
         optional_field, multiple_field, auto_field = False, False, False
         if len(field_def) == 3:
             field_name, field_type, field_label = field_def
@@ -668,7 +666,7 @@ def parse_model_def(model_def, model_defs):
             ref_name = field_type[1:]+'Ref'
             ref_class = setting.models[ref_name]
             if ref_name not in setting.models:
-                raise InternalError("reference to unknown model '{0}' in {1}".format(ref_name, line))
+                raise InternalError(_("Reference to unknown model '{0}' in {1}").format(ref_name, line))
             # don not extend pm.cmap, since model reference needs no conversion
             pm.dmap[field_name] = display_reference
             pm.rmap[field_name] = ref_class
@@ -728,7 +726,7 @@ def read_models(model_defs):
     elif setting.config['dbtype'] == 'rethinkdb':
         from .engine.rethinkdb import Item
     else:
-        raise InternalError('Storage engine should be MongoDB or RethinkDB')
+        raise InternalError(_('Storage engine should be MongoDB or RethinkDB'))
     setting.models['BareItem'] = BareItem
     setting.models['Item'] = Item
 

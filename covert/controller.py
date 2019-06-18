@@ -18,7 +18,7 @@ from .common import encode_dict, logger
 
 def http_server(app, **kwarg):
     """HTTP server for development purposes"""
-    logger.debug('Starting HTTP server')
+    logger.debug(_('Starting HTTP server'))
     # wrapped = ErrorMiddleware(app, debug=True)
     waitress.serve(app, **kwarg)
 
@@ -39,12 +39,12 @@ def exception_report(exc, ashtml=True):
     """
     exc_type, exc_value, exc_trace = sys.exc_info()
     if ashtml:
-        head = 'Traceback (most recent call last)'
+        head = _('Traceback (most recent call last)')
         body = traceback.format_tb(exc_trace)
         tail = '{0}: {1}'.format(exc_type.__name__, str(exc_value))
         return setting.templates['error'].render(this={'head':head, 'body':body, 'tail':tail})
     else:
-        head = ['Internal error. ', 'Traceback (most recent call last)']
+        head = [_('Internal error. Traceback (most recent call last)')]
         body = traceback.format_tb(exc_trace)
         tail = ['{0}: {1}'.format(exc_type.__name__, str(exc_value))]
         return '\n'.join(head+body+tail)
@@ -124,7 +124,7 @@ class CondRouter:
         except Exception as e:
             response = Response()
             response.text = exception_report(e)
-            logger.error('{}: {} {} [mode {}] results in exception {}\n'.format(date_time,
+            logger.error(_('{}: {} {} [mode {}] results in exception {}\n').format(date_time,
                          req_method, request.path_qs, mode, exception_report(e, False)))
         return response(environ, start_response)
 
@@ -185,12 +185,12 @@ class MapRouter:
                 response.cache_control.max_age = 0
             except Exception as e:
                 result = exception_report(e, ashtml=(self.content_type=='text/html'))
-                print('{}: exception occurred in {}'.format(controller_name, route_name))
+                print(_('{}: exception occurred in {}').format(controller_name, route_name))
                 if self.content_type != 'text/html':
                     print(result)
                 response.status = 500
         else: # no match in the known routes
-            result = '{}: nothing found for {} {}'.\
+            result = _('{}: nothing found for {} {}').\
                      format(controller_name, req_method, request.path_qs)
             logger.warning(result)
             response.status = 404

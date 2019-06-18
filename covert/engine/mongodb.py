@@ -42,7 +42,7 @@ class Translator(ast.NodeVisitor):
 
     # default method
     def generic_visit(self, n):
-        raise NotImplementedError('Translator: no method for '+n.__class__.__name__)
+        raise NotImplementedError(_('Translator: no method for ')+n.__class__.__name__)
     # auxiliaries
     def visit_elts        (self, n): return [self.visit(elt) for elt in n.elts]
     def visit_values      (self, n): return [self.visit(elt) for elt in n.values]
@@ -82,9 +82,10 @@ class Translator(ast.NodeVisitor):
 def init_storage():
     """Initialize storage engine."""
     setting.store_connection = MongoClient()
-    setting.store_db = setting.store_connection[setting.store_dbname]
+    dbname = setting.store_dbname
+    setting.store_db = setting.store_connection[dbname]
     if setting.debug >= 2:
-        logger.debug("Create MongoDB connection, set database to '{}'".format(setting.store_dbname))
+        logger.debug(_("Create MongoDB connection, set database to '{}'").format(dbname))
 
 class Item(BareItem):
     """Class for reading and writing objects from/to this storage engine.
@@ -136,8 +137,8 @@ class Item(BareItem):
         try:
             root = compile(expr, '', 'eval', ast.PyCF_ONLY_AST)
         except SyntaxError as e:
-            logger.debug("Item.filter: expr={}".format(expr))
-            logger.debug("Exception '{}'".format(e))
+            logger.debug(_("Item.filter: expr={}").format(expr))
+            logger.debug(_("Exception '{}'").format(e))
             raise
         translator = Translator(cls.cmap, cls.wmap)
         try:
@@ -145,8 +146,8 @@ class Item(BareItem):
             return result
         except Exception as e:
             logger.debug(str(e))
-            logger.debug("Item.filter: expr={}".format(expr))
-            logger.debug("Item.filter: root={}".format(ast.dump(root)))
+            logger.debug(_("Item.filter: expr={}").format(expr))
+            logger.debug(_("Item.filter: root={}").format(ast.dump(root)))
             return None
 
     @classmethod
@@ -311,7 +312,7 @@ class Item(BareItem):
         if validate:
             validate_result = self.validate(self)
             if validate_result['status'] != SUCCESS:
-                message = "{} {}\ndoes not validate because of error\n{}\n".\
+                message = _("{} {}\ndoes not validate because of error\n{}\n").\
                     format(self.name, self, validate_result['data'])
                 result = {'status':FAIL, 'data':message}
                 report_db_action(result)
@@ -336,7 +337,7 @@ class Item(BareItem):
             self.notify()
             return reply
         except Exception as e:
-            message = 'item {}\nnot written because of error\n{}\n'.format(doc, str(e))
+            message = _('item {}\nnot written because of error\n{}\n').format(doc, str(e))
             reply = {'status':ERROR, 'data':None, 'message':message}
             report_db_action(reply)
             raise InternalError(message)
@@ -366,11 +367,11 @@ class Item(BareItem):
                      'data': item_id, 'message':str(result.raw_result)}
             report_db_action(reply)
             if reply['status'] == FAIL:
-                message = 'item {}\nnot updated, matched count={}'.format(self, result.matched_count)
+                message = _('item {}\nnot updated, matched count={}').format(self, result.matched_count)
                 raise InternalError(message)
             return reply
         except Exception as e:
-            message = 'item {}\nnot updated because of error\n{}\n'.format(self, str(e))
+            message = _('item {}\nnot updated because of error\n{}\n').format(self, str(e))
             reply = {'status':ERROR, 'data':None, 'message':message}
             report_db_action(reply)
             raise InternalError(message)
@@ -399,11 +400,11 @@ class Item(BareItem):
                      'data': item_id, 'message':str(result.raw_result)}
             report_db_action(reply)
             if reply['status'] == FAIL:
-                message = 'item {}\nnot updated, matched count={}'.format(self, result.matched_count)
+                message = _('item {}\nnot updated, matched count={}').format(self, result.matched_count)
                 raise InternalError(message)
             return reply
         except Exception as e:
-            message = 'item {}\nnot written because of error\n{}\n'.format(self, str(e))
+            message = _('item {}\nnot written because of error\n{}\n').format(self, str(e))
             reply = {'status':ERROR, 'data':None, 'message':message}
             report_db_action(reply)
             raise InternalError(message)
