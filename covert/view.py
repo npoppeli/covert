@@ -45,26 +45,6 @@ setting.labels = {
      'cancel' : _('Cancel')
 }
 
-# show:    Show	    Toon	    Show
-# sort:    Sort	    Sorteer	    Sortera
-# index:   Browse	Blader	    Bläddra
-# search:  Search	Zoek	    Sök
-# match:   Match	Resultaat	Resultat
-# modify:  Modify	Wijzig	    Ändra
-# update:  Update	Wijzig	    Ändra
-# new:     New	    Nieuw	    Ny
-# create:  Create	Maak	    Skapa
-# delete:  Delete	Verwijder	Radera
-# push:    Push	    Verleng	    Utbreda
-# pop:     Pop	    Verklein	Krympa
-# home:    Home	    Begin	    Hem
-# info:    Info	    Info	    Info
-# ok:      OK	    OK	        OK
-# refresh: Refresh	Ververs	    Fylla på
-# return:  Return	Terug	    Retur
-# cancel:  Cancel	Annuleer	Upphäva
-
-
 def label_for(name):
     """Return label for route 'name'."""
     return setting.labels.get(name, 'unknown')

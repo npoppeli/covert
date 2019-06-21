@@ -1,0 +1,372 @@
+# English translations for PROJECT.
+# Copyright (C) 2019 ORGANIZATION
+# This file is distributed under the same license as the PROJECT project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2019.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2019-06-21 19:53+0200\n"
+"PO-Revision-Date: 2019-06-21 19:56+0200\n"
+"Last-Translator: \n"
+"Language: en\n"
+"Language-Team: \n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.7.0\n"
+"X-Generator: Poedit 2.0.6\n"
+
+#: atom.py:66
+msgid "Atom {0} is already registered"
+msgstr "Atom {0} is already registered"
+
+#: config.py:72
+msgid "Current directory does not contain a 'config' file"
+msgstr "Current directory does not contain a 'config' file"
+
+#: config.py:97
+msgid "Debug option is {}"
+msgstr "Debug option is {}"
+
+#: config.py:98
+msgid "Verbose option is {}"
+msgstr "Verbose option is {}"
+
+#: config.py:99
+msgid "Changes are{}written to the database"
+msgstr "Changes are{}written to the database"
+
+#: config.py:99
+msgid " *not* "
+msgstr " *not* "
+
+#: config.py:100
+msgid "Static content is in directory {}"
+msgstr "Static content is in directory {}"
+
+#: config.py:101
+msgid "User interface is in the '{}' language"
+msgstr "User interface is in the '{}' language"
+
+#: config.py:102
+msgid "Web server listens to {}:{}"
+msgstr "Web server listens to {}:{}"
+
+#: config.py:119
+msgid "Unknown storage engine: only MongoDB and RethinkDB are supported"
+msgstr "Unknown storage engine: only MongoDB and RethinkDB are supported"
+
+#: config.py:124
+msgid "Created new folder for media storage: {}"
+msgstr "Created new folder for media storage: {}"
+
+#: config.py:127
+msgid "Initialized content-addressable media storage"
+msgstr "Initialized content-addressable media storage"
+
+#: config.py:135
+msgid "{} should be Python module"
+msgstr "{} should be Python module"
+
+#: config.py:161
+msgid "{} should be in YAML or Python form"
+msgstr "{} should be in YAML or Python form"
+
+#: config.py:179
+msgid "Application has {0} routes"
+msgstr "Application has {0} routes"
+
+#: config.py:189
+msgid "Application has {0} buttons"
+msgstr "Application has {0} buttons"
+
+#: config.py:198
+msgid "Application has {0} models"
+msgstr "Application has {0} models"
+
+#: controller.py:21
+msgid "Starting HTTP server"
+msgstr "Starting HTTP server"
+
+#: controller.py:42
+msgid "Traceback (most recent call last)"
+msgstr "Traceback (most recent call last)"
+
+#: controller.py:47
+msgid "Internal error. Traceback (most recent call last)"
+msgstr "Internal error. Traceback (most recent call last)"
+
+#: controller.py:127
+msgid "{}: {} {} [mode {}] results in exception {}\n"
+msgstr "{}: {} {} [mode {}] results in exception {}\n"
+
+#: controller.py:188
+msgid "{}: exception occurred in {}"
+msgstr "{}: exception occurred in {}"
+
+#: controller.py:193
+msgid "{}: nothing found for {} {}"
+msgstr "{}: nothing found for {} {}"
+
+#: layout.py:36
+#, python-format
+msgid "Cannot redefine template type %s"
+msgstr "Cannot redefine template type %s"
+
+#: layout.py:40
+#, python-format
+msgid "Define new template type %s"
+msgstr "Define new template type %s"
+
+#: layout.py:47
+#, python-format
+msgid "Chameleon template engine not available (%s)"
+msgstr "Chameleon template engine not available (%s)"
+
+#: layout.py:60
+msgid "Scanning for templates in {0}"
+msgstr "Scanning for templates in {0}"
+
+#: layout.py:61
+msgid "Template types: {0}"
+msgstr "Template types: {0}"
+
+#: layout.py:75
+msgid "Template {} is in file {}"
+msgstr "Template {} is in file {}"
+
+#: layout.py:77
+msgid "Error in template '{0}' in file {1}"
+msgstr "Error in template '{0}' in file {1}"
+
+#: model.py:252
+msgid "Active"
+msgstr "Active"
+
+#: model.py:254
+msgid "Created"
+msgstr "Created"
+
+#: model.py:255
+msgid "Modified"
+msgstr "Modified"
+
+#: model.py:275
+#, python-format
+msgid ""
+"Error in applying rmap to doc=%s\n"
+"%s"
+msgstr ""
+"Error in applying rmap to doc=%s\n"
+"%s"
+
+#: model.py:618
+msgid "Field definition '{0}' should have 3 or 4 components"
+msgstr "Field definition '{0}' should have 3 or 4 components"
+
+#: model.py:669
+msgid "Reference to unknown model '{0}' in {1}"
+msgstr "Reference to unknown model '{0}' in {1}"
+
+#: model.py:729
+msgid "Storage engine should be MongoDB or RethinkDB"
+msgstr "Storage engine should be MongoDB or RethinkDB"
+
+#: view.py:28
+msgid "Show"
+msgstr "Show"
+
+#: view.py:29
+msgid "Sort"
+msgstr "Sort"
+
+#: view.py:30
+msgid "Browse"
+msgstr "Browse"
+
+#: view.py:31
+msgid "Search"
+msgstr "Search"
+
+#: view.py:32
+msgid "Match"
+msgstr "Match"
+
+#: view.py:33
+msgid "Modify"
+msgstr "Modify"
+
+#: view.py:34
+msgid "Update"
+msgstr "Update"
+
+#: view.py:35
+msgid "New"
+msgstr "New"
+
+#: view.py:36
+msgid "Create"
+msgstr "Create"
+
+#: view.py:37
+msgid "Delete"
+msgstr "Delete"
+
+#: view.py:38
+msgid "Push"
+msgstr "Push"
+
+#: view.py:39
+msgid "Pop"
+msgstr "Pop"
+
+#: view.py:40
+msgid "Home"
+msgstr "Home"
+
+#: view.py:41
+msgid "Info"
+msgstr "Info"
+
+#: view.py:42
+msgid "OK"
+msgstr "OK"
+
+#: view.py:43
+msgid "Refresh"
+msgstr "Refresh"
+
+#: view.py:44
+msgid "Return"
+msgstr "Return"
+
+#: view.py:45
+msgid "Cancel"
+msgstr "Cancel"
+
+#: engine/hashfs.py:113
+msgid "Could not locate file: {0}"
+msgstr "Could not locate file: {0}"
+
+#: engine/hashfs.py:208
+msgid "unshard: path '{}' is not subdirectory of root '{}'"
+msgstr "unshard: path '{}' is not subdirectory of root '{}'"
+
+#: engine/hashfs.py:250
+msgid "Stream: {} is not a valid file path or readable object"
+msgstr "Stream: {} is not a valid file path or readable object"
+
+#: engine/mongodb.py:45
+msgid "Translator: no method for "
+msgstr "Translator: no method for "
+
+#: engine/mongodb.py:88
+msgid "Create MongoDB connection, set database to '{}'"
+msgstr "Create MongoDB connection, set database to '{}'"
+
+#: engine/mongodb.py:140 engine/mongodb.py:149
+msgid "Item.filter: expr={}"
+msgstr "Item.filter: expr={}"
+
+#: engine/mongodb.py:141
+msgid "Exception '{}'"
+msgstr "Exception '{}'"
+
+#: engine/mongodb.py:150
+msgid "Item.filter: root={}"
+msgstr "Item.filter: root={}"
+
+#: engine/mongodb.py:315 engine/rethinkdb.py:312
+msgid ""
+"{} {}\n"
+"does not validate because of error\n"
+"{}\n"
+msgstr ""
+"{} {}\n"
+"does not validate because of error\n"
+"{}\n"
+
+#: engine/mongodb.py:340 engine/mongodb.py:407 engine/rethinkdb.py:335
+#: engine/rethinkdb.py:402
+msgid ""
+"{} {}\n"
+"not written because of error\n"
+"{}\n"
+msgstr ""
+"{} {}\n"
+"not written because of error\n"
+"{}\n"
+
+#: engine/mongodb.py:370 engine/mongodb.py:403
+msgid ""
+"{} {}\n"
+"not updated, matched count={}"
+msgstr ""
+"{} {}\n"
+"not updated, matched count={}"
+
+#: engine/mongodb.py:374 engine/rethinkdb.py:369
+msgid ""
+"{} {}\n"
+"not updated because of error\n"
+"{}\n"
+msgstr ""
+"{} {}\n"
+"not updated because of error\n"
+"{}\n"
+
+#: engine/rethinkdb.py:83
+msgid "Create RethinkDB connection, set database to '{}'"
+msgstr "Create RethinkDB connection, set database to '{}'"
+
+#: engine/rethinkdb.py:365 engine/rethinkdb.py:398
+msgid ""
+"{} {}\n"
+"not updated, replaced={}"
+msgstr ""
+"{} {}\n"
+"not updated, replaced={}"
+
+#~ msgid ""
+#~ "item {}\n"
+#~ "not written because of error\n"
+#~ "{}\n"
+#~ msgstr ""
+#~ "item {}\n"
+#~ "not written because of error\n"
+#~ "{}\n"
+
+#~ msgid ""
+#~ "item {}\n"
+#~ "not updated, matched count={}"
+#~ msgstr ""
+#~ "item {}\n"
+#~ "not updated, matched count={}"
+
+#~ msgid ""
+#~ "item {}\n"
+#~ "not updated because of error\n"
+#~ "{}\n"
+#~ msgstr ""
+#~ "item {}\n"
+#~ "not updated because of error\n"
+#~ "{}\n"
+
+#~ msgid ""
+#~ "item {}\n"
+#~ "does not validate because of error\n"
+#~ "{}\n"
+#~ msgstr ""
+#~ "item {}\n"
+#~ "does not validate because of error\n"
+#~ "{}\n"
+
+#~ msgid ""
+#~ "item {}\n"
+#~ "not updated, replaced={}"
+#~ msgstr ""
+#~ "item {}\n"
+#~ "not updated, replaced={}"

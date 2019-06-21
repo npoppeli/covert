@@ -309,8 +309,8 @@ class Item(BareItem):
         if validate:
             validate_result = self.validate(self)
             if validate_result['status'] != SUCCESS:
-                message = _("item {}\ndoes not validate because of error\n{}\n").\
-                    format(self, validate_result['data'])
+                message = _("{} {}\ndoes not validate because of error\n{}\n").\
+                    format(self.name, self, validate_result['data'])
                 result = {'status':FAIL, 'data':message}
                 report_db_action(result)
                 return result
@@ -332,7 +332,7 @@ class Item(BareItem):
             self.notify()
             return reply
         except Exception as e:
-            message = _('item {}\nnot written because of error\n{}\n').format(doc, str(e))
+            message = _('{} {}\nnot written because of error\n{}\n').format(self.name, doc, str(e))
             reply = {'status':ERROR, 'data':None, 'message':message}
             report_db_action(reply)
             raise InternalError(message)
@@ -362,11 +362,11 @@ class Item(BareItem):
                      'data': item_id, 'message':str(result.replaced)}
             report_db_action(reply)
             if reply['status'] == FAIL:
-                message = _('item {}\nnot updated, replaced={}').format(self, result.replaced)
+                message = _('{} {}\nnot updated, replaced={}').format(self.name, self, result.replaced)
                 raise InternalError(message)
             return reply
         except Exception as e:
-            message = _('item {}\nnot updated because of error\n{}\n').format(self, str(e))
+            message = _('{} {}\nnot updated because of error\n{}\n').format(self.name, self, str(e))
             reply = {'status':ERROR, 'data':None, 'message':message}
             report_db_action(reply)
             raise InternalError(message)
@@ -395,11 +395,11 @@ class Item(BareItem):
                      'data': item_id, 'message':str(result.replaced)}
             report_db_action(reply)
             if reply['status'] == FAIL:
-                message = _('item {}\nnot updated, replaced={}').format(self, result.replaced)
+                message = _('{} {}\nnot updated, replaced={}').format(self.name, self, result.replaced)
                 raise InternalError(message)
             return reply
         except Exception as e:
-            message = _('item {}\nnot written because of error\n{}\n').format(self, str(e))
+            message = _('{} {}\nnot written because of error\n{}\n').format(self.name, self, str(e))
             reply = {'status':ERROR, 'data':None, 'message':message}
             report_db_action(reply)
             raise InternalError(message)

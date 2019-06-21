@@ -1,0 +1,372 @@
+# Swedish translations for PROJECT.
+# Copyright (C) 2019 ORGANIZATION
+# This file is distributed under the same license as the PROJECT project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2019.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2019-06-21 19:53+0200\n"
+"PO-Revision-Date: 2019-06-21 19:56+0200\n"
+"Last-Translator: \n"
+"Language: sv\n"
+"Language-Team: \n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.7.0\n"
+"X-Generator: Poedit 2.0.6\n"
+
+#: atom.py:66
+msgid "Atom {0} is already registered"
+msgstr "Atom {0} är redan registrerad"
+
+#: config.py:72
+msgid "Current directory does not contain a 'config' file"
+msgstr "Aktuell katalog innehåller inte en \"config\" fil"
+
+#: config.py:97
+msgid "Debug option is {}"
+msgstr "Debug option är {}"
+
+#: config.py:98
+msgid "Verbose option is {}"
+msgstr "Pratig option är {}"
+
+#: config.py:99
+msgid "Changes are{}written to the database"
+msgstr "Ändringar är {} skrivna till databasen"
+
+#: config.py:99
+msgid " *not* "
+msgstr " *inte* "
+
+#: config.py:100
+msgid "Static content is in directory {}"
+msgstr "Statiskt innehåll finns i katalogen {}"
+
+#: config.py:101
+msgid "User interface is in the '{}' language"
+msgstr "Användargränssnittet finns i '{}' språk"
+
+#: config.py:102
+msgid "Web server listens to {}:{}"
+msgstr "Webbservern lyssnar på {}: {}"
+
+#: config.py:119
+msgid "Unknown storage engine: only MongoDB and RethinkDB are supported"
+msgstr "Okänd lagringsmotor: endast MongoDB och RethinkDB stöds"
+
+#: config.py:124
+msgid "Created new folder for media storage: {}"
+msgstr "Skapat ny mapp för medialagring: {}"
+
+#: config.py:127
+msgid "Initialized content-addressable media storage"
+msgstr "Initialiserad innehållsadresserbar medialagring"
+
+#: config.py:135
+msgid "{} should be Python module"
+msgstr "{} ska vara Python-modulen"
+
+#: config.py:161
+msgid "{} should be in YAML or Python form"
+msgstr "{} bör vara i YAML eller Python form"
+
+#: config.py:179
+msgid "Application has {0} routes"
+msgstr "Applikationen har {0} rutter"
+
+#: config.py:189
+msgid "Application has {0} buttons"
+msgstr "Applikationen har {0} knappar"
+
+#: config.py:198
+msgid "Application has {0} models"
+msgstr "Applikationen har {0} modeller"
+
+#: controller.py:21
+msgid "Starting HTTP server"
+msgstr "Startar HTTP-servern"
+
+#: controller.py:42
+msgid "Traceback (most recent call last)"
+msgstr "Traceback (senaste samtal sist)"
+
+#: controller.py:47
+msgid "Internal error. Traceback (most recent call last)"
+msgstr "Internt fel. Traceback (senaste samtal sist)"
+
+#: controller.py:127
+msgid "{}: {} {} [mode {}] results in exception {}\n"
+msgstr "{}: {} {} [läge {}] resulterar i undantag {}\n"
+
+#: controller.py:188
+msgid "{}: exception occurred in {}"
+msgstr "{}: undantag inträffade i {}"
+
+#: controller.py:193
+msgid "{}: nothing found for {} {}"
+msgstr "{}: ingenting hittades för {} {}"
+
+#: layout.py:36
+#, python-format
+msgid "Cannot redefine template type %s"
+msgstr "Det går inte att omdefiniera malltypen% s"
+
+#: layout.py:40
+#, python-format
+msgid "Define new template type %s"
+msgstr "Definiera ny malltyp% s"
+
+#: layout.py:47
+#, python-format
+msgid "Chameleon template engine not available (%s)"
+msgstr "Chameleon templatsmotor inte tillgänglig (% s)"
+
+#: layout.py:60
+msgid "Scanning for templates in {0}"
+msgstr "Skanning efter mallar i {0}"
+
+#: layout.py:61
+msgid "Template types: {0}"
+msgstr "Malltyper: {0}"
+
+#: layout.py:75
+msgid "Template {} is in file {}"
+msgstr "Mall {} finns i filen {}"
+
+#: layout.py:77
+msgid "Error in template '{0}' in file {1}"
+msgstr "Fel i mall '{0}' i fil {1}"
+
+#: model.py:252
+msgid "Active"
+msgstr "Aktiva"
+
+#: model.py:254
+msgid "Created"
+msgstr "Skapad"
+
+#: model.py:255
+msgid "Modified"
+msgstr "Ändrad"
+
+#: model.py:275
+#, python-format
+msgid ""
+"Error in applying rmap to doc=%s\n"
+"%s"
+msgstr ""
+"Fel vid tillämpning av rmap till doc=%s\n"
+"%s"
+
+#: model.py:618
+msgid "Field definition '{0}' should have 3 or 4 components"
+msgstr "Fältdefinition '{0}' ska ha 3 eller 4 komponenter"
+
+#: model.py:669
+msgid "Reference to unknown model '{0}' in {1}"
+msgstr "Hänvisning till okänd modell '{0}' i {1}"
+
+#: model.py:729
+msgid "Storage engine should be MongoDB or RethinkDB"
+msgstr "Lagringsmotor ska vara MongoDB eller RethinkDB"
+
+#: view.py:28
+msgid "Show"
+msgstr "Show"
+
+#: view.py:29
+msgid "Sort"
+msgstr "Sortera"
+
+#: view.py:30
+msgid "Browse"
+msgstr "Bläddra"
+
+#: view.py:31
+msgid "Search"
+msgstr "Sök"
+
+#: view.py:32
+msgid "Match"
+msgstr "Resultat"
+
+#: view.py:33
+msgid "Modify"
+msgstr "Ändra"
+
+#: view.py:34
+msgid "Update"
+msgstr "Ändra"
+
+#: view.py:35
+msgid "New"
+msgstr "Ny"
+
+#: view.py:36
+msgid "Create"
+msgstr "Skapa"
+
+#: view.py:37
+msgid "Delete"
+msgstr "Radera"
+
+#: view.py:38
+msgid "Push"
+msgstr "Utbreda"
+
+#: view.py:39
+msgid "Pop"
+msgstr "Krympa"
+
+#: view.py:40
+msgid "Home"
+msgstr "Hem"
+
+#: view.py:41
+msgid "Info"
+msgstr "Info"
+
+#: view.py:42
+msgid "OK"
+msgstr "OK"
+
+#: view.py:43
+msgid "Refresh"
+msgstr "Fylla på"
+
+#: view.py:44
+msgid "Return"
+msgstr "Retur"
+
+#: view.py:45
+msgid "Cancel"
+msgstr "Upphäva"
+
+#: engine/hashfs.py:113
+msgid "Could not locate file: {0}"
+msgstr "Det gick inte att hitta filen: {0}"
+
+#: engine/hashfs.py:208
+msgid "unshard: path '{}' is not subdirectory of root '{}'"
+msgstr "unshard: sökväg '{}' är inte underkatalog för root '{}'"
+
+#: engine/hashfs.py:250
+msgid "Stream: {} is not a valid file path or readable object"
+msgstr "Stream: {} är inte en giltig filväg eller läsbart objekt"
+
+#: engine/mongodb.py:45
+msgid "Translator: no method for "
+msgstr "Translator: ingen metod för"
+
+#: engine/mongodb.py:88
+msgid "Create MongoDB connection, set database to '{}'"
+msgstr "Skapa MongoDB-anslutning, sätt databas till '{}'"
+
+#: engine/mongodb.py:140 engine/mongodb.py:149
+msgid "Item.filter: expr={}"
+msgstr "Item.filter: expr={}"
+
+#: engine/mongodb.py:141
+msgid "Exception '{}'"
+msgstr "Undantag '{}'"
+
+#: engine/mongodb.py:150
+msgid "Item.filter: root={}"
+msgstr "Item.filter: root={}"
+
+#: engine/mongodb.py:315 engine/rethinkdb.py:312
+msgid ""
+"{} {}\n"
+"does not validate because of error\n"
+"{}\n"
+msgstr ""
+"{} {}\n"
+"valideras inte på grund av fel\n"
+"{}\n"
+
+#: engine/mongodb.py:340 engine/mongodb.py:407 engine/rethinkdb.py:335
+#: engine/rethinkdb.py:402
+msgid ""
+"{} {}\n"
+"not written because of error\n"
+"{}\n"
+msgstr ""
+"{} {}\n"
+"inte skrivet på grund av fel\n"
+"{}\n"
+
+#: engine/mongodb.py:370 engine/mongodb.py:403
+msgid ""
+"{} {}\n"
+"not updated, matched count={}"
+msgstr ""
+"{} {}\n"
+"inte uppdaterad, matchad räkning={}"
+
+#: engine/mongodb.py:374 engine/rethinkdb.py:369
+msgid ""
+"{} {}\n"
+"not updated because of error\n"
+"{}\n"
+msgstr ""
+"{} {}\n"
+"inte uppdaterad på grund av fel\n"
+"{}\n"
+
+#: engine/rethinkdb.py:83
+msgid "Create RethinkDB connection, set database to '{}'"
+msgstr "Skapa RethinkDB-anslutning, sätt databas till '{}'"
+
+#: engine/rethinkdb.py:365 engine/rethinkdb.py:398
+msgid ""
+"{} {}\n"
+"not updated, replaced={}"
+msgstr ""
+"{} {}\n"
+"inte uppdaterad, replaced={}"
+
+#~ msgid ""
+#~ "item {}\n"
+#~ "not written because of error\n"
+#~ "{}\n"
+#~ msgstr ""
+#~ "objektet {}\n"
+#~ "inte skrivet på grund av fel\n"
+#~ "{}\n"
+
+#~ msgid ""
+#~ "item {}\n"
+#~ "not updated, matched count={}"
+#~ msgstr ""
+#~ "objektet {}\n"
+#~ "inte uppdaterat, matchat räkning={}"
+
+#~ msgid ""
+#~ "item {}\n"
+#~ "not updated because of error\n"
+#~ "{}\n"
+#~ msgstr ""
+#~ "objektet {}\n"
+#~ "uppdateras inte på grund av fel\n"
+#~ "{}\n"
+
+#~ msgid ""
+#~ "item {}\n"
+#~ "does not validate because of error\n"
+#~ "{}\n"
+#~ msgstr ""
+#~ "item {}\n"
+#~ "does not validate because of error\n"
+#~ "{}\n"
+
+#~ msgid ""
+#~ "item {}\n"
+#~ "not updated, replaced={}"
+#~ msgstr ""
+#~ "item {}\n"
+#~ "not updated, replaced={}"

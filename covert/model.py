@@ -247,12 +247,12 @@ class BareItem(dict):
     wmap = {}
     # metadata
     meta = OrderedDict()
-    meta['id']     = Field(label='Id',      schema='string',  formtype='hidden',  auto=True)
-    meta['_skey']  = Field(label='Sort by', schema='string',  formtype='hidden',  auto=True)
-    meta['active'] = Field(label='Actief',  schema='boolean', formtype='boolean', auto=False,
+    meta['id']     = Field(label='Id',          schema='string',  formtype='hidden',  auto=True)
+    meta['_skey']  = Field(label='Sort by',     schema='string',  formtype='hidden',  auto=True)
+    meta['active'] = Field(label=_('Active'),   schema='boolean', formtype='boolean', auto=False,
                            enum=bool_atom.enum, control=bool_atom.control)
-    meta['ctime']  = Field(label='Created',  schema='datetime', formtype='hidden',  auto=True)
-    meta['mtime']  = Field(label='Modified', schema='datetime', formtype='hidden',  auto=True)
+    meta['ctime']  = Field(label=_('Created'),  schema='datetime', formtype='hidden',  auto=True)
+    meta['mtime']  = Field(label=_('Modified'), schema='datetime', formtype='hidden',  auto=True)
 
     def __init__(self, doc=None):
         """Initialize item.
