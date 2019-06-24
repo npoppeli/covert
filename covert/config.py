@@ -5,7 +5,7 @@ Attributes:
     config_default (dict): default values for configuration options
 """
 
-import argparse, logging, sys, gettext
+import argparse, gettext, logging, sys
 from importlib import import_module
 from inspect import getmembers, isclass
 from os import getcwd, mkdir
@@ -15,6 +15,7 @@ from .model import read_models
 from .view import read_views, Button
 from .layout import read_templates
 from .common import read_yaml_file, InternalError, logger
+from . import common as c
 from .engine.hashfs import HashFS
 
 extra_arguments = {}
@@ -53,7 +54,7 @@ config_default = dict(content='content', layout='layout', media='media',
                       host='localhost', port='8080',
                       models='models', views='views', language='en')
 
-def read_config():
+def read_configuration():
     """Read configuration file.
 
     Read configuration file and define global settings (variables in module 'setting')
@@ -69,7 +70,7 @@ def read_config():
         doc0 = read_yaml_file(config_file)
         config.update(doc0)
     else:
-        logger.error(_("Current directory does not contain a 'config' file"))
+        logger.error(c._("Current directory does not contain a 'config' file"))
         sys.exit()
     if 'debug'   in config: setting.debug   = config['debug']
     if 'nostore' in config: setting.nostore = config['nostore']
@@ -86,22 +87,24 @@ def read_config():
     setting.language = config['language'] if config['language'] in setting.languages\
                        else config_default['language']
     if setting.language != 'en':  # switch to application language
+        print("C: install '{}' translation catalog from path {}".format(setting.language, setting.locales))
         app_trans = gettext.translation('covert', localedir=setting.locales, languages=[setting.language])
-        app_trans.install()
+        c._ = app_trans.gettext
+
     # keep original configuration
     setting.config = config
     # in debugging mode, print some configuration parameters
     if setting.debug:
         logger.setLevel(logging.DEBUG)
     if setting.debug >= 2:
-        logger.debug(_("Debug option is {}").format(setting.debug))
-        logger.debug(_("Verbose option is {}").format(setting.verbose))
-        logger.debug(_("Changes are{}written to the database").format(_(' *not* ') if setting.nostore else ' '))
-        logger.debug(_("Static content is in directory {}").format(setting.content))
-        logger.debug(_("User interface is in the '{}' language").format(setting.language))
-        logger.debug(_("Web server listens to {}:{}").format(setting.host, setting.port))
+        logger.debug(c._("Debug option is {}").format(setting.debug))
+        logger.debug(c._("Verbose option is {}").format(setting.verbose))
+        logger.debug(c._("Changes are{}written to the database").format(c._(' *not* ') if setting.nostore else ' '))
+        logger.debug(c._("Static content is in directory {}").format(setting.content))
+        logger.debug(c._("User interface is in the '{}' language").format(setting.language))
+        logger.debug(c._("Web server listens to {}:{}").format(setting.host, setting.port))
 
-def kernel_init():
+def initialize_kernel():
     """Initialize kernel.
 
     Initialize various parts of kernel (storage, layout, models, views).
@@ -116,15 +119,15 @@ def kernel_init():
     elif setting.dbtype == 'rethinkdb':
         from .engine.rethinkdb import init_storage
     else:
-        raise InternalError(_('Unknown storage engine: only MongoDB and RethinkDB are supported'))
+        raise InternalError(c._('Unknown storage engine: only MongoDB and RethinkDB are supported'))
     init_storage()
     # initialize media storage
     if not exists(setting.media):
         mkdir(setting.media)
-        logger.debug(_('Created new folder for media storage: {}').format(setting.media))
+        logger.debug(c._('Created new folder for media storage: {}').format(setting.media))
     setting.store_mdb = HashFS(setting.media)
     if setting.debug >= 2:
-        logger.debug(_('Initialized content-addressable media storage'))
+        logger.debug(c._('Initialized content-addressable media storage'))
 
     # execute prelude (if present)
     if 'prelude' in setting.config:
@@ -132,7 +135,7 @@ def kernel_init():
         if extension == '.py':
             module_ = import_module(name)
         else:
-            logger.info(_('{} should be Python module').format(setting.config['prelude']))
+            logger.info(c._('{} should be Python module').format(setting.config['prelude']))
 
     # read icons
     if 'icons' in setting.config:
@@ -158,7 +161,7 @@ def kernel_init():
             models = read_yaml_file(item)
             read_models(models)
         else:
-            logger.info(_('{} should be in YAML or Python form').format(item))
+            logger.info(c._('{} should be in YAML or Python form').format(item))
 
     # import views
     name, extension = splitext(setting.config['views'])
@@ -176,7 +179,7 @@ def kernel_init():
     # print information about models and views
     if setting.tables:
         # print all routes (tabular)
-        print(_('Application has {0} routes').format(len(setting.routes)))
+        print(c._('Application has {0} routes').format(len(setting.routes)))
         fmt = "{:>5} {:<30} {:<10} {:<15} {:<20} {:<15} {:<30}"
         print(fmt.format('order', 'pattern', 'method', 'view', 'name', 'vars', 'templates'))
         print('-' * 120)
@@ -186,7 +189,7 @@ def kernel_init():
                              ', '.join(route.vars), ', '.join(route.templates)))
         print('')
         # print all buttons (tabular)
-        print(_('Application has {0} buttons').format(len(setting.buttons)))
+        print(c._('Application has {0} buttons').format(len(setting.buttons)))
         fmt = "{:<25} {:<15} {:<25} {:<35} {:<10} {:<15} {:<10}"
         print(fmt.format('uid', 'label', 'icon', 'action', 'method', 'vars', 'name'))
         print('-' * 130)
@@ -195,7 +198,7 @@ def kernel_init():
                              button.method, ', '.join(button.vars), button.name))
         print('')
         # print all models (tabular)
-        print(_('Application has {0} models').format(len(setting.models)))
+        print(c._('Application has {0} models').format(len(setting.models)))
         ref_classes = []
         for name in sorted(setting.models.keys()):
             if name.endswith('Ref'):
