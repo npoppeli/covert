@@ -12,8 +12,7 @@ ISO 8601 datetime notation:
 
 from datetime import datetime, date, time
 from .common import InternalError, escape_squote
-# from . import common as c
-# use c._ for translation
+from . import common as c
 
 class Atom:
     """Instances of this class define the atomic constituents of items.
@@ -63,7 +62,7 @@ def define_atom(name, **kwarg):
         name  (str): name of atom type
     """
     if name in atom_map:
-        raise InternalError(_('Atom {0} is already registered').format(name))
+        raise InternalError(c._('Atom {0} is already registered').format(name))
     else:
         atom_map[name] = Atom(**kwarg)
 

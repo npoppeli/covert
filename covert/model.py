@@ -28,6 +28,7 @@ from voluptuous import Schema, Optional, MultipleInvalid
 from .atom import atom_map, EMPTY_DATETIME
 from .common import InternalError, SUCCESS, FAIL, logger
 from .controller import exception_report
+from . import common as c
 from . import setting
 
 # functions for flattening and unflattening items (documents)
@@ -249,10 +250,10 @@ class BareItem(dict):
     meta = OrderedDict()
     meta['id']     = Field(label='Id',          schema='string',  formtype='hidden',  auto=True)
     meta['_skey']  = Field(label='Sort by',     schema='string',  formtype='hidden',  auto=True)
-    meta['active'] = Field(label=_('Active'),   schema='boolean', formtype='boolean', auto=False,
+    meta['active'] = Field(label=c._('Active'),   schema='boolean', formtype='boolean', auto=False,
                            enum=bool_atom.enum, control=bool_atom.control)
-    meta['ctime']  = Field(label=_('Created'),  schema='datetime', formtype='hidden',  auto=True)
-    meta['mtime']  = Field(label=_('Modified'), schema='datetime', formtype='hidden',  auto=True)
+    meta['ctime']  = Field(label=c._('Created'),  schema='datetime', formtype='hidden',  auto=True)
+    meta['mtime']  = Field(label=c._('Modified'), schema='datetime', formtype='hidden',  auto=True)
 
     def __init__(self, doc=None):
         """Initialize item.
@@ -272,7 +273,7 @@ class BareItem(dict):
             try:
                 self.update(mapdoc(self.rmap, doc))
             except Exception as e:
-                logger.error(_('Error in applying rmap to doc=%s\n%s'),
+                logger.error(c._('Error in applying rmap to doc=%s\n%s'),
                              doc, exception_report(e, ashtml=False))
 
     _format = 'Item {id}'
@@ -615,7 +616,7 @@ def parse_model_def(model_def, model_defs):
     for line in model_def:
         field_def = line.split()
         if len(field_def) not in (3, 4):
-            raise InternalError(_("Field definition '{0}' should have 3 or 4 components").format(line))
+            raise InternalError(c._("Field definition '{0}' should have 3 or 4 components").format(line))
         optional_field, multiple_field, auto_field = False, False, False
         if len(field_def) == 3:
             field_name, field_type, field_label = field_def
@@ -666,7 +667,7 @@ def parse_model_def(model_def, model_defs):
             ref_name = field_type[1:]+'Ref'
             ref_class = setting.models[ref_name]
             if ref_name not in setting.models:
-                raise InternalError(_("Reference to unknown model '{0}' in {1}").format(ref_name, line))
+                raise InternalError(c._("Reference to unknown model '{0}' in {1}").format(ref_name, line))
             # don not extend pm.cmap, since model reference needs no conversion
             pm.dmap[field_name] = display_reference
             pm.rmap[field_name] = ref_class
@@ -726,7 +727,7 @@ def read_models(model_defs):
     elif setting.config['dbtype'] == 'rethinkdb':
         from .engine.rethinkdb import Item
     else:
-        raise InternalError(_('Storage engine should be MongoDB or RethinkDB'))
+        raise InternalError(c._('Storage engine should be MongoDB or RethinkDB'))
     setting.models['BareItem'] = BareItem
     setting.models['Item'] = Item
 

@@ -10,6 +10,7 @@ import sys
 from os import walk
 from os.path import join, splitext, relpath
 from . import setting
+from . import common as c
 from .common import logger
 from .controller import exception_report
 
@@ -33,18 +34,18 @@ def add_template_type(extension, factory):
         None
     """
     if extension in template_factory:
-        logger.debug(_('Cannot redefine template type %s'), extension)
+        logger.debug(c._('Cannot redefine template type %s'), extension)
     else:
         template_factory[extension] = factory
         if setting.debug >= 2:
-            logger.debug(_('Define new template type %s'), extension)
+            logger.debug(c._('Define new template type %s'), extension)
 
 
 try:
     from chameleon import PageTemplateFile
     add_template_type('.pt', PageTemplateFile)
 except ImportError as e:
-    logger.critical(_('Chameleon template engine not available (%s)'), e)
+    logger.critical(c._('Chameleon template engine not available (%s)'), e)
     sys.exit(1)
 
 def read_templates():
@@ -57,8 +58,8 @@ def read_templates():
     """
     template_types = list(template_factory.keys())
     if setting.debug > 1:
-        logger.debug(_('Scanning for templates in {0}').format(setting.layout))
-        logger.debug(_('Template types: {0}').format(' '.join(template_types)))
+        logger.debug(c._('Scanning for templates in {0}').format(setting.layout))
+        logger.debug(c._('Template types: {0}').format(' '.join(template_types)))
     for (dirpath, __, filenames) in walk(setting.layout):
         prefix = relpath(dirpath, setting.layout)
         for filename in filenames:
@@ -72,7 +73,7 @@ def read_templates():
                 try:
                     setting.templates[template_name] = template_factory[extension](file_path)
                     if setting.tables and setting.debug > 1:
-                        logger.debug(_("Template {} is in file {}").format(template_name, relpath(file_path, setting.layout)))
+                        logger.debug(c._("Template {} is in file {}").format(template_name, relpath(file_path, setting.layout)))
                 except Exception as e:
-                    logger.error(_("Error in template '{0}' in file {1}").format(template_name, file_path))
+                    logger.error(c._("Error in template '{0}' in file {1}").format(template_name, file_path))
                     logger.error(exception_report(e, ashtml=False))

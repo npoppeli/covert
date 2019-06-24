@@ -11,6 +11,7 @@ This module defines the HashFS class and related utilities.
 import hashlib, io, os, shutil
 from distutils.dir_util import mkpath
 from tempfile import NamedTemporaryFile
+from .. import common as c
 
 def to_bytes(s):
     return s if isinstance(s, bytes) else bytes(s, 'utf8')
@@ -110,7 +111,7 @@ class HashFS:
         """
         realpath = self.realpath(file)
         if realpath is None:
-            raise IOError(_('Could not locate file: {0}').format(file))
+            raise IOError(c._('Could not locate file: {0}').format(file))
         return io.open(realpath, mode)
 
     def delete(self, file):
@@ -205,7 +206,7 @@ class HashFS:
     def unshard(self, path):
         """Unshard path to determine hash value."""
         if not self.haspath(path):
-            raise ValueError(_("unshard: path '{}' is not subdirectory of root '{}'").\
+            raise ValueError(c._("path '{}' is not subdirectory of root '{}'").\
                              format(path, self.root))
         return os.path.splitext(self.relpath(path))[0].replace(os.sep, '')
 

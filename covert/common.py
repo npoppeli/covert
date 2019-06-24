@@ -26,14 +26,14 @@ except ImportError:
 logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
 logger = logging.getLogger('waitress')
 
-# TODO: I18N
+# I18N
 # After every update that involves strings:
 #  pybabel extract *.py engine/*.py -o locales/covert.pot
 #  pybabel update -i locales/covert.pot -D 'covert' -d locales
 setting.locales = join(dirname(setting.__file__), 'locales')
+print("C: install 'en' translation catalog from path", setting.locales)
 translator = gettext.translation('covert', localedir=setting.locales, languages=['en'])
-translator.install()
-logger.debug("Installed 'en' translation catalog from path", setting.locales)
+_ = translator.gettext
 
 # String handling
 def escape_squote(s):

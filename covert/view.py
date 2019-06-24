@@ -18,6 +18,7 @@ from urllib.parse import urlencode
 from .common import SUCCESS, write_file, logger, str2int
 from .common import encode_dict, show_dict, CATEGORY_READ
 from .model import unflatten, mapdoc
+from . import common as c
 from . import setting
 
 def icon_for(name):
@@ -25,24 +26,24 @@ def icon_for(name):
     return setting.icons.get(name, '')
 
 setting.labels = {
-     'show'   : _('Show'),
-     'sort'   : _('Sort'),
-     'index'  : _('Browse'),
-     'search' : _('Search'),
-     'match'  : _('Match'),
-     'modify' : _('Modify'),
-     'update' : _('Update'),
-     'new'    : _('New'),
-     'create' : _('Create'),
-     'delete' : _('Delete'),
-     'push'   : _('Push'),
-     'pop'    : _('Pop'),
-     'home'   : _('Home'),
-     'info'   : _('Info'),
-     'ok'     : _('OK'),
-     'refresh': _('Refresh'),
-     'return' : _('Return'),
-     'cancel' : _('Cancel')
+     'show'   : c._('Show'),
+     'sort'   : c._('Sort'),
+     'index'  : c._('Browse'),
+     'search' : c._('Search'),
+     'match'  : c._('Match'),
+     'modify' : c._('Modify'),
+     'update' : c._('Update'),
+     'new'    : c._('New'),
+     'create' : c._('Create'),
+     'delete' : c._('Delete'),
+     'push'   : c._('Push'),
+     'pop'    : c._('Pop'),
+     'home'   : c._('Home'),
+     'info'   : c._('Info'),
+     'ok'     : c._('OK'),
+     'refresh': c._('Refresh'),
+     'return' : c._('Return'),
+     'cancel' : c._('Cancel')
 }
 
 def label_for(name):
@@ -296,7 +297,7 @@ def read_views(module):
         None
     """
     for key, value in setting.labels.items():
-        setting.labels[key] = _(value)
+        setting.labels[key] = c._(value)
     for class_name, view_class in getmembers(module, isclass):
         if (class_name in ['BareItemView', 'ItemView'] or
             not issubclass(view_class, BareItemView) or
