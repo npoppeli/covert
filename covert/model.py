@@ -25,11 +25,19 @@ from bisect import bisect_left, bisect_right
 from copy import deepcopy
 from collections import OrderedDict
 from voluptuous import Schema, Optional, MultipleInvalid
+try:
+    from jsondiff import diff as json_diff
+except ImportError:
+    # TODO: substitute bare-bones implementation of json_diff
+    def json_diff(a, b, **kwargs):
+        return {}
+
 from .atom import atom_map, EMPTY_DATETIME
 from .common import InternalError, SUCCESS, FAIL, logger
 from .controller import exception_report
 from . import common as c
 from . import setting
+
 
 # functions for flattening and unflattening items (documents)
 def _flatten(doc, prefix, keys):
@@ -377,7 +385,7 @@ class BareItem(dict):
         Make deep copy of item, erasing the 'auto' fields, so that it looks new.
 
         Returns:
-            dict: copy of item with 'auto' fields set to 'None'.
+            Item: copy of item with 'auto' fields set to 'None'.
         """
         cls = self.__class__
         item = cls()
@@ -387,6 +395,20 @@ class BareItem(dict):
                 clone[name] = None
         item.update(clone)
         return item
+
+    def __xor__(self, other):
+        """Compute difference between two Item instances.
+
+        Returns:
+              dict: dictionary with differences; keys are '$insert', '$update', '$delete'
+        """
+        diff = json_diff(self, other, syntax='explicit')
+        result = {}
+        for key, value in diff.items():
+            details = {k: v for k, v in value.items() if k not in BareItem.fields}
+            if str(key) in ('$insert', '$update', '$delete'):
+                result[str(key)] = details
+        return result
 
     def follow(self, key):
         """Retrieve item(s) referenced by itemref field from storage.
