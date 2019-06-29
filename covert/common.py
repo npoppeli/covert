@@ -20,6 +20,9 @@ try:
 except ImportError:
     from yaml import Loader
 
+# In case we ever need a trie data structure:
+# see http://jtauber.com/2005/02/trie.py for Python implementation
+
 # Logging
 # basicConfig adds a StreamHandler with default Formatter to the root logger. This function
 # does nothing if the root logger already has handlers configured for it.
@@ -31,7 +34,7 @@ logger = logging.getLogger('waitress')
 #  pybabel extract *.py engine/*.py -o locales/covert.pot
 #  pybabel update -i locales/covert.pot -D 'covert' -d locales
 setting.locales = join(dirname(setting.__file__), 'locales')
-print("C: install 'en' translation catalog from path", setting.locales)
+# print("C: install 'en' translation catalog from path", setting.locales)
 translator = gettext.translation('covert', localedir=setting.locales, languages=['en'])
 _ = translator.gettext
 
@@ -194,23 +197,17 @@ def read_json_file(path):
         text = ''.join(f.readlines())
     return json.loads(text)
 
-def show_value(s):
-    if isinstance(s, list):
-        return "[{}]".format(', '.join([str(el) for el in s]))
-    else:
-        return str(s)
-
-def show_item3(label1, label2, label3, item1, item2, item3):
-    fmt = "{:<15}: {!s:<35} {!s:<35} {!s:<35}"
-    print(fmt.format('', label1, label2, label3))
-    print('-' * 120)
-    for key in sorted(set(item1.keys()) | set(item2.keys()) | set(item3.keys())):
-        value1 = show_value(item1.get(key, '-'))
-        value2 = show_value(item2.get(key, '-'))
-        value3 = show_value(item3.get(key, '-'))
-        if key == '_id' or (value1 == '' and value2 == '' and value3 == ''):
-            continue
-        print(fmt.format(key, value1, value2, value3))
-    print('\n')
-
-# Trie data structure: see http://jtauber.com/2005/02/trie.py for Python implementation
+def format_json_diff(a, b):
+    """Format the difference between two items so that it is human-readable."""
+    result = ''
+    diff = a ^ b
+    for key, value in diff.items():
+        # TODO: translate `k` (field name) to application language
+        details = '; '.join('{}: {}'.format(k, v) for k, v in value.items())
+        if key == '$insert':
+            result += "{}: {}. ".format(_('Inserted'), details)
+        elif key == '$update':
+            result += "{}: {}. ".format(_('Updated'), details)
+        elif key == '$delete':
+            result += "{}: {}. ".format(_('Deleted'), details)
+    return result
