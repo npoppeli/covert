@@ -16,15 +16,12 @@ from inspect import getmembers, isclass, isfunction
 from itertools import chain
 from urllib.parse import urlencode
 from .common import SUCCESS, write_file, logger, str2int
-from .common import encode_dict, show_dict, CATEGORY_READ
+from .common import encode_dict, show_dict, CATEGORY_READ, format_json_diff
 from .model import unflatten, mapdoc
 from . import common as c
 from . import setting
 
-def icon_for(name):
-    """Return icon for route 'name'."""
-    return setting.icons.get(name, '')
-
+# Routes and buttons
 setting.labels = {
      'show'   : c._('Show'),
      'sort'   : c._('Sort'),
@@ -47,18 +44,25 @@ setting.labels = {
 }
 
 def label_for(name):
-    """Return label for route 'name'."""
+    """Look up label for route 'name'."""
     return setting.labels.get(name, 'unknown')
 
+def icon_for(name):
+    """Look up icon for action 'name'."""
+    return setting.icons.get(name, '')
+
+def button_for(name):
+    """Look up button for route 'name'."""
+    return setting.buttons[name]
+
 def url_for(name, item, query=None):
-    """Return URL for route 'name'."""
+    """Generate URL for route 'name'."""
     url = setting.patterns[name].format(**item)
     if query:
         url += '?' + urlencode(query)
     return url
 
 
-# Routes and buttons
 class Button:
     """Representation of a button.
 
@@ -101,9 +105,14 @@ class Button:
         d = dict([(key, getattr(self, key, '')) for key in self.__slots__])
         return str(d)
 
-    def __call__(self, item):
-        self.action = url_for(self.uid, item)
-        d = dict([(key, getattr(self, key, '')) for key in self.__slots__])
+    def __call__(self, item, **kwarg):
+        """Render button as dictionary, which can be included in the render tree.
+        The extra keyword arguments can be used to customize button properties."""
+        if self.action:
+            self.action = self.action.format(**item)
+        d = dict((key, getattr(self, key, '')) for key in self.__slots__)
+        for key, value in kwarg.items():
+            d[key] = value
         return d
 
 
@@ -360,7 +369,7 @@ class Cursor:
     For some attributes, default values are defined in the 'default' dictionary.
     """
     __slots__ = ('skip', 'limit', 'incl', 'dir', 'operator', 'count',
-                 'filter', 'form', 'prev', 'next', 'action', 'submit')
+                 'filter', 'form', 'prev', 'next', 'action', 'method', 'submit')
     default = {'skip': 0, 'limit': 20, 'incl': 0, 'dir': 0, 'count': 0, 'submit': ''}
 
     def __init__(self, request, model):
@@ -393,6 +402,7 @@ class Cursor:
             * prev      (bool):    True if 'previous' button enabled
             * next      (bool):    True if 'next' button enabled
             * action    (str):     form action
+            * method    (str):     form method
             * submit    (str):     value of the form button that was pressed
         """
         initial_post = '_skip' not in request.params
@@ -627,10 +637,11 @@ class RenderTree:
                 if pos == 1:
                     label = field_meta.label
                     if form:
-                        push_button = Button(self.view_name+'_push', action='', name='push')
-                        pop_button  = Button(self.view_name+'_pop' , action='', name='pop' )
-                        button_list.append(push_button(item))
-                        button_list.append(pop_button(item))
+                        # TODO: view_name + '_' + action_name should move to a function
+                        push = Button(self.view_name+'_push', action='', name='push')
+                        pop  = Button(self.view_name+'_pop' , action='', name='pop' )
+                        button_list.append(push(item))
+                        button_list.append(pop(item))
                 else:
                     label = str(pos)
             else:
@@ -710,9 +721,12 @@ class RenderTree:
         """
         if self.data:
             item = self.data[0]
-            # TODO: there is already a button for this action, but we need to change its name
-            post_button = Button(self.view_name+'_ok', action=action, method=method, name='ok')
-            self.buttons.append(post_button(item))
+            # TODO: view_name + '_' + action_name should move to a function
+            button = button_for(self.view_name+'_'+action)
+            ok     = button(item, name='ok',     label=c._('OK'),     icon=icon_for('ok'))
+            cancel = button(item, name='cancel', label=c._('Cancel'), icon=icon_for('cancel'))
+            self.buttons.append(ok)
+            self.buttons.append(cancel)
             if method:
                 self.method = method
 
@@ -720,12 +734,14 @@ class RenderTree:
         """Add search button to render tree."""
         if self.data:
             item = self.data[0]
-            # TODO: there is already a button for this action, but we need to change its name
-            search_button = Button(self.view_name+'_match', action=action, name='search')
-            self.buttons.append(search_button(item))
+            # TODO: view_name + '_' + action_name should move to a function
+            button = button_for(self.view_name+'_'+action)
+            go = button(item, name='search', label=c._('Search'), icon=icon_for('search'))
+            self.buttons.append(go)
 
     def add_return_button(self, location):
         """Add return button to render tree."""
+        # TODO: view_name + '_' + action_name should move to a function
         return_button = Button(self.view_name+'_return', action='return', name='return')
         return_button.action = location
         self.buttons.append(return_button)
@@ -739,9 +755,10 @@ class RenderTree:
         return result
 
     def dump(self, name):
-        if setting.debug:
+        if setting.debug > 0:
             d = self()
             postfix = datetime.now().strftime('_%H%M%S.json')
+            print('Dump to file ', name+postfix)
             write_file(name+postfix, show_dict(d))
 
 
@@ -782,7 +799,7 @@ class ItemView(BareItemView):
     view_name = 'item'
     item_buttons = 3
 
-    def buttons(self, vars=None):
+    def buttons(self, vars=None, ignore=None):
         """Make list of buttons for this view."""
         selection = [button for key, button in setting.buttons.items()
                      if button.method not in ('PUT', 'POST') and
@@ -793,13 +810,17 @@ class ItemView(BareItemView):
         else:
             sub_selection = [button for button in selection
                              if set(button.vars) == set() and not button.param]
-        return sorted(sub_selection, key=lambda b: b.order)
+        if ignore:
+            sub_selection = [button for button in sub_selection
+                             if not button.uid.endswith(ignore)]
+        sub_selection = sorted(sub_selection, key=lambda b: b.order)
+        return sub_selection
 
     def show_item(self, item_or_id):
         """Prepare render tree for showing one item."""
         tree = self.tree
         tree.add_item(item_or_id)
-        tree.add_buttons(self.buttons(['id']))
+        tree.add_buttons(self.buttons(['id'], ignore='show'))
         tree.flatten_item()
         tree.prune_item()
         return tree()
@@ -814,12 +835,6 @@ class ItemView(BareItemView):
         tree.flatten_items()
         tree.prune_items(depth=1)
         return tree()
-
-    def convert_form(self, keep_empty=False):
-        """Convert request parameters to unflattened dictionary."""
-        raw_form = {key:value for key, value in self.request.params.items()
-                              if (value or keep_empty) and not key.startswith('_')}
-        self.form = unflatten(raw_form, self.model)
 
     def extract_item(self, prefix=None, model=None):
         """Convert unflattened form to item."""
@@ -853,8 +868,14 @@ class ItemView(BareItemView):
         """Show the result list of a search."""
         return self.show_items('match')
 
+    def convert_form(self, keep_empty=False):
+        """Convert request parameters to unflattened dictionary."""
+        raw_form = {key:value for key, value in self.request.params.items()
+                              if (value or keep_empty) and not key.startswith('_')}
+        self.form = unflatten(raw_form, self.model)
+
     def build_form(self, description, action, bound=False, postproc=None, method='POST',
-                   clear=False, keep_empty=False):
+                   clear=False, keep_empty=False, diff=False):
         """Prepare render tree for rendering as a form.
 
         This function handles simple forms (single item) and multi-faceted forms (multiple items,
@@ -877,9 +898,13 @@ class ItemView(BareItemView):
         validation = []
         if bound:
             self.convert_form(keep_empty=keep_empty)
+            delta = []
             for item in tree.data:
+                old = item.copy()
                 if not item['_hide']:
                     item.update(self.extract_item(prefix=item['_prefix'], model=type(item)))
+                    new = item
+                    delta.append(format_json_diff(old, new))
                     validation.append(item.validate(item))
             if all([v['status']==SUCCESS for v in validation]):
                 if callable(postproc):
@@ -887,42 +912,59 @@ class ItemView(BareItemView):
                 for item in tree.data:
                     item.write(validate=False)
                 tree.title = ''
-                tree.message = '{} {}'.format(description, str(tree.data[0]))
+                tree.message = '{} {}. '.format(description, str(tree.data[0]))
+                if diff:
+                    tree.message += ''.join(delta)
                 return self.show_item(tree.data[0])
             else:
                 errors = '\n'.join([v['data'] for v in validation])
-                tree.message = '{} {} has validation errors {}'.\
+                tree.message = c._('{} {} has validation errors {}').\
                                format(description, str(tree.data[0]), errors)
                 tree.style = 1
         tree.add_form_buttons(action, method)
         tree.flatten_items(form=True)
         tree.prune_items(form=True, clear=clear)
+        # tree.dump('form')
         return tree()
 
     @route('/{id:objectid}/modify', template='form')
     def modify(self):
         """Make a form for modify/update action."""
         self.tree.add_item(self.model.lookup(self.params['id']))
-        return self.build_form(description='Modified item', action='update', method='PUT')
+        return self.build_form(description=c._('Modified item'),
+                               action='update', method='PUT')
 
     @route('/{id:objectid}', method='PUT', template='show;form')
     def update(self):
         """Update an existing item."""
-        self.tree.add_item(self.model.lookup(self.params['id']))
-        return self.build_form(description='Modified item', action='update', method='PUT',
-                               bound=True, keep_empty=True)
+        submit = self.request.params['_submit']
+        if submit == 'ok': # modify item and show this
+            self.tree.add_item(self.model.lookup(self.params['id']))
+            return self.build_form(description=c._('Modified item'), bound=True,
+                                   action='update', method='PUT', keep_empty=True, diff=True)
+        else: # leave item unmodified and show this
+            self.tree.message = c._('Item was not modified')
+            return self.show_item(self.params['id'])
 
     @route('/new', template='form')
     def new(self):
         """Make a form for new/create action."""
         self.tree.add_item(self.model())
-        return self.build_form(description='New item', action='create', clear=True)
+        return self.build_form(description=c._('New item'),
+                               action='create', clear=True)
 
-    @route('', method='POST', template='show;form')
+    @route('', method='POST', template='show;form;index')
     def create(self):
         """Create a new item."""
-        self.tree.add_item(self.model())
-        return self.build_form(description='New item', action='create', clear=True, bound=True)
+        submit = self.request.params['_submit']
+        if submit == 'ok': # modify item and show this
+            self.tree.add_item(self.model())
+            return self.build_form(description=c._('New item'),
+                                   action='create', clear=True, bound=True)
+        else: # show index page
+            self.tree.style = 2
+            self.tree.message = c._('No new item was created')
+            return self.show_items('index')
 
     @route('/{id:objectid}', method='DELETE', template='delete')
     def delete(self):
