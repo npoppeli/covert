@@ -28,9 +28,22 @@ from voluptuous import Schema, Optional, MultipleInvalid
 try:
     from jsondiff import diff as json_diff
 except ImportError:
-    # TODO: substitute bare-bones implementation of json_diff
+    """Substitute a bare-bones implementation of json_diff"""
     def json_diff(a, b, **kwargs):
-        return {}
+        ka, kb = set(a.keys()), set(b.keys())
+        inserted, deleted, updated = {}, {}, {}
+        for k in ka | kb:
+            va, vb = a.get(k, None), b.get(k, None)
+            if isinstance(va, dict) or isinstance(vb, dict) or \
+                    isinstance(va, list) or isinstance(vb, list):
+                continue
+            if va and not vb:
+                deleted[k] = va
+            elif vb and not va:
+                inserted[k] = vb
+            elif va != vb:
+                updated[k] = vb
+        return {'$insert': inserted, '$delete': deleted, '$update': updated}
 
 from .atom import atom_map, EMPTY_DATETIME
 from .common import InternalError, SUCCESS, FAIL, logger
