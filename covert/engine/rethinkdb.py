@@ -11,6 +11,7 @@ from ..common import SUCCESS, ERROR, FAIL, logger, InternalError
 from ..model import BareItem, mapdoc, Visitor
 from .. import setting
 from .. import common as c
+from ..event import event
 from bson.objectid import ObjectId
 
 def report_db_action(result):
@@ -283,6 +284,7 @@ class Item(BareItem):
             self['id'] = str(ObjectId())
             self['active'] = True
             self['ctime'] = self['mtime']
+        event('{}:finalize'.format(self.name.lower()), self)
 
     def notify(self):
         """Notify other items that the present item has been modified.
@@ -291,7 +293,7 @@ class Item(BareItem):
         Returns:
             None
         """
-        pass
+        event('{}:notify'.format(self.name.lower()), self)
 
     def write(self, validate=True):
         """Write item to permanent storage.

@@ -5,11 +5,12 @@ This module defines the Item class and an initialization function for the storag
 The Item class encapsulates the details of the storage engine.
 """
 
-import ast, sys
+import ast
 from datetime import datetime
 from pymongo import MongoClient
 from ..common import SUCCESS, ERROR, FAIL, logger, InternalError
 from .. import common as c
+from ..event import event
 from ..model import BareItem, mapdoc
 from .. import setting
 from bson.objectid import ObjectId
@@ -286,6 +287,7 @@ class Item(BareItem):
             self['id'] = str(self['_id'])
             self['active'] = True
             self['ctime'] = self['mtime']
+        event('{}:finalize'.format(self.name.lower()), self)
 
     def notify(self):
         """Notify other items that the present item has been modified.
@@ -294,7 +296,7 @@ class Item(BareItem):
         Returns:
             None
         """
-        pass
+        event('{}:notify'.format(self.name.lower()), self)
 
     def write(self, validate=True):
         """Write item to permanent storage.
