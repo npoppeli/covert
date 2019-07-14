@@ -43,7 +43,14 @@ except ImportError:
                 inserted[k] = vb
             elif va != vb:
                 updated[k] = vb
-        return {'$insert': inserted, '$delete': deleted, '$update': updated}
+        result = {}
+        if inserted:
+            result['$insert'] = inserted
+        if deleted:
+            result['$delete'] = deleted
+        if updated:
+            result['$update'] = updated
+        return result
 
 from .atom import atom_map, EMPTY_DATETIME
 from .common import InternalError, SUCCESS, FAIL, logger
@@ -234,6 +241,20 @@ class Field:
         self.enum     = enum
 
 
+def format_item(item):
+    """Default format function for Item"""
+    return item._format.format(**item)
+
+def display_itemref(itemref):
+    """Default display function for ItemRef"""
+    model = setting.models[itemref.collection]
+    item = model.lookup(itemref.refid)
+    return '', str(item), '/{}/{}'.format(itemref.collection.lower(), itemref.refid), ''
+
+bool_atom     = atom_map['boolean']
+string_atom   = atom_map['string']
+datetime_atom = atom_map['datetime']
+
 class BareItem(dict):
     """Base class for Item.
 
@@ -246,9 +267,8 @@ class BareItem(dict):
         * mtime  (datetime): modification time (automatic)
     """
     # basics
-    bool_atom     = atom_map['boolean']
-    string_atom   = atom_map['string']
-    datetime_atom = atom_map['datetime']
+    _format = 'Item {id}'
+    _formatter = format_item
     name = 'BareItem'
     fields = ['id', '_skey', 'ctime', 'mtime', 'active']
     index = [('id', 1), ('_skey', 1)]
@@ -297,14 +317,17 @@ class BareItem(dict):
                 logger.error(c._('Error in applying rmap to doc=%s\n%s'),
                              doc, exception_report(e, ashtml=False))
 
-    _format = 'Item {id}'
+    @classmethod
+    def format_with(cls, func):
+        cls._formatter = func
+
     def __str__(self):
         """Informal string representation of item.
 
         Returns:
             str: human-readable representation.
         """
-        return self._format.format(**self)
+        return self._formatter()
 
     def __repr__(self):
         """Formal string representation of item.
@@ -509,9 +532,12 @@ def display_reference(ref):
 class ItemRef:
     """Reference to Item"""
     collection = 'Item'
+    _display = display_itemref
 
     def __init__(self, refid=None):
         """Initialize item reference.
+
+        This method is used as the read map for an item reference.
 
         Arguments:
             refid (str): id of item (default: None, for an empty reference).
@@ -525,7 +551,8 @@ class ItemRef:
         Returns:
             bool: self == other.
         """
-        return self.__class__.__name__ == other.__class__.__name__ and self.refid == other.refid
+        return self.__class__.__name__ == other.__class__.__name__ and \
+               self.refid == other.refid
 
     def __ne__(self, other):
         """Determine inequality of item references.
@@ -533,7 +560,8 @@ class ItemRef:
         Returns:
             bool: self != other.
         """
-        return self.__class__.__name__ != other.__class__.__name__ or self.refid != other.refid
+        return self.__class__.__name__ != other.__class__.__name__ or \
+               self.refid != other.refid
 
     def __hash__(self):
         """Calculate hash value.
@@ -557,7 +585,7 @@ class ItemRef:
         Returns:
             str: human-readable representation.
         """
-        return "{}.{}".format(self.collection[0], self.refid[18:] if self.refid else 'null')
+        return "{}.{}".format(self.collection[0], self.refid)
 
     def __repr__(self):
         """Formal string representation of item reference.
@@ -567,15 +595,17 @@ class ItemRef:
         """
         return "{}({},{})".format(self.__class__.__name__, self.collection, self.refid)
 
+    @classmethod
+    def display_with(cls, func):
+        cls._display = func
+
     def display(self):
         """Display form of item reference.
 
         Returns:
             str: string to be inserted into render tree.
         """
-        model = setting.models[self.collection]
-        item = model.lookup(self.refid)
-        return '', str(item), '/{}/{}'.format(self.collection.lower(), self.refid), ''
+        return self._display()
 
     def lookup(self, field=None):
         """Retrieve item referenced by itemref object from storage.
@@ -767,14 +797,13 @@ def read_models(model_defs):
     setting.models['Item'] = Item
 
     model_names = [name for name in model_defs.keys() if name[0].isalpha()]
-    # build reference classes (unless they already exist)
+    # construct reference classes
     for model_name in model_names:
         ref_name = model_name+'Ref'
         ref_class = type(ref_name, (ItemRef,), {})
         ref_class.collection = model_name
-        if ref_name not in setting.models:
-            setting.models[ref_name] = ref_class
-    # build actual (outer) classes
+        setting.models[ref_name] = ref_class
+    # construct actual (outer) classes
     for model_name in model_names:
         model_def = model_defs[model_name]
         class_dict = {}
