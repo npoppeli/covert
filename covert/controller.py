@@ -39,13 +39,17 @@ def exception_report(exc, ashtml=True):
         str: exception report as plain or HTML text
     """
     exc_type, exc_value, exc_trace = sys.exc_info()
+    title = c._('Internal error')
+    head = c._('Traceback (most recent call last)')
     if ashtml:
-        head = c._('Traceback (most recent call last)')
-        body = traceback.format_tb(exc_trace)
+        body = []
+        for line in traceback.format_tb(exc_trace):
+            body.extend(line.splitlines())
         tail = '{0}: {1}'.format(exc_type.__name__, str(exc_value))
-        return setting.templates['error'].render(this={'head':head, 'body':body, 'tail':tail})
+        tree = {'title': title, 'head':head, 'body':body, 'tail':tail}
+        return setting.templates['error'].render(this=tree)
     else:
-        head = [c._('Internal error. Traceback (most recent call last)')]
+        head = [title + '. ' + head]
         body = traceback.format_tb(exc_trace)
         tail = ['{0}: {1}'.format(exc_type.__name__, str(exc_value))]
         return '\n'.join(head+body+tail)
