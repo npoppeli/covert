@@ -440,8 +440,9 @@ class BareItem(dict):
         """
         diff = json_diff(self, other, syntax='explicit')
         result = {}
+        ignore = [f for f in self.fields if self.meta[f].auto]
         for key, value in diff.items():
-            details = {k: v for k, v in value.items() if k not in BareItem.fields}
+            details = {k: v for k, v in value.items() if k not in ignore}
             if str(key) in ('$insert', '$update', '$delete'):
                 result[str(key)] = details
         return result
