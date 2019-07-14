@@ -202,6 +202,8 @@ def format_json_diff(a, b):
     result = ''
     diff = a ^ b
     for key, value in diff.items():
+        if not value:
+            continue
         # TODO: translate `k` (field name) to application language
         details = '; '.join('{}: {}'.format(k, v) for k, v in value.items())
         if key == '$insert':
