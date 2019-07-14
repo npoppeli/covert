@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2019-06-22 17:00+0200\n"
-"PO-Revision-Date: 2019-06-22 17:02+0200\n"
+"POT-Creation-Date: 2019-07-14 17:03+0200\n"
+"PO-Revision-Date: 2019-07-14 17:06+0200\n"
 "Last-Translator: \n"
 "Language: sv\n"
 "Language-Team: \n"
@@ -23,67 +23,79 @@ msgstr ""
 msgid "Atom {0} is already registered"
 msgstr "Atom {0} är redan registrerad"
 
+#: common.py:210
+msgid "Inserted"
+msgstr "Infogad"
+
+#: common.py:212
+msgid "Updated"
+msgstr "Uppdaterad"
+
+#: common.py:214
+msgid "Deleted"
+msgstr "Raderade"
+
 #: config.py:73
 msgid "Current directory does not contain a 'config' file"
 msgstr "Aktuell katalog innehåller inte en \"config\" fil"
 
-#: config.py:98
+#: config.py:99
 msgid "Debug option is {}"
 msgstr "Debug option är {}"
 
-#: config.py:99
+#: config.py:100
 msgid "Verbose option is {}"
 msgstr "Pratig option är {}"
 
-#: config.py:100
+#: config.py:101
 msgid "Changes are{}written to the database"
 msgstr "Ändringar är {} skrivna till databasen"
 
-#: config.py:100
+#: config.py:101
 msgid " *not* "
 msgstr " *inte* "
 
-#: config.py:101
+#: config.py:102
 msgid "Static content is in directory {}"
 msgstr "Statiskt innehåll finns i katalogen {}"
 
-#: config.py:102
+#: config.py:103
 msgid "User interface is in the '{}' language"
 msgstr "Användargränssnittet finns i '{}' språk"
 
-#: config.py:103
+#: config.py:104
 msgid "Web server listens to {}:{}"
 msgstr "Webbservern lyssnar på {}: {}"
 
-#: config.py:120
+#: config.py:121
 msgid "Unknown storage engine: only MongoDB and RethinkDB are supported"
 msgstr "Okänd lagringsmotor: endast MongoDB och RethinkDB stöds"
 
-#: config.py:125
+#: config.py:126
 msgid "Created new folder for media storage: {}"
 msgstr "Skapat ny mapp för medialagring: {}"
 
-#: config.py:128
+#: config.py:129
 msgid "Initialized content-addressable media storage"
 msgstr "Initialiserad innehållsadresserbar medialagring"
 
-#: config.py:136
+#: config.py:137
 msgid "{} should be Python module"
 msgstr "{} ska vara Python-modulen"
 
-#: config.py:162
+#: config.py:163
 msgid "{} should be in YAML or Python form"
 msgstr "{} bör vara i YAML eller Python form"
 
-#: config.py:180
+#: config.py:181
 msgid "Application has {0} routes"
 msgstr "Applikationen har {0} rutter"
 
-#: config.py:190
+#: config.py:191
 msgid "Application has {0} buttons"
 msgstr "Applikationen har {0} knappar"
 
-#: config.py:199
+#: config.py:200
 msgid "Application has {0} models"
 msgstr "Applikationen har {0} modeller"
 
@@ -91,25 +103,37 @@ msgstr "Applikationen har {0} modeller"
 msgid "Starting HTTP server"
 msgstr "Startar HTTP-servern"
 
+#: controller.py:42
+msgid "Internal error"
+msgstr "Internt fel"
+
 #: controller.py:43
 msgid "Traceback (most recent call last)"
 msgstr "Traceback (senaste samtal sist)"
 
-#: controller.py:48
-msgid "Internal error. Traceback (most recent call last)"
-msgstr "Internt fel. Traceback (senaste samtal sist)"
-
-#: controller.py:128
+#: controller.py:132
 msgid "{}: {} {} [mode {}] results in exception {}\n"
 msgstr "{}: {} {} [läge {}] resulterar i undantag {}\n"
 
-#: controller.py:189
+#: controller.py:193
 msgid "{}: exception occurred in {}"
 msgstr "{}: undantag inträffade i {}"
 
-#: controller.py:194
+#: controller.py:198
 msgid "{}: nothing found for {} {}"
 msgstr "{}: ingenting hittades för {} {}"
+
+#: event.py:15
+msgid "Cannot override handler for {}"
+msgstr "Kan inte omdefiniera handler för {}"
+
+#: event.py:18
+msgid "New event handler for {}"
+msgstr "Ny handler för {}"
+
+#: event.py:21
+msgid "Event handler for {} is not a callable"
+msgstr "Handler för {} kan inte ringas"
 
 #: layout.py:37
 #, python-format
@@ -142,19 +166,19 @@ msgstr "Mall {} finns i filen {}"
 msgid "Error in template '{0}' in file {1}"
 msgstr "Fel i mall '{0}' i fil {1}"
 
-#: model.py:253
+#: model.py:294
 msgid "Active"
 msgstr "Aktiva"
 
-#: model.py:255
+#: model.py:296
 msgid "Created"
 msgstr "Skapad"
 
-#: model.py:256
+#: model.py:297
 msgid "Modified"
 msgstr "Ändrad"
 
-#: model.py:276
+#: model.py:317
 #, python-format
 msgid ""
 "Error in applying rmap to doc=%s\n"
@@ -163,89 +187,109 @@ msgstr ""
 "Fel vid tillämpning av rmap till doc=%s\n"
 "%s"
 
-#: model.py:619
+#: model.py:684
 msgid "Field definition '{0}' should have 3 or 4 components"
 msgstr "Fältdefinition '{0}' ska ha 3 eller 4 komponenter"
 
-#: model.py:670
+#: model.py:735
 msgid "Reference to unknown model '{0}' in {1}"
 msgstr "Hänvisning till okänd modell '{0}' i {1}"
 
-#: model.py:730
+#: model.py:795
 msgid "Storage engine should be MongoDB or RethinkDB"
 msgstr "Lagringsmotor ska vara MongoDB eller RethinkDB"
 
-#: view.py:29
+#: view.py:27
 msgid "Show"
 msgstr "Show"
 
-#: view.py:30
+#: view.py:28
 msgid "Sort"
 msgstr "Sortera"
 
-#: view.py:31
+#: view.py:29
 msgid "Browse"
 msgstr "Bläddra"
 
-#: view.py:32
+#: view.py:30 view.py:739
 msgid "Search"
 msgstr "Sök"
 
-#: view.py:33
+#: view.py:31
 msgid "Match"
 msgstr "Resultat"
 
-#: view.py:34
+#: view.py:32
 msgid "Modify"
 msgstr "Ändra"
 
-#: view.py:35
+#: view.py:33
 msgid "Update"
 msgstr "Ändra"
 
-#: view.py:36
+#: view.py:34
 msgid "New"
 msgstr "Ny"
 
-#: view.py:37
+#: view.py:35
 msgid "Create"
 msgstr "Skapa"
 
-#: view.py:38
+#: view.py:36
 msgid "Delete"
 msgstr "Radera"
 
-#: view.py:39
+#: view.py:37
 msgid "Push"
 msgstr "Utbreda"
 
-#: view.py:40
+#: view.py:38
 msgid "Pop"
 msgstr "Krympa"
 
-#: view.py:41
+#: view.py:39
 msgid "Home"
 msgstr "Hem"
 
-#: view.py:42
+#: view.py:40
 msgid "Info"
 msgstr "Info"
 
-#: view.py:43
+#: view.py:41 view.py:726
 msgid "OK"
 msgstr "OK"
 
-#: view.py:44
+#: view.py:42
 msgid "Refresh"
 msgstr "Fylla på"
 
-#: view.py:45
+#: view.py:43 view.py:746
 msgid "Return"
 msgstr "Retur"
 
-#: view.py:46
+#: view.py:44 view.py:727
 msgid "Cancel"
 msgstr "Upphäva"
+
+#: view.py:920
+msgid "{} {} has validation errors {}"
+msgstr "{} {} har valideringsfel {}"
+
+#: view.py:932 view.py:941
+msgid "Modified item"
+msgstr "Ändrat föremål"
+
+#: view.py:944
+msgid "Item was not modified"
+msgstr "Föremål ändrades inte"
+
+#: view.py:951 view.py:960
+msgid "New item"
+msgstr "Nytt föremål"
+
+#: view.py:964
+msgid "No new item was created"
+msgstr "Inget nytt föremål skapades"
 
 #: engine/hashfs.py:114
 msgid "Could not locate file: {0}"
@@ -259,27 +303,27 @@ msgstr "sökväg '{}' är inte underkatalog för root '{}'"
 msgid "Stream: {} is not a valid file path or readable object"
 msgstr "Stream: {} är inte en giltig filväg eller läsbart objekt"
 
-#: engine/mongodb.py:46
+#: engine/mongodb.py:47
 msgid "Translator: no method for "
 msgstr "Translator: ingen metod för"
 
-#: engine/mongodb.py:89
+#: engine/mongodb.py:90
 msgid "Create MongoDB connection, set database to '{}'"
 msgstr "Skapa MongoDB-anslutning, sätt databas till '{}'"
 
-#: engine/mongodb.py:141 engine/mongodb.py:150
+#: engine/mongodb.py:142 engine/mongodb.py:151
 msgid "Item.filter: expr={}"
 msgstr "Item.filter: expr={}"
 
-#: engine/mongodb.py:142
+#: engine/mongodb.py:143
 msgid "Exception '{}'"
 msgstr "Undantag '{}'"
 
-#: engine/mongodb.py:151
+#: engine/mongodb.py:152
 msgid "Item.filter: root={}"
 msgstr "Item.filter: root={}"
 
-#: engine/mongodb.py:316 engine/rethinkdb.py:313
+#: engine/mongodb.py:307 engine/rethinkdb.py:306
 msgid ""
 "{} {}\n"
 "does not validate because of error\n"
@@ -289,8 +333,8 @@ msgstr ""
 "valideras inte på grund av fel\n"
 "{}\n"
 
-#: engine/mongodb.py:341 engine/mongodb.py:408 engine/rethinkdb.py:336
-#: engine/rethinkdb.py:403
+#: engine/mongodb.py:334 engine/mongodb.py:401 engine/rethinkdb.py:331
+#: engine/rethinkdb.py:398
 msgid ""
 "{} {}\n"
 "not written because of error\n"
@@ -300,7 +344,7 @@ msgstr ""
 "inte skrivet på grund av fel\n"
 "{}\n"
 
-#: engine/mongodb.py:371 engine/mongodb.py:404
+#: engine/mongodb.py:364 engine/mongodb.py:397
 msgid ""
 "{} {}\n"
 "not updated, matched count={}"
@@ -308,7 +352,7 @@ msgstr ""
 "{} {}\n"
 "inte uppdaterad, matchad räkning={}"
 
-#: engine/mongodb.py:375 engine/rethinkdb.py:370
+#: engine/mongodb.py:368 engine/rethinkdb.py:365
 msgid ""
 "{} {}\n"
 "not updated because of error\n"
@@ -318,11 +362,11 @@ msgstr ""
 "inte uppdaterad på grund av fel\n"
 "{}\n"
 
-#: engine/rethinkdb.py:84
+#: engine/rethinkdb.py:85
 msgid "Create RethinkDB connection, set database to '{}'"
 msgstr "Skapa RethinkDB-anslutning, sätt databas till '{}'"
 
-#: engine/rethinkdb.py:366 engine/rethinkdb.py:399
+#: engine/rethinkdb.py:361 engine/rethinkdb.py:394
 msgid ""
 "{} {}\n"
 "not updated, replaced={}"
@@ -373,3 +417,6 @@ msgstr ""
 
 #~ msgid "unshard: path '{}' is not subdirectory of root '{}'"
 #~ msgstr "unshard: sökväg '{}' är inte underkatalog för root '{}'"
+
+#~ msgid "Internal error. Traceback (most recent call last)"
+#~ msgstr "Internt fel. Traceback (senaste samtal sist)"
