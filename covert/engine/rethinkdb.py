@@ -298,7 +298,7 @@ class Item(BareItem):
                   {'status':FAIL, 'data':None}.
         """
         self._finalize()
-        event('{}:write:pre'.format(self.name.lower()), self)
+        event('write:pre', self)
         new = self['mtime'] == self['ctime']
         if validate:
             validate_result = self.validate(self)
@@ -325,7 +325,7 @@ class Item(BareItem):
             report_db_action(reply)
             # This event handler can be used to notify other items that the present item has
             # been modified. Use this with care, and avoid write cycles!
-            event('{}:write:post'.format(self.name.lower()), self)
+            event('write:post', self)
             return reply
         except Exception as e:
             message = c._('{} {}\nnot written because of error\n{}\n').format(self.name, doc, str(e))
