@@ -108,9 +108,9 @@ class Button:
     def __call__(self, item, **kwarg):
         """Render button as dictionary, which can be included in the render tree.
         The extra keyword arguments can be used to customize button properties."""
-        if self.action:
-            self.action = self.action.format(**item)
         d = dict((key, getattr(self, key, '')) for key in self.__slots__)
+        if d['action'] and item:
+            d['action'] = d['action'].format(**item)
         for key, value in kwarg.items():
             d[key] = value
         return d
@@ -335,7 +335,7 @@ def read_views(module):
                         templates.append('default')
                 if member.icon:
                     if member_name in setting.icons:
-                        logger.debug("Attempt to redefine icon for '%s''", member_name)
+                        logger.debug("Attempt to redefine icon for '%s'", member_name)
                     else:
                         # logger.debug("New icon '%s' for '%s'", member.icon, member_name)
                         setting.icons[member_name] = member.icon
@@ -611,7 +611,7 @@ class RenderTree:
                 active.append(item['active'])
                 recent.append(now - item['mtime'] < delta)
         else:
-            origin = self.request.cookies.get('search-origin', 'onbekend')
+            origin = self.request.cookies.get('search-origin', 'index')
             self.add_return_button(origin)
             self.message += 'Geen resultaten voor zoekopdracht:\n{}'.format(self.cursor.filter)
         # TODO: move lines below to event handler
@@ -742,9 +742,9 @@ class RenderTree:
     def add_return_button(self, location):
         """Add return button to render tree."""
         # TODO: view_name + '_' + action_name should move to a function
-        return_button = Button(self.view_name+'_return', action='return', name='return')
-        return_button.action = location
-        self.buttons.append(return_button)
+        button = Button(self.view_name+'_return', action=location)
+        go = button(None, label=c._('Return'), icon=icon_for('return'))
+        self.buttons.append(go)
 
     def __call__(self):
         """Create dictionary representation of render tree."""
@@ -839,7 +839,7 @@ class ItemView(BareItemView):
     def extract_item(self, prefix=None, model=None):
         """Convert unflattened form to item."""
         # The first step is easy, thanks to unflattening.
-        selection = self.form[prefix.rstrip('.')] if prefix else self.form
+        selection = self.form.get(prefix.rstrip('.'), {}) if prefix else self.form
         return (model or self.model).convert(selection)
 
     @route('/{id:objectid}', template='show')
