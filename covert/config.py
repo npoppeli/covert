@@ -87,7 +87,6 @@ def read_configuration():
     setting.language = config['language'] if config['language'] in setting.languages\
                        else config_default['language']
     if setting.language != 'en':  # switch to application language
-        print("C: install '{}' translation catalog from path {}".format(setting.language, setting.locales))
         app_trans = gettext.translation('covert', localedir=setting.locales, languages=[setting.language])
         c._ = app_trans.gettext
 
@@ -214,6 +213,4 @@ def initialize_kernel():
                     meta = model.meta[field_name]
                     print(fmt.format(field_name, meta.label, meta.schema, meta.optional,
                                      meta.multiple, meta.auto, meta.formtype))
-                # print('qmap:', str(model.qmap))
-                # print('emap:', str(model.emap))
             print('')
