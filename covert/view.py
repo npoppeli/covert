@@ -10,13 +10,14 @@ do form validation in the client, using Parsley.js (jQuery) for example.
 """
 
 import re
-from collections import OrderedDict
-from datetime import datetime, timedelta
+from collections import OrderedDict, defaultdict
+from datetime import datetime
 from inspect import getmembers, isclass, isfunction
 from itertools import chain
 from urllib.parse import urlencode
 from .common import SUCCESS, write_file, logger, str2int
 from .common import encode_dict, show_dict, CATEGORY_READ, format_json_diff
+from .event import event
 from .model import unflatten, mapdoc
 from . import common as c
 from . import setting
@@ -576,29 +577,22 @@ class RenderTree:
     def add_item(self, oid_or_item, prefix='', hide=None):
         """Add item to render tree."""
         item = self.model.lookup(oid_or_item) if isinstance(oid_or_item, str) else oid_or_item
+        event('append:init', item, self)
         item['_buttons'] = []
         item['_prefix'] = prefix+'.' if prefix else ''
         item['_hide'] = hide == 'all'
         item['_hidden'] = [] if hide is None or hide == 'all' else hide
+        event('append:pre', item, self)
         self.data.append(item)
-        # TODO: move lines below to event handler
-        now, delta = datetime.now(), timedelta(days=10)
-        recent = now - item['mtime'] < delta
-        if 'recent' in self.computed:
-            self.computed['recent'].append(recent)
-        else:
-            self.computed['recent'] = [recent]
+        event('append:post', item, self)
 
     def add_items(self, buttons):
         """Add list of items to render tree."""
         self.poly = False
         items = self.model.find(self.cursor.filter,
                                 limit=self.cursor.limit, skip=self.cursor.skip)
-        # TODO: move line below to event handler
-        active, recent = [], []
         if items:
-            # TODO: move line below to event handler
-            now, delta = datetime.now(), timedelta(days=10)
+            event('append:init', items[0], self)
             for item in items:
                 item['_buttons'] = []
                 for button in buttons:
@@ -606,17 +600,13 @@ class RenderTree:
                 item['_prefix'] = ''
                 item['_hide'] = False
                 item['_hidden'] = []
+                event('append:pre', item, self)
                 self.data.append(item)
-                # TODO: move line below to event handler
-                active.append(item['active'])
-                recent.append(now - item['mtime'] < delta)
+                event('append:post', item, self)
         else:
             origin = self.request.cookies.get('search-origin', 'index')
             self.add_return_button(origin)
             self.message += 'Geen resultaten voor zoekopdracht:\n{}'.format(self.cursor.filter)
-        # TODO: move lines below to event handler
-        self.computed['active'] = active
-        self.computed['recent'] = recent
 
     def flatten_item(self, nr=0, form=False):
         """Flatten one item in the render tree."""
@@ -624,29 +614,39 @@ class RenderTree:
         item_meta = item.meta
         flat_item = item.display().flatten()
         newitem = OrderedDict()
+        has_buttons = defaultdict(bool)
         for key, value in flat_item.items():
             if key.startswith('_'):
                 newitem[key] = value
                 continue
             path, depth = key.split('.'), key.count('.')
             button_list = []
-            if path[-1].isnumeric(): # TODO: add button also for source.[012].relations
-                field = path[-2]
-                field_meta = item_meta[field]
-                pos = int(path[-1])+1
-                if pos == 1:
-                    label = field_meta.label
-                    if form:
-                        # TODO: view_name + '_' + action_name should move to a function
-                        push = Button(self.view_name+'_push', action='', name='push')
-                        pop  = Button(self.view_name+'_pop' , action='', name='pop' )
-                        button_list.append(push(item))
-                        button_list.append(pop(item))
+            if depth > 0 and path[1].isnumeric(): # add push/pop buttons
+                parent = path[0]
+                index = 1 + int(path[1])
+                #logger.debug('form={} index={} parent={} has_buttons={}'.\
+                #             format(form, index, parent, has_buttons[parent]))
+                if form and (index == 1) and not has_buttons[parent]:
+                    # Add buttons to first element in group
+                    # (e.g. notes.0 or relations.0.role)
+                    # TODO: view_name + '_' + action_name -> function
+                    # logger.debug('parent={} add buttons'.format(parent))
+                    push = Button(self.view_name+'_push', action='', name='push')
+                    pop  = Button(self.view_name+'_pop' , action='', name='pop' )
+                    button_list.append(push(item))
+                    button_list.append(pop(item))
+                    has_buttons[parent] = True
+                # set label and metadata
+                if depth == 1:
+                    field_meta = item_meta[parent]
+                    label = field_meta.label if index == 1 else str(index)
                 else:
-                    label = str(pos)
+                    child = path[-1]
+                    field_meta = item_meta[child]
+                    label = '{}.{}.{}'.format(item_meta[parent].label,
+                                              path[1], field_meta.label)
             else:
-                field = path[-1]
-                field_meta = item_meta[field]
+                field_meta = item_meta[ path[-1] ]
                 if depth == 0:
                     label = field_meta.label
                 else:
@@ -758,7 +758,6 @@ class RenderTree:
         if setting.debug > 0:
             d = self()
             postfix = datetime.now().strftime('_%H%M%S.json')
-            print('Dump to file ', name+postfix)
             write_file(name+postfix, show_dict(d))
 
 
@@ -924,7 +923,6 @@ class ItemView(BareItemView):
         tree.add_form_buttons(action, method)
         tree.flatten_items(form=True)
         tree.prune_items(form=True, clear=clear)
-        # tree.dump('form')
         return tree()
 
     @route('/{id:objectid}/modify', template='form')
