@@ -269,12 +269,10 @@ class Item(BareItem):
         else:
             return cls(item)
 
-    def finalize(self):
+    def _finalize(self):
         """Finalize item before writing to permanent storage.
 
         Finalization includes setting of auto fields.
-        NOTE: if you want to skip this step, at least update self['mtime'], e.g.
-        +timedelta(hours=1) to avoid writing an item with duplicate id to the database.
 
         Returns:
             None
@@ -287,16 +285,6 @@ class Item(BareItem):
             self['id'] = str(self['_id'])
             self['active'] = True
             self['ctime'] = self['mtime']
-        event('{}:finalize'.format(self.name.lower()), self)
-
-    def notify(self):
-        """Notify other items that the present item has been modified.
-        NOTE: this should be used with care, avoiding cycles, infinite recursion etcetera.
-
-        Returns:
-            None
-        """
-        event('{}:notify'.format(self.name.lower()), self)
 
     def write(self, validate=True):
         """Write item to permanent storage.
@@ -310,7 +298,8 @@ class Item(BareItem):
             dict: {'status':SUCCESS, 'data':<item id>} or
                   {'status':FAIL, 'data':None}.
         """
-        self.finalize()
+        self._finalize()
+        event('{}:write:pre'.format(self.name.lower()), self)
         new = self['mtime'] == self['ctime']
         if validate:
             validate_result = self.validate(self)
@@ -337,7 +326,9 @@ class Item(BareItem):
                 message = 'nModified=1'
                 reply = {'status':SUCCESS, 'data':self['id'], 'message':message}
             report_db_action(reply)
-            self.notify()
+            # This event handler can be used to notify other items that the present item has
+            # been modified. Use this with care, and avoid write cycles!
+            event('{}:write:post'.format(self.name.lower()), self)
             return reply
         except Exception as e:
             message = c._('{} {}\nnot written because of error\n{}\n').format(self.name, doc, str(e))

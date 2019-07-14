@@ -18,7 +18,7 @@ def add_handler(evnt, handler):
     else:
         logger.debug(c._('Event handler for {} is not a callable').format(evnt))
 
-def event(evnt, node):
+def event(evnt, item):
     """call handler for event 'event'"""
     if evnt in event_handler:
-        event_handler[evnt](node)
+        event_handler[evnt](item)
