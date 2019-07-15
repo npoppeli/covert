@@ -22,6 +22,6 @@ def add_handler(evnt, handler):
 
 def event(evnt, item, tree={}):
     """call handler for event 'event' and render tree 'tree' (optional)"""
-    if evnt in event_handler:
-        key = "{}:{}".format(item.name.lower(), evnt)
+    key = "{}:{}".format(item.name.lower(), evnt)
+    if key in event_handler:
         event_handler[key](item, tree)
