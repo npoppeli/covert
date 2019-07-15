@@ -84,10 +84,13 @@ def read_configuration():
     setting.dbtype  = config['dbtype']
 
     # I18N
-    setting.language = config['language'] if config['language'] in setting.languages\
-                       else config_default['language']
+    if config['language'] in setting.languages:
+        setting.language = config['language']
+    else:
+        setting.language = config_default['language']
     if setting.language != 'en':  # switch to application language
-        app_trans = gettext.translation('covert', localedir=setting.locales, languages=[setting.language])
+        app_trans = gettext.translation('covert', localedir=setting.locales,
+                                        languages=[setting.language])
         c._ = app_trans.gettext
 
     # keep original configuration

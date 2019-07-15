@@ -34,7 +34,6 @@ logger = logging.getLogger('waitress')
 #  pybabel extract *.py engine/*.py -o locales/covert.pot
 #  pybabel update -i locales/covert.pot -D 'covert' -d locales
 setting.locales = join(dirname(setting.__file__), 'locales')
-# print("C: install 'en' translation catalog from path", setting.locales)
 translator = gettext.translation('covert', localedir=setting.locales, languages=['en'])
 _ = translator.gettext
 

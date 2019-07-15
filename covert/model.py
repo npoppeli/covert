@@ -23,6 +23,8 @@ are two exceptions (described in the code below).
 
 from bisect import bisect_left, bisect_right
 from copy import deepcopy
+import gettext
+from os.path import join, realpath
 from collections import OrderedDict
 from voluptuous import Schema, Optional, MultipleInvalid
 try:
@@ -669,7 +671,7 @@ class ParsedModel:
         self.dmap, self.cmap = {}, {}
         self.qmap, self.emap = {}, {}
 
-def parse_model_def(model_def, model_defs):
+def parse_model_def(model_def, model_defs, transl):
     """Parse definition of one model.
 
     Arguments:
@@ -678,7 +680,6 @@ def parse_model_def(model_def, model_defs):
                            (needed for forward references to inner classes)
     """
     pm = ParsedModel() # parsed model definition
-    label_index = setting.languages.index(setting.language)
     for line in model_def:
         field_def = line.split()
         if len(field_def) not in (3, 4):
@@ -700,11 +701,9 @@ def parse_model_def(model_def, model_defs):
             continue
         schema_key = Optional(field_name) if optional_field else field_name
         pm.names.append(field_name)
-        field_label = field_label.replace('_', ' ')
-        parts = field_label.split('|')
-        field_label = parts[label_index]
+        field_label = transl(field_label.replace('_', ' '))
         if field_type[0] == '_': # embedded model (comparable to inner class)
-            embedded = parse_model_def(model_defs[field_type], model_defs)
+            embedded = parse_model_def(model_defs[field_type], model_defs, transl)
             if multiple_field:
                 pm.empty[field_name] = [] if optional_field else [embedded.empty]
             elif not optional_field:
@@ -797,6 +796,9 @@ def read_models(model_defs):
     setting.models['BareItem'] = BareItem
     setting.models['Item'] = Item
 
+    # I18N: find the message catalog (.mo) for the model
+    locale_dir = realpath(join(setting.site, 'locales'))
+    model_trans = gettext.translation('model', localedir=locale_dir, languages=[setting.language])
     model_names = [name for name in model_defs.keys() if name[0].isalpha()]
     # construct reference classes
     for model_name in model_names:
@@ -808,7 +810,7 @@ def read_models(model_defs):
     for model_name in model_names:
         model_def = model_defs[model_name]
         class_dict = {}
-        pm = parse_model_def(model_def, model_defs) # pm: instance of class ParsedModel
+        pm = parse_model_def(model_def, model_defs, model_trans.gettext)
         pm.names.extend(Item.fields)
         index = BareItem.index.copy()
         index.extend(pm.index)
