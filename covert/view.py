@@ -577,14 +577,14 @@ class RenderTree:
     def add_item(self, oid_or_item, prefix='', hide=None):
         """Add item to render tree."""
         item = self.model.lookup(oid_or_item) if isinstance(oid_or_item, str) else oid_or_item
-        event('append:init', item, self)
+        event('additem:init', item, self)
         item['_buttons'] = []
         item['_prefix'] = prefix+'.' if prefix else ''
         item['_hide'] = hide == 'all'
         item['_hidden'] = [] if hide is None or hide == 'all' else hide
-        event('append:pre', item, self)
+        event('additem:pre', item, self)
         self.data.append(item)
-        event('append:post', item, self)
+        event('additem:post', item, self)
 
     def add_items(self, buttons):
         """Add list of items to render tree."""
@@ -592,7 +592,7 @@ class RenderTree:
         items = self.model.find(self.cursor.filter,
                                 limit=self.cursor.limit, skip=self.cursor.skip)
         if items:
-            event('append:init', items[0], self)
+            event('additem:init', items[0], self)
             for item in items:
                 item['_buttons'] = []
                 for button in buttons:
@@ -600,9 +600,9 @@ class RenderTree:
                 item['_prefix'] = ''
                 item['_hide'] = False
                 item['_hidden'] = []
-                event('append:pre', item, self)
+                event('additem:pre', item, self)
                 self.data.append(item)
-                event('append:post', item, self)
+                event('additem:post', item, self)
         else:
             origin = self.request.cookies.get('search-origin', 'index')
             self.add_return_button(origin)
