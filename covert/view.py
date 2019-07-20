@@ -338,13 +338,11 @@ def read_views(module):
                     if member_name in setting.icons:
                         logger.debug("Attempt to redefine icon for '%s'", member_name)
                     else:
-                        # logger.debug("New icon '%s' for '%s'", member.icon, member_name)
                         setting.icons[member_name] = member.icon
                 if member.label:
                     if member_name in setting.labels:
                         logger.debug("Attempt to redefine label for '%s'", member_name)
                     else:
-                        # logger.debug("New label '%s' for '%s'", member.label, member_name)
                         setting.labels[member_name] = member.label
                 for method in member.method.split(','):
                     setting.patterns[route_name] = pattern
@@ -755,7 +753,7 @@ class RenderTree:
         return result
 
     def dump(self, name):
-        if setting.debug > 0:
+        if setting.debug > 1:
             d = self()
             postfix = datetime.now().strftime('_%H%M%S.json')
             write_file(name+postfix, show_dict(d))
@@ -822,6 +820,7 @@ class ItemView(BareItemView):
         tree.add_buttons(self.buttons(['id'], ignore='show'))
         tree.flatten_item()
         tree.prune_item()
+        tree.dump('show_item')
         return tree()
 
     def show_items(self, action):
@@ -833,6 +832,7 @@ class ItemView(BareItemView):
         tree.add_buttons(self.buttons([]))
         tree.flatten_items()
         tree.prune_items(depth=1)
+        tree.dump('show_items')
         return tree()
 
     def extract_item(self, prefix=None, model=None):
@@ -923,6 +923,7 @@ class ItemView(BareItemView):
         tree.add_form_buttons(action, method)
         tree.flatten_items(form=True)
         tree.prune_items(form=True, clear=clear)
+        tree.dump('build_form')
         return tree()
 
     @route('/{id:objectid}/modify', template='form')
