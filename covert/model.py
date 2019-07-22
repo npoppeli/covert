@@ -26,7 +26,11 @@ from copy import deepcopy
 import gettext
 from os.path import join, realpath
 from collections import OrderedDict
-from voluptuous import Schema, Optional, MultipleInvalid
+# Schema validation with voluptuous:
+# - PREVENT_EXTRA (0): prevent additional keys in the data, raise error MultipleInvalid (default)
+# - ALLOW_EXTRA   (1): allow additional keys in the data
+# - REMOVE_EXTRA  (2): remove additional keys from the data
+from voluptuous import Schema, Optional, MultipleInvalid, ALLOW_EXTRA, PREVENT_EXTRA
 try:
     from jsondiff import diff as json_diff
 except ImportError:
@@ -358,11 +362,11 @@ class BareItem(dict):
         """
         validator = cls._validate
         try:
-            _ = validator(doc)
-            return {'status': SUCCESS, 'data':''}
+            _result = validator(doc)
+            return {'status': SUCCESS, 'data': ''}
         except MultipleInvalid as e:
             error = '; '.join([str(el) for el in e.errors ])
-            return {'status': FAIL, 'data':error}
+            return {'status': FAIL, 'data': error}
 
     @classmethod
     def lookup(cls, oid):
@@ -373,7 +377,7 @@ class BareItem(dict):
         Arguments:
             * oid (str): item id.
         """
-        item = {'id':oid}
+        item = {'id': oid}
         return cls(item)
 
     @classmethod
@@ -839,7 +843,7 @@ def read_models(model_defs):
         class_dict['schema']   = schema
         class_dict['_format']   = pm.fmt
         class_dict['meta']      = meta
-        class_dict['_validate'] = Schema(schema, required=True, extra=True)
+        class_dict['_validate'] = Schema(schema, required=True, extra=ALLOW_EXTRA)
         model_class = type(model_name, (Item,), class_dict)
         model_class.create_collection()
         model_class.create_index(index)
