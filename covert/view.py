@@ -622,13 +622,9 @@ class RenderTree:
             if depth > 0 and path[1].isnumeric(): # add push/pop buttons
                 parent = path[0]
                 index = 1 + int(path[1])
-                #logger.debug('form={} index={} parent={} has_buttons={}'.\
-                #             format(form, index, parent, has_buttons[parent]))
                 if form and (index == 1) and not has_buttons[parent]:
-                    # Add buttons to first element in group
-                    # (e.g. notes.0 or relations.0.role)
+                    # Add buttons to first element in group (examples: notes.0, relations.0.role)
                     # TODO: view_name + '_' + action_name -> function
-                    # logger.debug('parent={} add buttons'.format(parent))
                     push = Button(self.view_name+'_push', action='', name='push')
                     pop  = Button(self.view_name+'_pop' , action='', name='pop' )
                     button_list.append(push(item))
@@ -636,14 +632,23 @@ class RenderTree:
                     has_buttons[parent] = True
                 # set label and metadata
                 if depth == 1:
+                    if parent not in item_meta:
+                        logger.debug('flatten_item: discard extra field {}={}'.format(key, value))
+                        continue
                     field_meta = item_meta[parent]
                     label = field_meta.label if index == 1 else str(index)
                 else:
                     child = path[-1]
+                    if child not in item_meta:
+                        logger.debug('flatten_item: discard extra field {}={}'.format(key, value))
+                        continue
                     field_meta = item_meta[child]
                     label = '{}.{}.{}'.format(item_meta[parent].label,
                                               path[1], field_meta.label)
             else:
+                if path[-1] not in item_meta:
+                    logger.debug('flatten_item: discard extra field {}={}'.format(key, value))
+                    continue
                 field_meta = item_meta[ path[-1] ]
                 if depth == 0:
                     label = field_meta.label
@@ -808,8 +813,7 @@ class ItemView(BareItemView):
             sub_selection = [button for button in selection
                              if set(button.vars) == set() and not button.param]
         if ignore:
-            sub_selection = [button for button in sub_selection
-                             if not button.uid.endswith(ignore)]
+            sub_selection = [button for button in sub_selection if not button.uid.endswith(ignore)]
         sub_selection = sorted(sub_selection, key=lambda b: b.order)
         return sub_selection
 
@@ -886,6 +890,7 @@ class ItemView(BareItemView):
             action      (str):  URL for submit button.
             bound       (bool): form contains user input.
             postproc    (func): function to perform optional post-processing after validation.
+                                Note: application-specific, cannot be replaced by event handlers!
             method      (str):  HTTP method, usually 'POST' or 'PUT'.
             clear       (bool): clear form (used in new/create forms).
             keep_empty  (bool): keep empty values (used in modify/update forms).
