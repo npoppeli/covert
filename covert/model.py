@@ -369,6 +369,18 @@ class BareItem(dict):
             return {'status': FAIL, 'data': error}
 
     @classmethod
+    def validation(cls, level):
+        """Set validation level.
+
+        Arguments:
+            * level (str): validation level.
+        """
+        if level == 'strict':
+            cls._validate.extra = PREVENT_EXTRA
+        else:
+            cls._validate.extra = ALLOW_EXTRA
+
+    @classmethod
     def lookup(cls, oid):
         """Retrieve item with id=oid from storage.
 
@@ -843,6 +855,8 @@ def read_models(model_defs):
         class_dict['schema']   = schema
         class_dict['_format']   = pm.fmt
         class_dict['meta']      = meta
+        # extra fields such as '_id' and '_rev' are allowed, but this creates
+        # a vulnerability (unwanted fields), for which the application must check
         class_dict['_validate'] = Schema(schema, required=True, extra=ALLOW_EXTRA)
         model_class = type(model_name, (Item,), class_dict)
         model_class.create_collection()
