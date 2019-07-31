@@ -633,21 +633,21 @@ class RenderTree:
                 # set label and metadata
                 if depth == 1:
                     if parent not in item_meta:
-                        logger.debug('flatten_item: discard extra field {}={}'.format(key, value))
+                        logger.info('flatten_item: discard extra field {}={}'.format(key, value))
                         continue
                     field_meta = item_meta[parent]
                     label = field_meta.label if index == 1 else str(index)
                 else:
                     child = path[-1]
                     if child not in item_meta:
-                        logger.debug('flatten_item: discard extra field {}={}'.format(key, value))
+                        logger.info('flatten_item: discard extra field {}={}'.format(key, value))
                         continue
                     field_meta = item_meta[child]
                     label = '{}.{}.{}'.format(item_meta[parent].label,
                                               path[1], field_meta.label)
             else:
                 if path[-1] not in item_meta:
-                    logger.debug('flatten_item: discard extra field {}={}'.format(key, value))
+                    logger.info('flatten_item: discard extra field {}={}'.format(key, value))
                     continue
                 field_meta = item_meta[ path[-1] ]
                 if depth == 0:
