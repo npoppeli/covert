@@ -28,7 +28,7 @@ class Translator(ast.NodeVisitor):
     A filter is a restricted form of Python expression. EXPAND ...
     Field names are written as variables. Constants are always strings.
     Allowed boolean operators: and, not.
-    Allowed binary operators: ==, ~=, <, <=, >, >=, in, % (=~ in Perl notation).
+    Allowed binary operators: ==, ~=, <, <=, >, >=, in, % (match regex).
     Fields with 'multiple' property (list-valued fields) have a normal query condition,
     since MongoDB does not distinguish search scalar field from search list field.
     """
