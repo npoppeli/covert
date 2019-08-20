@@ -16,14 +16,40 @@ reading from/writing to storage, and for converting from/displaying as HTML (see
 storage   -> [JSON document] -> read    -> [item] -> display -> [item']         -> HTML page
 HTML form -> [item']         -> convert -> [item] -> write   -> [JSON document] -> storage
 
-Other important transformations are the structure transformations of flattening and unflattening.
-In most cases these transformations do not require knowledge of the model definition, but there
-are two exceptions (described in the code below).
+As of August 2019 we use a new approach for mapping between the application structure of a document and
+a flattened structure of the same document that is used to create, e.g., an HTML representation.
+
+The new mapping is bijective, i.e. completely retains the structure of the document, including
+types of scalars and the order in lists.
+
+The flat structure is an ordered dictionary, where each value is a string representation of the
+value in the original document, and each key is a compact description of the path of that value
+in the original document. The 'display' transformation maps from the application structure to the
+flat structure.
+
+Each key has the following structure: [field].[sequence_number].[atom_type](#[index])?, where
+* 'field' is the field name from the model definition
+* 'sequence_number' is the number of the dictionary in the application structure,
+  starting at 0 for the outermost dictionary
+* 'atom_type' is a one-character code that describes the type of the value, either
+  - a code from the atom map
+  - 'a' for empty array
+  - 'z' for None
+  - '^' for item reference
+  - 'o' followed by one or more digits, indicating a nested dictionary
+ * 'index' is a list index, in case of a list-valued (multiple) field
+
+The 'convert' transformation takes the flattened version of a document and rebuilds the original
+application structure of the document.
+
+This algorithm is based on work by Paul van Schayck (Maastricht UMC), Ton Smeele (Utrecht University),
+Daniel Theunissen (Maastricht University) and Lazlo Westerhof (Utrecht University) on JSON-AVU
+mapping for iRODS. Original code can be found here:
+https://github.com/MaastrichtUniversity/irods_avu_json.
 """
 
-from bisect import bisect_left, bisect_right
 from copy import deepcopy
-import gettext
+import gettext, re
 from os.path import join, realpath
 from collections import OrderedDict
 # Schema validation with voluptuous:
@@ -34,146 +60,29 @@ from voluptuous import Schema, Optional, MultipleInvalid, ALLOW_EXTRA, PREVENT_E
 try:
     from jsondiff import diff as json_diff
 except ImportError:
-    """Substitute a bare-bones implementation of json_diff"""
+    """Define a bare-bones implementation of json_diff"""
     def json_diff(a, b, **kwargs):
         ka, kb = set(a.keys()), set(b.keys())
         inserted, deleted, updated = {}, {}, {}
         for k in ka | kb:
             va, vb = a.get(k, None), b.get(k, None)
             if isinstance(va, dict) or isinstance(vb, dict) or \
-                    isinstance(va, list) or isinstance(vb, list):
-                continue
-            if va and not vb:
-                deleted[k] = va
-            elif vb and not va:
-                inserted[k] = vb
-            elif va != vb:
-                updated[k] = vb
+               isinstance(va, list) or isinstance(vb, list): continue
+            if   va and not vb: deleted[k]  = va
+            elif vb and not va: inserted[k] = vb
+            elif va != vb:      updated[k]  = vb
         result = {}
-        if inserted:
-            result['$insert'] = inserted
-        if deleted:
-            result['$delete'] = deleted
-        if updated:
-            result['$update'] = updated
+        if inserted: result['$insert'] = inserted
+        if deleted:  result['$delete'] = deleted
+        if updated:  result['$update'] = updated
         return result
 
-from .atom import atom_map, EMPTY_DATETIME
+from .atom import atom_map, EMPTY_DATETIME, atom_codemap
 from .common import InternalError, SUCCESS, FAIL, logger
 from .controller import exception_report
+from .event import event
 from . import common as c
 from . import setting
-
-
-# functions for flattening and unflattening items (documents)
-def _flatten(doc, prefix, keys):
-    """Generator for flattening an item (document).
-
-    The result of flattening an item is a flat dictionary. The keys of this flat dictionary are
-    the paths in the original item, e.g. 'children', 'children.0', 'children.0.firstname'.
-    This generator is used by Item.flatten().
-
-    Arguments:
-        doc (Item): original document.
-        prefix (str): path prefix (for recursion).
-        keys: keys of doc, in model definition order.
-
-    Yields:
-        (key, value): key-value pair to build up flat dictionary.
-    """
-    for key in [el for el in keys if el in doc.keys()]: # keys in model order
-        value = doc[key]
-        sub_prefix = '{}{}.'.format(prefix, key)
-        if isinstance(value, dict):  # embedded document
-            yield from _flatten(value, sub_prefix, keys)
-        elif isinstance(value, list):  # list of scalars or documents
-            if len(value) == 0:  # empty list
-                # inspect schema to determine whether we should add an empty scalar ''
-                # or an empty dict: {key1: '', key2: '', ...}
-                schema = doc.schema[key][0]
-                if isinstance(schema, dict):
-                    for subkey in schema.keys():
-                        yield '{}0.{}'.format(sub_prefix, subkey), ''
-                else:
-                    yield sub_prefix + '0', ''
-            elif isinstance(value[0], dict):  # list of documents
-                for sub_key, element in enumerate(value):
-                    yield from _flatten(element, sub_prefix+str(sub_key)+'.', keys)
-            else:  # list of scalars
-                for sub_key, element in enumerate(value):
-                    yield sub_prefix + str(sub_key), element
-        else:  # scalar
-            yield prefix + key, value
-    for key in [el for el in doc.keys() if el not in keys]: # keys not defined in model
-        yield key, doc[key]
-
-def unflatten(doc, model):
-    """Unflatten item (document).
-
-    Unflatten item to (re)create hierarchical structure. A flattened document has keys 'a',
-    'a.b', 'a.b.c' etcetera. As preparation, the keys are transformed into lists (this speeds up
-    the unflattening), and the document is transformed to a list of 2-tuples, sorted on key.
-
-    Arguments:
-        doc   (dict):  flattened document.
-        model (class): model class of document
-
-    Returns:
-        dict: unflattened item
-    """
-    list_rep = [(key.split('.'), doc[key]) for key in sorted(doc.keys())]
-    # logger.debug('\n'.join(["'{}': '{}'".format(elt[0], str(elt[1])) for elt in list_rep]))
-    return _unflatten(list_rep, model.meta)
-
-def _unflatten(list_rep, meta):
-    """Function for unflattening an item (document).
-
-    This function is called by unflatten() to do the actual unflattening.
-
-    Arguments:
-        list_rep (list): list of (key, value) pairs, sorted on key, where each key is
-        a list derived from path (e.g. 'a', 'a.b' or 'a.b.0.c') by splitting on the '.'.
-
-    Returns:
-        list|dict: complete dict, or component thereof (dict, list).
-    """
-    result = {}
-    car_list = [elt[0].pop(0) for elt in list_rep]  # take first element (car) from each key
-    car_set = set(car_list) # set of (unique) car's is the set of keys of result
-    for key in car_set:
-        optional = meta[key].optional if key in meta else False
-        begin = bisect_left(car_list, key)
-        end = bisect_right(car_list, key)
-        children = list_rep[begin:end]
-        if len(children) == 1: # recursion terminates here
-            child = children[0]
-            path = child[0]
-            if not path: # scalar
-                result[key] = child[1]
-            elif path[0].isnumeric(): # one-item list
-                # RHS = [] if key refers to an optional field, and child[1] is empty
-                if optional and not(child[1]):
-                    # key is optional && value child[1] empty
-                    result[key] = []
-                else:
-                    # not an edge case
-                    result[key] = [child[1]]
-            else: # one-item dict
-                result[key] = {path[0]:child[1]}
-        else: # recursion => value can be nested dict, list of nested dict's or list of scalars
-            value = _unflatten(children, meta)
-            if isinstance(value, list) and len(value) == 1 and optional and \
-                not any(map(bool, value[0].values())):
-                # key is optional && value is empty dictionary
-                result[key] = []
-            else:
-                # not an edge case
-                result[key] = value
-    # convert a dictionary with numeric keys to a list
-    if car_set and all([key.isnumeric() for key in car_set]):
-        return [t[1] for t in sorted(result.items(), key=lambda t: int(t[0]))]
-    else:
-        return result
 
 def mapdoc(fnmap, doc):
     """Map item (document) by applying functions in function map.
@@ -185,9 +94,9 @@ def mapdoc(fnmap, doc):
 
     Arguments:
         fnmap (dict): dictionary of mapping functions.
-        doc (dict):   item to be mapped (transformed).
+        doc   (dict):   item to be mapped (transformed).
 
-    Returns/Yields:
+    Returns:
         dict: transformed item (document).
     """
     result = {}
@@ -219,9 +128,9 @@ class Field:
     Attributes:
         * see constructor method
     """
-    __slots__ = ('label', 'schema', 'formtype', 'control', 'optional', 'multiple',
+    __slots__ = ('label', 'schema', 'formtype', 'code', 'control', 'optional', 'multiple',
                  'auto', 'atomic',  'control', 'enum')
-    def __init__(self, label, schema, formtype, optional=False, multiple=False,
+    def __init__(self, label, schema, formtype, code, optional=False, multiple=False,
                  control='input', auto=False, atomic=True, enum=None):
         """Initialize object.
 
@@ -229,6 +138,7 @@ class Field:
             label    (str):   human-readable description of field
             schema   (class): class of atom, used for item validation
             formtype (str):   HTML form type
+            code     (str):   one-character atom code
             control  (str):   HTML input type
             enum     (list):  range of allowed values for enumerated type
             optional (bool):  True if field is optional
@@ -239,6 +149,7 @@ class Field:
         self.label    = label
         self.schema   = schema
         self.formtype = formtype
+        self.code     = code
         self.control  = control
         self.optional = optional
         self.multiple = multiple
@@ -246,20 +157,16 @@ class Field:
         self.atomic   = atomic
         self.enum     = enum
 
+bool_atom     = atom_map['boolean']
+string_atom   = atom_map['string']
+datetime_atom = atom_map['datetime']
+
+RE_PATH  = '^(_?[a-zA-Z]+)\.(\d+)\.([^o]|o\d+)(#\d+)?'
 
 def format_item(item):
     """Default format function for Item"""
     return item._format.format(**item)
 
-def display_itemref(itemref):
-    """Default display function for ItemRef"""
-    model = setting.models[itemref.collection]
-    item = model.lookup(itemref.refid)
-    return '', str(item), '/{}/{}'.format(itemref.collection.lower(), itemref.refid), ''
-
-bool_atom     = atom_map['boolean']
-string_atom   = atom_map['string']
-datetime_atom = atom_map['datetime']
 
 class BareItem(dict):
     """Base class for Item.
@@ -285,22 +192,22 @@ class BareItem(dict):
     _empty    = {'id':'', '_skey': '', 'active':True,
                  'ctime':EMPTY_DATETIME, 'mtime':EMPTY_DATETIME}
     # transformation maps
-    cmap = {'ctime':datetime_atom.convert, 'mtime':datetime_atom.convert, 'active': bool_atom.convert}
-    dmap = {'ctime':datetime_atom.display, 'mtime':datetime_atom.display, 'active': bool_atom.display}
-    qmap = {'ctime':datetime_atom.query,   'mtime':datetime_atom.query,   'active': bool_atom.query,
+    cmap = {'ctime': datetime_atom.convert, 'mtime': datetime_atom.convert, 'active': bool_atom.convert}
+    dmap = {'ctime': datetime_atom.display, 'mtime': datetime_atom.display, 'active': bool_atom.display}
+    qmap = {'ctime':datetime_atom.query,    'mtime':datetime_atom.query,    'active': bool_atom.query,
             '_skey': string_atom.query}
-    emap = {'ctime':datetime_atom.expr,    'mtime':datetime_atom.expr,    'active': bool_atom.expr,
+    emap = {'ctime':datetime_atom.expr,     'mtime':datetime_atom.expr,     'active': bool_atom.expr,
             '_skey': string_atom.expr}
     rmap = {}
     wmap = {}
     # metadata
     meta = OrderedDict()
-    meta['id']     = Field(label='Id',          schema='string',  formtype='hidden',  auto=True)
-    meta['_skey']  = Field(label='Sort by',     schema='string',  formtype='hidden',  auto=True)
-    meta['active'] = Field(label=c._('Active'),   schema='boolean', formtype='boolean', auto=False,
+    meta['id']     = Field(label='Id',          code='s', schema='string',  formtype='hidden',  auto=True)
+    meta['_skey']  = Field(label='Sort by',     code='s', schema='string',  formtype='hidden',  auto=True)
+    meta['active'] = Field(label=c._('Active'), code='b', schema='boolean', formtype='boolean', auto=False,
                            enum=bool_atom.enum, control=bool_atom.control)
-    meta['ctime']  = Field(label=c._('Created'),  schema='datetime', formtype='hidden',  auto=True)
-    meta['mtime']  = Field(label=c._('Modified'), schema='datetime', formtype='hidden',  auto=True)
+    meta['ctime']  = Field(label=c._('Created'),  code='x', schema='datetime', formtype='hidden', auto=True)
+    meta['mtime']  = Field(label=c._('Modified'), code='x', schema='datetime', formtype='hidden', auto=True)
 
     def __init__(self, doc=None):
         """Initialize item.
@@ -323,115 +230,82 @@ class BareItem(dict):
                 logger.error(c._('Error in applying rmap to doc=%s\n%s'),
                              doc, exception_report(e, ashtml=False))
 
-    @classmethod
-    def format_with(cls, func):
-        cls._formatter = func
-
-    def __str__(self):
-        """Informal string representation of item.
-
-        Returns:
-            str: human-readable representation.
-        """
-        return self._formatter()
-
-    def __repr__(self):
-        """Formal string representation of item.
-
-        Returns:
-            str: representation for Python interpreter.
-        """
-        content = ', '.join(["'{}':'{}'".format(key, self.get(key, '')) for key in self.fields])
-        return '{}({})'.format(self.__class__.__name__, content)
-
     def accept(self, visitor):
         visitor.visit(self)
 
     @classmethod
-    def validate(cls, doc):
-        """Validate item.
-
-        Validate document using class-specific validation function.
-
-        Arguments:
-            * doc (dict): item to be validated.
-
-        Returns:
-            * {'status': 'success', 'data':{} }                   if validation OK
-            * {'status': 'fail',    'data':{field1:error1, ...} } if validation not OK
-        """
-        validator = cls._validate
-        try:
-            _result = validator(doc)
-            return {'status': SUCCESS, 'data': ''}
-        except MultipleInvalid as e:
-            error = '; '.join([str(el) for el in e.errors ])
-            return {'status': FAIL, 'data': error}
-
-    @classmethod
-    def validation(cls, level):
-        """Set validation level.
-
-        Arguments:
-            * level (str): validation level.
-        """
-        if level == 'strict':
-            cls._validate.extra = PREVENT_EXTRA
-        else:
-            cls._validate.extra = ALLOW_EXTRA
-
-    @classmethod
-    def lookup(cls, oid):
-        """Retrieve item with id=oid from storage.
-
-        This is a trivial implementation, overridden by sub-classes.
-
-        Arguments:
-            * oid (str): item id.
-        """
-        item = {'id': oid}
-        return cls(item)
-
-    @classmethod
     def convert(cls, doc):
-        """Convert item from string form to actual, typed form.
-
-        Convert item with only string values to item with typed values.
-        The item can be partially complete.
+        """Convert a document in flat structure to one in application structure.
 
         Arguments:
-            * doc (dict): item read from HTML form.
+            * doc (OrderedDict): flattened document
 
         Returns:
-            dict: item with values according to the model definition
+            instance of current class
         """
-        return mapdoc(cls.cmap, doc)
+        result = cls._convert(doc, 0)
+        doc = cls()
+        doc.update(result)
+        return doc
 
-    def display(self):
-        """Convert item to string form.
+    @classmethod
+    def _convert(cls, doc, parent):
+        """
+        Auxiliary method. This does the actual conversion of a flattened structure, but
+        creates a regular dictionary, not yet an Item instance.
 
-        Convert item with typed values to item with only string values.
+        Arguments:
+            doc    (OrderedDict): flattened document
+            parent (int)        : number of parent dictionary
 
         Returns:
-            dict: item with only string fields.
+            dictionary
         """
-        cls = self.__class__
-        item = cls()
-        item.update(mapdoc(self.dmap, self))
-        return item
-
-    def flatten(self):
-        """Flatten item (document).
-
-        Flatten item (document with hierarchical structure) to flat dictionary.
-
-        Returns:
-            dict: flattened item.
-        """
-        flat_dict = OrderedDict()
-        for key, value in _flatten(self, '', self.fields):
-            flat_dict[key] = value
-        return flat_dict
+        result = {}
+        for key in sorted(doc.keys()):
+            value = doc[key]
+            # check if the key matches the pattern, and if so unpack it
+            # groups: 1=field name, 2: object number, 3: atom code | object id, 4: array index
+            pattern = re.compile(RE_PATH)
+            matched = pattern.match(key)
+            if not matched:
+                result[key] = value
+                continue
+            field = matched.group(1)
+            if matched.group(2):
+                object_number = int(matched.group(2))
+            else:
+                object_number = None
+            if object_number != parent:
+                continue
+            atom_type = matched.group(3)
+            list_index = matched.group(4)
+            if list_index:
+                list_index = int(list_index[1:])
+            # convert value, depending on field 3 in the key (atom type)
+            if atom_type.startswith('o'):  # nested dictionary
+                value = cls._convert(doc, int(atom_type[1:]))
+            elif atom_type == 'z':
+                value = None
+            elif atom_type == 'a':
+                value = []
+            elif atom_type == '^':  # item reference
+                ref_classname, object_id = value[-1].split('.')
+                ref_class = setting.models[ref_classname]
+                value = ref_class(None if object_id == '0' else object_id)
+            elif atom_type in atom_codemap:  # scalar value
+                atom_def = atom_codemap[atom_type]
+                convert = atom_def.convert
+                if convert is not None:
+                    value = convert(value)
+            # add value to dictionary in progress, where necessary as element of a list
+            if list_index is not None and field not in result:
+                result[field] = []
+            if field in result and isinstance(result[field], list):
+                result[field].insert(list_index, value)
+            else:
+                result[field] = value
+        return result
 
     def copy(self):
         """Make deep copy of item.
@@ -450,20 +324,57 @@ class BareItem(dict):
         item.update(clone)
         return item
 
-    def __xor__(self, other):
-        """Compute difference between two Item instances.
+    def display(self):
+        """Convert a document in application structure to one in a flat structure.
 
         Returns:
-              dict: dictionary with differences; keys are '$insert', '$update', '$delete'
+            OrderedDict
         """
-        diff = json_diff(self, other, syntax='explicit')
-        result = {}
-        ignore = [f for f in self.fields if self.meta[f].auto]
-        for key, value in diff.items():
-            details = {k: v for k, v in value.items() if k not in ignore}
-            if str(key) in ('$insert', '$update', '$delete'):
-                result[str(key)] = details
-        return result
+        self._display = []
+        self._dict_number = 0
+        self._display_dict(self, 0)
+        return OrderedDict(self._display)
+
+    def _display_dict(self, dct, parent, index=''):
+        # process dictionary in model order
+        declared_keys = [key for key in self.fields if key in dct.keys()]
+        extra_keys = [key for key in dct.keys() if key not in self.fields]
+        for key in declared_keys + extra_keys:
+            value = dct[key]
+            if isinstance(value, dict):
+                self._dict_number += 1
+                self._display.append(('{}.{}.o{}{}'.format(key, parent, self._dict_number, index),
+                                      'o'+str(self._dict_number)))
+                self._display_dict(value, self._dict_number)
+            elif value == []:
+                self._display.append(('{}.{}.{}'.format(key, parent, 'a'),
+                                      ''))
+            elif value is None:
+                self._display.append(('{}.{}.{}'.format(key, parent, 'z'),
+                                      ''))
+            elif isinstance(value, list):
+                self._display_list(key, value, parent, index)
+            else: # scalar
+                # atom type 's' implies cmap == dmap == identity
+                code = self.meta[key].code if key in self.meta else 's'
+                self._display.append(('{}.{}.{}'.format(key, parent, code),
+                                     self.dmap[key](value) if key in self.dmap else value))
+
+    def _display_list(self, key, lst, parent, index=''):
+        if isinstance(lst[0], dict): # list of dictionaries, involves recursion
+            for n, value in enumerate(lst):
+                new_index = '{}#{}'.format(index, n)
+                self._dict_number += 1
+                self._display.append(('{}.{}.o{}{}'.format(key, parent, self._dict_number, new_index),
+                                      'o'+str(self._dict_number)))
+                self._display_dict(value, self._dict_number, new_index)
+        else: # list of scalars
+            # atom type 's' implies cmap == dmap == identity
+            code = self.meta[key].code if key in self.meta else 's'
+            for n, value in enumerate(lst):
+                new_index = '{}#{}'.format(index, n)
+                self._display.append(('{}.{}.{}{}'.format(key, parent, code, new_index),
+                                     self.dmap[key](value) if key in self.dmap else value))
 
     def follow(self, key):
         """Retrieve item(s) referenced by itemref field from storage.
@@ -482,6 +393,18 @@ class BareItem(dict):
                 return None
         else:
             return None
+
+    @classmethod
+    def lookup(cls, oid):
+        """Retrieve item with id=oid from storage.
+
+        This is a trivial implementation, overridden by sub-classes.
+
+        Arguments:
+            * oid (str): item id.
+        """
+        item = {'id': oid}
+        return cls(item)
 
     def take(self, *arg):
         """Retrieve item(s) referenced by itemref field from storage.
@@ -516,6 +439,74 @@ class BareItem(dict):
         else:
             return None
 
+    @classmethod
+    def validate(cls, doc):
+        """Validate item.
+
+        Validate document using class-specific validation function.
+
+        Arguments:
+            * doc (dict): item to be validated.
+
+        Returns:
+            * {'status': 'success', 'data':{} }                   if validation OK
+            * {'status': 'fail',    'data':{field1:error1, ...} } if validation not OK
+        """
+        validator = cls._validate
+        try:
+            _result = validator(doc)
+            return {'status': SUCCESS, 'data': ''}
+        except MultipleInvalid as e:
+            error = '; '.join([str(el) for el in e.errors ])
+            return {'status': FAIL, 'data': error}
+
+    @classmethod
+    def validation(cls, level):
+        """Set validation level.
+
+        Arguments:
+            * level (str): validation level.
+        """
+        if level == 'strict':
+            cls._validate.extra = PREVENT_EXTRA
+        else:
+            cls._validate.extra = ALLOW_EXTRA
+
+    def __repr__(self):
+        """Formal string representation of item.
+
+        Returns:
+            str: representation for Python interpreter.
+        """
+        content = ', '.join(["'{}':'{}'".format(key, self.get(key, '')) for key in self.fields])
+        return '{}({})'.format(self.__class__.__name__, content)
+
+    @classmethod
+    def format_with(cls, func):
+        cls._formatter = func
+
+    def __str__(self):
+        """Informal string representation of item.
+
+        Returns:
+            str: human-readable representation.
+        """
+        return self._formatter()
+
+    def __xor__(self, other):
+        """Compute difference between two Item instances.
+
+        Returns:
+              dict: dictionary with differences; keys are '$insert', '$update', '$delete'
+        """
+        diff = json_diff(self, other, syntax='explicit')
+        result = {}
+        ignore = [f for f in self.fields if self.meta[f].auto]
+        for key, value in diff.items():
+            details = {k: v for k, v in value.items() if k not in ignore}
+            if str(key) in ('$insert', '$update', '$delete'):
+                result[str(key)] = details
+        return result
 
 # Item references
 def get_objectid(ref):
@@ -540,18 +531,15 @@ def display_reference(ref):
         ref (itemref): item reference.
 
     Returns:
-        (str, str, str, str): prefix, infix, URL, postfix.
+        (tuple): display presentation of item reference.
     """
-    if ref.refid is None:
-        return '', '', '#', ''
-    else:
-        return ref.display()
+    return ref.display()
 
 
 class ItemRef:
     """Reference to Item"""
     collection = 'Item'
-    _display = display_itemref
+    name       = 'ItemRef'
 
     def __init__(self, refid=None):
         """Initialize item reference.
@@ -561,70 +549,32 @@ class ItemRef:
         Arguments:
             refid (str): id of item (default: None, for an empty reference).
         """
+        self.pre = ''
+        self.post = ''
         self.refid = refid
         self.str = ''
-
-    def __eq__(self, other):
-        """Determine equality of item references.
-
-        Returns:
-            bool: self == other.
-        """
-        return self.__class__.__name__ == other.__class__.__name__ and \
-               self.refid == other.refid
-
-    def __ne__(self, other):
-        """Determine inequality of item references.
-
-        Returns:
-            bool: self != other.
-        """
-        return self.__class__.__name__ != other.__class__.__name__ or \
-               self.refid != other.refid
-
-    def __hash__(self):
-        """Calculate hash value.
-
-        Returns:
-            int: hash value of self.refid.
-        """
-        return self.refid.__hash__()
-
-    def __bool__(self):
-        """Determine truth value of item reference.
-
-        Returns:
-            bool: self.id is not-empty (True)
-        """
-        return bool(self.refid)
-
-    def __str__(self):
-        """Informal string representation of item reference.
-
-        Returns:
-            str: human-readable representation.
-        """
-        return "{}.{}".format(self.collection[0], self.refid)
-
-    def __repr__(self):
-        """Formal string representation of item reference.
-
-        Returns:
-            str: representation for Python interpreter.
-        """
-        return "{}({},{})".format(self.__class__.__name__, self.collection, self.refid)
-
-    @classmethod
-    def display_with(cls, func):
-        cls._display = func
 
     def display(self):
         """Display form of item reference.
 
         Returns:
-            str: string to be inserted into render tree.
+            (str, str, str, str, str): prefix, infix, URL, postfix, class+id.
         """
-        return self._display()
+        if self.refid is None:
+            return '', '', '#', '', \
+                   '{}.0'.format(self.__class__.__name__)
+        model = setting.models[self.collection]
+        item = model.lookup(self.refid)
+        event('display:pre', self, None)
+        if item is None:
+            return '', '', '#', '', \
+                   '{}.0'.format(self.__class__.__name__)
+        else:
+            return self.pre, \
+                   str(item), \
+                   '/{}/{}'.format(self.collection.lower(), self.refid), \
+                   self.post, \
+                   '{}.{}'.format(self.__class__.__name__, self.refid)
 
     def lookup(self, field=None):
         """Retrieve item referenced by itemref object from storage.
@@ -640,6 +590,56 @@ class ItemRef:
             return item.get(field, None) if field else item
         else:
             return None
+
+    def __bool__(self):
+        """Determine truth value of item reference.
+
+        Returns:
+            bool: self.id is not-empty (True)
+        """
+        return bool(self.refid)
+
+    def __eq__(self, other):
+        """Determine equality of item references.
+
+        Returns:
+            bool: self == other.
+        """
+        return self.__class__.__name__ == other.__class__.__name__ and \
+               self.refid == other.refid
+
+    def __hash__(self):
+        """Calculate hash value.
+
+        Returns:
+            int: hash value of self.refid.
+        """
+        return self.refid.__hash__()
+
+    def __ne__(self, other):
+        """Determine inequality of item references.
+
+        Returns:
+            bool: self != other.
+        """
+        return self.__class__.__name__ != other.__class__.__name__ or \
+               self.refid != other.refid
+
+    def __repr__(self):
+        """Formal string representation of item reference.
+
+        Returns:
+            str: representation for Python interpreter.
+        """
+        return "{}({},{})".format(self.__class__.__name__, self.collection, self.refid)
+
+    def __str__(self):
+        """Informal string representation of item reference.
+
+        Returns:
+            str: human-readable representation.
+        """
+        return "{}.{}".format(self.collection, self.refid)
 
 
 # Auxiliary classes: Visitor
@@ -668,11 +668,11 @@ class ParsedModel:
         meta   (OrderedDict): meta-data
         empty  (dict):        empty item
         schema (dict):        schema for validation
+        cmap   (dict):        convert map
+        dmap   (dict):        display map
         rmap   (dict):        read map
         wmap   (dict):        write map, associated with read map
-        dmap   (dict):        display map
-        cmap   (dict):        convert map, associated with display map
-        qmap   (dict):        query map (variation on 'cmap')
+        qmap   (dict):        query map
         emap   (dict):        expression map, associated with query map
     """
 
@@ -726,8 +726,8 @@ def parse_model_def(model_def, model_defs, transl):
                 pm.empty[field_name] = embedded.empty
             pm.schema[schema_key] = [embedded.schema] if multiple_field else embedded.schema
             pm.meta[field_name] = Field(label=field_label, schema='dict',
-                                        formtype='hidden', control='input',
-                                        auto=False, atomic=False,
+                                        formtype='dict', control='input',
+                                        auto=False, atomic=False, code='_',
                                         optional=optional_field, multiple=multiple_field)
             pm.names.extend(embedded.names)
             pm.cmap[field_name] = dict
@@ -749,7 +749,6 @@ def parse_model_def(model_def, model_defs, transl):
             ref_class = setting.models[ref_name]
             if ref_name not in setting.models:
                 raise InternalError(c._("Reference to unknown model '{0}' in {1}").format(ref_name, line))
-            # don not extend pm.cmap, since model reference needs no conversion
             pm.dmap[field_name] = display_reference
             pm.rmap[field_name] = ref_class
             pm.wmap[field_name] = get_objectid
@@ -763,7 +762,7 @@ def parse_model_def(model_def, model_defs, transl):
             pm.schema[schema_key] = [ref_class] if multiple_field else ref_class
             pm.meta[field_name] = Field(label=field_label, schema='itemref',
                                         formtype='hidden', control='input',
-                                        auto=False, atomic=False,
+                                        auto=False, atomic=False, code='^',
                                         optional=optional_field, multiple=multiple_field)
         else: # atom class
             atom = atom_map[field_type]
@@ -782,7 +781,7 @@ def parse_model_def(model_def, model_defs, transl):
             pm.schema[schema_key] = [atom.schema] if multiple_field else atom.schema
             pm.meta[field_name] = Field(label=field_label, schema=field_type,
                                         formtype=atom.formtype, control=atom.control,
-                                        enum=atom.enum, auto=auto_field,
+                                        enum=atom.enum, auto=auto_field, code=atom.code,
                                         optional=optional_field, multiple=multiple_field)
     return pm
 
@@ -821,6 +820,7 @@ def read_models(model_defs):
         ref_name = model_name+'Ref'
         ref_class = type(ref_name, (ItemRef,), {})
         ref_class.collection = model_name
+        ref_class.name       = ref_name
         setting.models[ref_name] = ref_class
     # construct actual (outer) classes
     for model_name in model_names:
@@ -842,21 +842,22 @@ def read_models(model_defs):
         pm.emap.update(BareItem.emap)
         pm.rmap.update(BareItem.rmap)
         pm.wmap.update(BareItem.wmap)
-        class_dict['name']      = model_name
-        class_dict['index']     = index
-        class_dict['cmap']      = pm.cmap
-        class_dict['dmap']      = pm.dmap
-        class_dict['rmap']      = pm.rmap
-        class_dict['wmap']      = pm.wmap
-        class_dict['qmap']      = pm.qmap
-        class_dict['emap']      = pm.emap
-        class_dict['fields']    = pm.names
-        class_dict['_empty']    = empty
-        class_dict['schema']   = schema
-        class_dict['_format']   = pm.fmt
-        class_dict['meta']      = meta
-        # extra fields such as '_id' and '_rev' are allowed, but this creates
-        # a vulnerability (unwanted fields), for which the application must check
+        class_dict['name']    = model_name
+        class_dict['index']   = index
+        class_dict['cmap']    = pm.cmap
+        class_dict['dmap']    = pm.dmap
+        class_dict['rmap']    = pm.rmap
+        class_dict['wmap']    = pm.wmap
+        class_dict['qmap']    = pm.qmap
+        class_dict['emap']    = pm.emap
+        class_dict['fields']  = pm.names
+        class_dict['_empty']  = empty
+        class_dict['schema']  = schema
+        class_dict['_format'] = pm.fmt
+        class_dict['meta']    = meta
+        # Note: the way we define validation here does not forbid extra fields, because
+        # # we need e.g. '_id' and '_rev'. This creates the risk of unwanted fields in
+        # the database. The application must check for this.
         class_dict['_validate'] = Schema(schema, required=True, extra=ALLOW_EXTRA)
         model_class = type(model_name, (Item,), class_dict)
         model_class.create_collection()
