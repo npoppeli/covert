@@ -2,7 +2,7 @@
 """Objects and functions related to the atomic constituents of items.
 
 The atomic constituents of items should be a common subset of MongoDB, RethinkDB and ArangoDB.
-Otherwise, atoms have a partial dependence on the storage engine, via the read and write maps.
+Otherwise, atoms have a partial dependence on the storage engine, via the read and write mapssenum.
 
 ISO 8601 datetime notation:
 * date    : yyyy-mm-dd
@@ -25,14 +25,16 @@ class Atom:
         * see constructor method
     """
 
-    __slots__ = ('schema', 'convert', 'display', 'query', 'formtype', 'control',
+    __slots__ = ('code', 'schema', 'convert', 'display', 'query', 'formtype', 'control',
                  'default', 'read', 'write', 'enum', 'expr')
 
-    def __init__(self, schema, convert, display, query, formtype, control,
+    def __init__(self, code, schema, convert, display, query, formtype, control,
                  default='', read=None, write=None, enum=None, expr=None):
         """Initialize atom.
 
         Arguments:
+            code     (str):      one-letter code for atom, used for (un)flattening
+                                 lowercase letters are reserved for internal use
             schema   (class):    class of atom, used for item validation
             convert  (callable): convert string representation to actual type
             query    (callable): similar to convert, adds search operator
@@ -41,6 +43,7 @@ class Atom:
             enum     (list):     range of allowed values for enumerated type
             control  (str):      HTML input type
         """
+        self.code     = code
         self.schema   = schema
         self.convert  = convert
         self.display  = display
@@ -53,18 +56,20 @@ class Atom:
         self.write    = write
         self.enum     = enum
 
-
 atom_map = {}
+atom_codemap = {}
 def define_atom(name, **kwarg):
     """Define new type of atom.
 
     Arguments:
         name  (str): name of atom type
     """
-    if name in atom_map:
+    new_atom = Atom(**kwarg)
+    if name in atom_map or new_atom.code in atom_codemap:
         raise InternalError(c._('Atom {0} is already registered').format(name))
     else:
-        atom_map[name] = Atom(**kwarg)
+        atom_map[name] = new_atom
+        atom_codemap[new_atom.code] = new_atom
 
 identity = None # since we use sparse transformation maps
 
@@ -80,6 +85,7 @@ bool_repr = {True:'ja', False:'nee'}
 
 boolean_convert = lambda x: bool(int(x))
 define_atom('boolean',
+            code     = 'b',
             schema   = bool,
             convert  = boolean_convert,
             query    = lambda x: ('==', boolean_convert(x)),
@@ -92,26 +98,22 @@ define_atom('boolean',
 
 # date and datetime use str.format in the display map, to avoid Python issue 13305
 def date_convert(x):
-    return datetime.strptime(x, "%Y-%m-%d").date() if x else EMPTY_DATE
+    if not x or x == '????-??-??':
+        return EMPTY_DATE
+    else:
+        return datetime.strptime(x, "%Y-%m-%d").date()
 
 def date_display(x):
-    return '????-??-??' if x.year == MINYEAR\
-    else '{0:04d}-{1:02d}-{2:02d}'.format(x.year, x.month, x.day)
+    if x.year == MINYEAR:
+        return '????-??-??'
+    else:
+        return '{0:04d}-{1:02d}-{2:02d}'.format(x.year, x.month, x.day)
 
 def date_expr(x):
     return "'" + date_display(x) + "'"
 
-def datetime_display(x):
-    return '{0:04d}-{1:02d}-{2:02d}T{3:02d}:{4:02d}:{5:02d}'.\
-      format(x.year, x.month, x.day, x.hour, x.minute, x.second)
-
-def datetime_expr(x):
-    return "'" + datetime_display(x) + "'"
-
-def str_display(x):
-    return "'" + escape_squote(x) + "'"
-
 define_atom('date',
+            code     = 'd',
             schema   = date,
             convert  = date_convert,
             display  = date_display,
@@ -125,9 +127,20 @@ define_atom('date',
             )
 
 def datetime_convert(x):
-    return datetime.strptime(x, "%Y-%m-%dT%H:%M:%S") if x else EMPTY_DATETIME
+    if x:
+        return datetime.strptime(x, "%Y-%m-%dT%H:%M:%S")
+    else:
+        return EMPTY_DATETIME
+
+def datetime_display(x):
+    return '{0:04d}-{1:02d}-{2:02d}T{3:02d}:{4:02d}:{5:02d}'.\
+      format(x.year, x.month, x.day, x.hour, x.minute, x.second)
+
+def datetime_expr(x):
+    return "'" + datetime_display(x) + "'"
 
 define_atom('datetime',
+            code     = 'x',
             schema   = datetime,
             convert  = datetime_convert,
             display  = datetime_display,
@@ -139,6 +152,7 @@ define_atom('datetime',
             )
 
 define_atom('float',
+            code     = 'f',
             schema   = float,
             convert  = float,
             display  = lambda x: '{0:.2}'.format(x),
@@ -150,6 +164,7 @@ define_atom('float',
             )
 
 define_atom('integer',
+            code     = 'i',
             schema   = int,
             convert  = int,
             display  = str,
@@ -160,7 +175,11 @@ define_atom('integer',
             control  = 'input'
             )
 
+def str_display(x):
+    return "'" + escape_squote(x) + "'"
+
 define_atom('memo',
+            code     = 'm',
             schema   = str,
             convert  = identity,
             display  = identity,
@@ -172,6 +191,7 @@ define_atom('memo',
             )
 
 define_atom('string',
+            code     = 's',
             schema   = str,
             convert  = identity,
             display  = identity,
@@ -183,6 +203,7 @@ define_atom('string',
             )
 
 define_atom('text',
+            code     = 'q',
             schema   = str,
             convert  = identity,
             display  = identity,
@@ -203,6 +224,7 @@ def time_expr(x):
     return "'" + time_display(x) + "'"
 
 define_atom('time',
+            code     = 't',
             schema   = time,
             convert  = time_convert,
             display  = time_display,
@@ -214,6 +236,7 @@ define_atom('time',
             )
 
 define_atom('url',
+            code     = 'u',
             schema   = str,
             convert  = identity,
             display  = identity,
