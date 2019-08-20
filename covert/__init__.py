@@ -34,12 +34,12 @@ Classes:
 """
 
 from .           import setting
-from .atom       import EMPTY_DATE, EMPTY_DATETIME, EMPTY_TIME, define_atom
+from .atom       import EMPTY_DATE, EMPTY_DATETIME, EMPTY_TIME, define_atom, atom_codemap
 from .common     import *
 from .config     import read_configuration, parse_cmdline, initialize_kernel, add_argument
 from .controller import http_server, CondRouter, MapRouter, PageRouter, JSONRouter
 from .event      import add_handler, event
 from .layout     import add_template_type
-from .model      import ItemRef, Visitor, unflatten
+from .model      import ItemRef, Visitor
 from .view       import route, BareItemView, ItemView, url_for, icon_for
 from .view       import route2pattern, route2regex, RenderTree, Cursor, Button
