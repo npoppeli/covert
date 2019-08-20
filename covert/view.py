@@ -18,7 +18,7 @@ from urllib.parse import urlencode
 from .common import SUCCESS, write_file, logger, str2int
 from .common import encode_dict, show_dict, CATEGORY_READ, format_json_diff
 from .event import event
-from .model import unflatten, mapdoc
+from .model import mapdoc
 from . import common as c
 from . import setting
 
@@ -423,10 +423,10 @@ class Cursor:
             elif value:
                 form[key] = value
         if initial_post:
-            unfl_form = unflatten(form, model)
-            logger.debug("cursor_init: unfl. form={}".format(unfl_form))
-            qmap_form = mapdoc(model.qmap, unfl_form)
-            logger.debug("cursor_init: qmap. form={}".format(qmap_form))
+            converted_form = model.convert(form)
+            logger.debug("cursor_init: converted form={}".format(converted_form))
+            qmap_form = mapdoc(model.qmap, converted_form)
+            logger.debug("cursor_init: qmapped   form={}".format(qmap_form))
             for key, value in qmap_form.items():
                 # if value is a list, use the first element
                 operator_value = value[0] if isinstance(value, list) else value
@@ -536,13 +536,8 @@ class RenderTree:
            # cursor.form contains query specifications, with real
            # values, i.e. values converted by mapdoc(model.qmap, <form>)
            for key, value in cursor.form.items():
-               if isinstance(value, dict): # not converted by mapdoc
-                   convert = self.model.cmap[key]
-                   key_set = set(value.keys())
-                   if  key_set == {'from', 'to'}:
-                       cursor.form[key] = ('in', convert(value['from']), convert(value['to']))
-                   elif key_set == {'from'}:
-                       cursor.form[key] = ('==', convert(value['from']))
+               if isinstance(value, list):
+                   cursor.form[key] = ('in', value[0], value[1])
            filter_spec = {} if cursor.incl == 1 else {'active': ('==', '1')}
            filter_spec.update(cursor.form)
            # translate filter dictionary to expression
@@ -610,51 +605,39 @@ class RenderTree:
         """Flatten one item in the render tree."""
         item = self.data[nr]
         item_meta = item.meta
-        flat_item = item.display().flatten()
+        flat_item = item.display()
         newitem = OrderedDict()
         has_buttons = defaultdict(bool)
         for key, value in flat_item.items():
             if key.startswith('_'):
                 newitem[key] = value
                 continue
-            path, depth = key.split('.'), key.count('.')
+            # path is built up like this: [field].[sequence_number].[atom_type](#[index])?
+            path, multiple = key.split('.'), '#' in key
+            field, depth = path[0], int(path[1])
             button_list = []
-            if depth > 0 and path[1].isnumeric(): # add push/pop buttons
-                parent = path[0]
-                index = 1 + int(path[1])
-                if form and (index == 1) and not has_buttons[parent]:
-                    # Add buttons to first element in group (examples: notes.0, relations.0.role)
+            if multiple and depth < 2: # add push/pop buttons
+                index = int(key[key.find('#')+1])
+                if form and (index == 0) and not has_buttons[field]:
+                    # add buttons to first element in group (examples: notes.0.s#0)
                     # TODO: view_name + '_' + action_name -> function
                     push = Button(self.view_name+'_push', action='', name='push')
                     pop  = Button(self.view_name+'_pop' , action='', name='pop' )
                     button_list.append(push(item))
                     button_list.append(pop(item))
-                    has_buttons[parent] = True
+                    has_buttons[field] = True
                 # set label and metadata
-                if depth == 1:
-                    if parent not in item_meta:
-                        logger.info('flatten_item: discard extra field {}={}'.format(key, value))
-                        continue
-                    field_meta = item_meta[parent]
-                    label = field_meta.label if index == 1 else str(index)
-                else:
-                    child = path[-1]
-                    if child not in item_meta:
-                        logger.info('flatten_item: discard extra field {}={}'.format(key, value))
-                        continue
-                    field_meta = item_meta[child]
-                    label = '{}.{}.{}'.format(item_meta[parent].label,
-                                              path[1], field_meta.label)
-            else:
-                if path[-1] not in item_meta:
-                    logger.info('flatten_item: discard extra field {}={}'.format(key, value))
+                if field not in item_meta:
+                    logger.info('flatten_item: discard extra field {}={} (multiple)'.format(key, value))
                     continue
-                field_meta = item_meta[ path[-1] ]
-                if depth == 0:
-                    label = field_meta.label
-                else:
-                    parent = path[0]
-                    label = '{}.{}'.format(item_meta[parent].label, field_meta.label)
+                field_meta = item_meta[field]
+                label = field_meta.label if index == 0 else str(index)
+            else:
+                if field not in item_meta:
+                    logger.info('flatten_item: discard extra field {}={} (not multiple)'.format(key, value))
+                    continue
+                field_meta = item_meta[field]
+                label = field_meta.label
             proplist = {'label': label, 'enum': field_meta.enum, 'schema': field_meta.schema,
                         'multiple': field_meta.multiple,
                         'formtype': 'hidden' if field_meta.auto else field_meta.formtype,
@@ -671,7 +654,11 @@ class RenderTree:
     def prune_item(self, nr=0, depth=2, clear=False, form=False):
         """Prune one item in the render tree."""
         item = self.data[nr]
-        hidden = item['_hidden']
+        if '_hidden.0.a' in item:
+            hidden = []
+        else:
+            hidden = [value for key, value in item.items() if key.startswith('_hidden')]
+            logger.debug('prune_item: hidden={}'.format(', '.join(hidden)))
         newitem = OrderedDict()
         for key, field in item.items():
             if key.startswith('_'):
@@ -686,7 +673,7 @@ class RenderTree:
         self.data[nr] = newitem
 
     def prune_items(self, depth=2, clear=False, form=False):
-        """Prune all items in the render tree."""
+        """P2rune all items in the render tree."""
         if self.poly:
             for nr in range(len(self.data)):
                 self.prune_item(nr=nr, depth=depth, clear=clear, form=form)
@@ -699,7 +686,7 @@ class RenderTree:
                         newitem[key] = field
                     else:
                         field_meta = field['meta']
-                        excluded = (key.count('.') > depth) or (key in hidden) or \
+                        excluded = (key.split('.')[1] >= depth) or (key in hidden) or \
                                    field_meta['multiple'] or field_meta['auto'] or \
                                    field_meta['schema'] in ('text', 'memo', 'itemref')
                         if not excluded: newitem[key] = field
@@ -754,7 +741,7 @@ class RenderTree:
         result = dict([(key, getattr(self, key)) for key in self.nodes])
         if result.get('cursor', None):
             result['cursor'] = result['cursor']()
-        result['data'] = [item for item in result['data'] if not item['_hide']]
+        result['data'] = [item for item in result['data'] if not item.get('_hide.0.s', False)]
         return result
 
     def dump(self, name):
@@ -841,7 +828,7 @@ class ItemView(BareItemView):
 
     def extract_item(self, prefix=None, model=None):
         """Convert unflattened form to item."""
-        # The first step is easy, thanks to unflattening.
+        # TODO: needs adjustment.
         selection = self.form.get(prefix.rstrip('.'), {}) if prefix else self.form
         return (model or self.model).convert(selection)
 
@@ -872,10 +859,17 @@ class ItemView(BareItemView):
         return self.show_items('match')
 
     def convert_form(self, keep_empty=False):
-        """Convert request parameters to unflattened dictionary."""
+        """Convert request parameters to unflattened document."""
         raw_form = {key:value for key, value in self.request.params.items()
                               if (value or keep_empty) and not key.startswith('_')}
-        self.form = unflatten(raw_form, self.model)
+        self.form = self.model.convert(raw_form)
+        if setting.debug > 1:
+            print('convert_form: raw')
+            for key, value in raw_form.items():
+                print('  {:<20}: {}'.format(key, value))
+            print('convert_form: converted')
+            for key, value in self.form.items():
+                print('  {:<20}: {}'.format(key, value))
 
     def build_form(self, description, action, bound=False, postproc=None, method='POST',
                    clear=False, keep_empty=False, diff=False):
