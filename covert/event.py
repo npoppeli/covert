@@ -14,7 +14,7 @@ def add_handler(evnt, handler):
         if evnt in event_handler:
             logger.debug(c._('Cannot override handler for {}').format(evnt))
         else:
-            if setting.debug > 1:
+            if setting.debug > 2:
                 logger.debug(c._('New event handler for {}').format(evnt))
             event_handler[evnt] = handler
     else:
