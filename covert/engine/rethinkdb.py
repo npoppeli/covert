@@ -311,7 +311,7 @@ class Item(BareItem):
         doc = {key:value for key, value in mapdoc(self.wmap, self).items()
                          if not key.startswith('__')}
         collection = r.table(self.name)
-        if setting.nostore: # don't write to the database
+        if setting.nostore: # do not write anything to the database
             reply = {'status':SUCCESS, 'data':'simulate '+('insert' if new else 'update')}
             report_db_action(reply)
             return reply
@@ -324,7 +324,8 @@ class Item(BareItem):
                 reply = {'status':SUCCESS, 'data':self['id'], 'message':str(result.replaced)}
             report_db_action(reply)
             # This event handler can be used to notify other items that the present item has
-            # been modified. Use this with care, and avoid write cycles!
+            # been modified. Use this with care, and avoid infinite recursion caused by
+            # event handlers indirectly calling each other!
             event('write:post', self)
             return reply
         except Exception as e:
