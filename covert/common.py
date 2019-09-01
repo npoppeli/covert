@@ -141,7 +141,7 @@ SUCCESS = 'success'
 FAIL    = 'fail'
 ERROR   = 'error'
 
-class ExtendedEncoder(json.JSONEncoder):
+class EncodeWithStrFallback(json.JSONEncoder):
     """JSON encoder that can handle all atom types"""
     def default(self, obj):
         if isinstance(obj, (dict, list, tuple, int, float, bool, str)):
@@ -149,11 +149,19 @@ class ExtendedEncoder(json.JSONEncoder):
         else:
             return str(obj)
 
+class EncodeWithReprFallback(json.JSONEncoder):
+    """Another JSON encoder that can handle all atom types"""
+    def default(self, obj):
+        if isinstance(obj, (dict, list, tuple, int, float, bool, str)):
+            return json.JSONEncoder.default(self, obj)
+        else:
+            return repr(obj)
+
 def decode_dict(s):
-    """Decode string to JSON document.
+    """Decode string in JSON form to dictionary.
 
     Arguments:
-        s (str): string in JSON notation
+        s (str): string in JSON form
 
     Returns:
         list|dict: JSON document
@@ -161,27 +169,32 @@ def decode_dict(s):
     return json.loads(s) if s else {}
 
 def encode_dict(d):
-    """Encode JSON document to string.
+    """Encode document (dictionary) to JSON string.
 
     Arguments:
-        d (dict): JSON document
+        d (dict): document
 
     Returns:
-        str: content as one string
+        str: content as one string in JSON form
     """
     # return html.escape(json.dumps(d, separators=(',', ':'), cls=ExtendedEncoder))
-    return json.dumps(d, separators=(',', ':'), cls=ExtendedEncoder)
+    return json.dumps(d, separators=(',', ':'), cls=EncodeWithStrFallback)
 
 def show_dict(d):
-    """Encode JSON document to pretty-printed string.
+    """Encode document (dictionary) to pretty-printed JSON string.
 
     Arguments:
-        d (dict): JSON document
+        d (dict): document
 
     Returns:
-        str: content as one pretty-printed string
+        str: content as one string in JSON form, and with nice formatting
     """
-    return json.dumps(d, separators=(',',':'), sort_keys=True, indent=2, cls=ExtendedEncoder)
+    return json.dumps(d, separators=(',',':'), cls=EncodeWithReprFallback,
+                      sort_keys=True, indent=2)
+
+def show_document(d):
+    return '\n'.join("{:<20}: {}".format(key, str(value)[0:80])
+                     for key, value in d.items())
 
 def read_json_file(path):
     """Read JSON file.
