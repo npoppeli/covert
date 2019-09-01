@@ -2,7 +2,7 @@
 """Objects and functions related to the atomic constituents of items.
 
 The atomic constituents of items should be a common subset of MongoDB, RethinkDB and ArangoDB.
-Otherwise, atoms have a partial dependence on the storage engine, via the read and write mapssenum.
+Otherwise, atoms have a partial dependence on the storage engine via the read and write maps.
 
 ISO 8601 datetime notation:
 * date    : yyyy-mm-dd
@@ -25,11 +25,11 @@ class Atom:
         * see constructor method
     """
 
-    __slots__ = ('code', 'schema', 'convert', 'display', 'query', 'formtype', 'control',
-                 'default', 'read', 'write', 'enum', 'expr')
+    __slots__ = ('code', 'schema', 'convert', 'display', 'formtype', 'control',
+                 'default', 'query', 'read', 'write', 'enum', 'expr')
 
-    def __init__(self, code, schema, convert, display, query, formtype, control,
-                 default='', read=None, write=None, enum=None, expr=None):
+    def __init__(self, code, schema, convert, display, formtype, control,
+                 default='', query='==', read=None, write=None, enum=None, expr=None):
         """Initialize atom.
 
         Arguments:
@@ -37,7 +37,7 @@ class Atom:
                                  lowercase letters are reserved for internal use
             schema   (class):    class of atom, used for item validation
             convert  (callable): convert string representation to actual type
-            query    (callable): similar to convert, adds search operator
+            query    (str):      standard operator in queries (default: ==)
             display  (callable): convert to string representation
             formtype (str):      HTML form type
             enum     (list):     range of allowed values for enumerated type
@@ -79,6 +79,10 @@ EMPTY_TIME     = time(0, 0, 0)
 EMPTY_DATE     = date(MINYEAR, 1, 1)
 MIDNIGHT       = time(0, 0, 0, 0)
 
+def empty_atom(a):
+    return a == '' or a is None or a == 0 or \
+           a == EMPTY_DATE or a == EMPTY_DATETIME or a == EMPTY_TIME
+
 true_strings = ('j', 'ja')
 # TODO I18N EN: yes/no or y/n, SV: ja/nej
 bool_repr = {True:'ja', False:'nee'}
@@ -88,7 +92,6 @@ define_atom('boolean',
             code     = 'b',
             schema   = bool,
             convert  = boolean_convert,
-            query    = lambda x: ('==', boolean_convert(x)),
             display  = lambda x: bool_repr[x],
             default  = False,
             formtype = 'boolean',
@@ -117,7 +120,6 @@ define_atom('date',
             schema   = date,
             convert  = date_convert,
             display  = date_display,
-            query    = lambda x: ('==', date_convert(x)),
             expr     = date_expr,
             read     = lambda x: x.date(),
             write    = lambda x: datetime.combine(x, MIDNIGHT),
@@ -144,7 +146,6 @@ define_atom('datetime',
             schema   = datetime,
             convert  = datetime_convert,
             display  = datetime_display,
-            query    = lambda x: ('==', datetime_convert(x)),
             expr     = datetime_expr,
             default  = EMPTY_DATETIME,
             formtype = 'datetime',
@@ -156,7 +157,6 @@ define_atom('float',
             schema   = float,
             convert  = float,
             display  = lambda x: '{0:.2}'.format(x),
-            query    = lambda x: ('==', float(x)),
             expr     = str,
             default  = 0.0,
             formtype = 'number',
@@ -168,7 +168,6 @@ define_atom('integer',
             schema   = int,
             convert  = int,
             display  = str,
-            query    = lambda x: ('==', int(x)),
             expr     = str,
             default  = 0,
             formtype = 'number',
@@ -183,7 +182,7 @@ define_atom('memo',
             schema   = str,
             convert  = identity,
             display  = identity,
-            query    = lambda x: ('%', x),
+            query    = '%',
             expr     = str_display,
             default  = '',
             formtype = 'memo',
@@ -195,7 +194,7 @@ define_atom('string',
             schema   = str,
             convert  = identity,
             display  = identity,
-            query    = lambda x: ('%', x),
+            query    = '%',
             expr     = str_display,
             default  = '',
             formtype = 'text',
@@ -207,7 +206,7 @@ define_atom('text',
             schema   = str,
             convert  = identity,
             display  = identity,
-            query    = lambda x: ('%', x),
+            query    = '%',
             expr     = str_display,
             default  = '',
             formtype = 'text',
@@ -228,7 +227,6 @@ define_atom('time',
             schema   = time,
             convert  = time_convert,
             display  = time_display,
-            query    = lambda x: ('==', time_convert(x)),
             expr     = time_display,
             default  = EMPTY_TIME,
             formtype = 'datetime',
@@ -240,7 +238,7 @@ define_atom('url',
             schema   = str,
             convert  = identity,
             display  = identity,
-            query    = lambda x: ('=~', x),
+            query    = '%',
             expr     = str_display,
             default  = '',
             formtype = 'url',
