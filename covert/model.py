@@ -78,7 +78,7 @@ except ImportError:
         return result
 
 from .atom import atom_map, EMPTY_DATETIME, atom_codemap
-from .common import InternalError, SUCCESS, FAIL, logger
+from .common import InternalError, SUCCESS, FAIL, logger, show_document
 from .controller import exception_report
 from .event import event
 from . import common as c
@@ -100,25 +100,29 @@ def mapdoc(fnmap, doc):
         dict: transformed item (document).
     """
     result = {}
-    for key, value in doc.items():
-        if key in fnmap: # apply mapping function
-            if fnmap[key] is None:
-                continue
-            if isinstance(value, dict): # embedded document
-                result[key] = mapdoc(fnmap, value)
-            elif isinstance(value, list): # list of scalars or documents
-                if len(value) == 0: # empty list
-                    result[key] = []
-                elif isinstance(value[0], dict): # list of documents
-                    result[key] = [mapdoc(fnmap, element) for element in value]
-                else: # list of scalars
-                    result[key] = [fnmap[key](element) for element in value]
-            else: # scalar
-                result[key] = fnmap[key](value)
-        else: # no mapping for this element
-            result[key] = value
-    return result
-
+    try:
+        for key, value in doc.items():
+            if key in fnmap: # apply mapping function
+                if fnmap[key] is None:
+                    continue
+                if isinstance(value, dict): # embedded document
+                    result[key] = mapdoc(fnmap, value)
+                elif isinstance(value, list): # list of scalars or documents
+                    if len(value) == 0: # empty list
+                        result[key] = []
+                    elif isinstance(value[0], dict): # list of documents
+                        result[key] = [mapdoc(fnmap, element) for element in value]
+                    else: # list of scalars
+                        result[key] = [fnmap[key](element) for element in value]
+                else: # scalar
+                    result[key] = fnmap[key](value)
+            else: # no mapping for this element
+                result[key] = value
+        return result
+    except TypeError as e:
+        logger.debug("\nmapdoc generated a TypeError:\n{}\n".\
+                     format(str(e), show_document(doc)))
+        return {}
 
 class Field:
     """Meta-data for one field in an item.
@@ -294,8 +298,7 @@ class BareItem(dict):
                 ref_class = setting.models[ref_classname]
                 value = ref_class(None if object_id == '0' else object_id)
             elif atom_type in atom_codemap:  # scalar value
-                atom_def = atom_codemap[atom_type]
-                convert = atom_def.convert
+                convert = atom_codemap[atom_type].convert
                 if convert is not None:
                     value = convert(value)
             # add value to dictionary in progress, where necessary as element of a list
@@ -341,19 +344,23 @@ class BareItem(dict):
         extra_keys = [key for key in dct.keys() if key not in self.fields]
         for key in declared_keys + extra_keys:
             value = dct[key]
-            if isinstance(value, dict):
+            # treat extra keys the same way as keys declared in the model,
+            # with two exceptions: value is a list or value is a dictionary
+            if key in extra_keys and (isinstance(value, list) or isinstance(value, dict)):
+                self._display.append((key, value))
+            elif isinstance(value, dict):
                 self._dict_number += 1
-                self._display.append(('{}.{}.o{}{}'.format(key, parent, self._dict_number, index),
-                                      'o'+str(self._dict_number)))
+                object_label = 'o'+str(self._dict_number)
+                self._display.append(('{}.{}.o{}{}'.\
+                              format(key, parent, self._dict_number, index), object_label))
                 self._display_dict(value, self._dict_number)
-            elif value == []:
-                self._display.append(('{}.{}.{}'.format(key, parent, 'a'),
-                                      ''))
             elif value is None:
-                self._display.append(('{}.{}.{}'.format(key, parent, 'z'),
-                                      ''))
+                self._display.append(('{}.{}.{}'.format(key, parent, 'z'), ''))
             elif isinstance(value, list):
-                self._display_list(key, value, parent, index)
+                if value:
+                    self._display_list(key, value, parent, index)
+                else:
+                    self._display.append(('{}.{}.{}'.format(key, parent, 'a'), ''))
             else: # scalar
                 # atom type 's' implies cmap == dmap == identity
                 code = self.meta[key].code if key in self.meta else 's'
@@ -534,6 +541,17 @@ def display_reference(ref):
         (tuple): display presentation of item reference.
     """
     return ref.display()
+
+def empty_reference(ref):
+    """Check if ref is a logically empty ItemRef instance.
+
+    Arguments:
+        ref (itemref): item reference.
+
+    Returns:
+        (boolean): True if empty item reference.
+    """
+    return isinstance(ref, ItemRef) and not bool(ref)
 
 
 class ItemRef:
