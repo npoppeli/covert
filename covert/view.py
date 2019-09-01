@@ -15,8 +15,10 @@ from datetime import datetime
 from inspect import getmembers, isclass, isfunction
 from itertools import chain
 from urllib.parse import urlencode
-from .common import SUCCESS, write_file, logger, str2int
+from .atom import empty_atom
+from .common import SUCCESS, write_file, logger, str2int, show_dict
 from .common import encode_dict, show_dict, CATEGORY_READ, format_json_diff
+from .model import empty_reference
 from .event import event
 from .model import mapdoc
 from . import common as c
@@ -416,26 +418,22 @@ class Cursor:
                 self.filter = value
             elif key =='_skey':
                 form[key] = value
-            elif key.startswith('*'): # operator
-                self.operator[key[1:]] = value
             elif key.startswith('_'):
                 setattr(self, key[1:], str2int(value) if key[1:] in self.default else value)
             elif value:
                 form[key] = value
         if initial_post:
+            # logger.debug("cursor_init: raw       form=\n"+show_document(form))
             converted_form = model.convert(form)
-            logger.debug("cursor_init: converted form={}".format(converted_form))
-            qmap_form = mapdoc(model.qmap, converted_form)
-            logger.debug("cursor_init: qmapped   form={}".format(qmap_form))
-            for key, value in qmap_form.items():
+            # logger.debug("cursor_init: converted form=\n"+show_document(converted_form))
+            for key, value in converted_form.items():
+                if empty_atom(value) or empty_reference(value) or value == []:
+                    continue # ignore empty values
+                operator = model.qmap[key]
                 # if value is a list, use the first element
-                operator_value = value[0] if isinstance(value, list) else value
-                if key in self.operator: # operator-value tuple with explicit operator
-                    self.form[key] = (self.operator[key], operator_value[1])
-                elif isinstance(value, dict): # not converted by mapdoc
-                    self.form[key] = operator_value
-                else: # operator-value tuple with default operator
-                    self.form[key] = (operator_value[0], operator_value[1])
+                actual_value = value[0] if isinstance(value, list) else value
+                self.form[key] = (operator, actual_value)
+            # logger.debug("cursor_init: form+operators=\n"+show_document(self.form))
 
     def __str__(self):
         d = dict([(key, getattr(self, key, '')) for key in self.__slots__])
@@ -533,8 +531,7 @@ class RenderTree:
         cursor = self.cursor
         initial_post = '_skip' not in self.request.params
         if initial_post and not cursor.filter:
-           # cursor.form contains query specifications, with real
-           # values, i.e. values converted by mapdoc(model.qmap, <form>)
+           # cursor.form contains query specifications with real values
            for key, value in cursor.form.items():
                if isinstance(value, list):
                    cursor.form[key] = ('in', value[0], value[1])
@@ -552,7 +549,7 @@ class RenderTree:
                    term = "({} {} {})".format(key, value[0], v1)
                terms.append(term)
            cursor.filter = ' and '.join(terms)
-           logger.debug("cursor.filter = {}".format(cursor.filter))
+           logger.debug("move_cursor (initial): cursor.filter = {}".format(cursor.filter))
         else:
             # cursor.incl == 1: remove term 'active=True' (if present) from filter
             #             == 0: add term 'active=True' (if not present) to filter
@@ -561,7 +558,7 @@ class RenderTree:
                     cursor.filter = remove_active(cursor.filter)
             elif 'active' not in cursor.filter:
                 cursor.filter += " and (active == '1')"
-            # logger.debug('move_cursor (follow-up): filter=|{}|'.format(cursor.filter))
+            logger.debug('move_cursor (follow-up): cursor.filter={}'.format(cursor.filter))
         cursor.count = self.model.count(cursor.filter)
         cursor.skip = max(0, min(cursor.count, cursor.skip+cursor.dir*cursor.limit))
         cursor.prev = cursor.skip>0
@@ -601,24 +598,25 @@ class RenderTree:
             self.add_return_button(origin)
             self.message += 'Geen resultaten voor zoekopdracht:\n{}'.format(self.cursor.filter)
 
-    def flatten_item(self, nr=0, form=False):
-        """Flatten one item in the render tree."""
+    def display_item(self, nr=0, in_form=False):
+        """Display one item in the render tree."""
         item = self.data[nr]
         item_meta = item.meta
-        flat_item = item.display()
-        newitem = OrderedDict()
+        disp_item = item.display()
+        new_item = OrderedDict()
         has_buttons = defaultdict(bool)
-        for key, value in flat_item.items():
+        for key, value in disp_item.items():
             if key.startswith('_'):
-                newitem[key] = value
+                new_item[key] = value
                 continue
             # path is built up like this: [field].[sequence_number].[atom_type](#[index])?
             path, multiple = key.split('.'), '#' in key
-            field, depth = path[0], int(path[1])
+            field = path[0]
+            depth = int(path[1]) if len(path) >= 2 else 0
             button_list = []
             if multiple and depth < 2: # add push/pop buttons
                 index = int(key[key.find('#')+1])
-                if form and (index == 0) and not has_buttons[field]:
+                if in_form and (index == 0) and not has_buttons[field]:
                     # add buttons to first element in group (examples: notes.0.s#0)
                     # TODO: view_name + '_' + action_name -> function
                     push = Button(self.view_name+'_push', action='', name='push')
@@ -628,13 +626,13 @@ class RenderTree:
                     has_buttons[field] = True
                 # set label and metadata
                 if field not in item_meta:
-                    logger.info('flatten_item: discard extra field {}={} (multiple)'.format(key, value))
+                    # logger.info('display_item: discard extra field {}={} (multiple)'.format(key, value))
                     continue
                 field_meta = item_meta[field]
                 label = field_meta.label if index == 0 else str(index)
             else:
                 if field not in item_meta:
-                    logger.info('flatten_item: discard extra field {}={} (not multiple)'.format(key, value))
+                    # logger.info('display_item: discard extra field {}={} (not multiple)'.format(key, value))
                     continue
                 field_meta = item_meta[field]
                 label = field_meta.label
@@ -642,56 +640,62 @@ class RenderTree:
                         'multiple': field_meta.multiple,
                         'formtype': 'hidden' if field_meta.auto else field_meta.formtype,
                         'auto': field_meta.auto, 'control': field_meta.control}
-            newitem[key] = {'value':value, 'meta':proplist, 'buttons':button_list}
-        newitem['_keys'] = [k for k in newitem.keys() if not k.startswith('_')]
-        self.data[nr] = newitem
+            new_item[key] = {'value':value, 'meta':proplist, 'buttons':button_list}
+        new_item['_keys'] = [k for k in new_item.keys() if not k.startswith('_')]
+        self.data[nr] = new_item
 
-    def flatten_items(self, form=False):
-        """Flatten all items in the render tree."""
+    def display_items(self, in_form=False):
+        """Display all items in the render tree."""
+        logger.debug('display_items: render tree contains {} items'.format(len(self.data)))
         for nr in range(len(self.data)):
-            self.flatten_item(nr=nr, form=form)
+            self.display_item(nr=nr, in_form=in_form)
 
-    def prune_item(self, nr=0, depth=2, clear=False, form=False):
+    def prune_item(self, nr=0, max_depth=2, clear=False, in_form=False):
         """Prune one item in the render tree."""
         item = self.data[nr]
         if '_hidden.0.a' in item:
             hidden = []
         else:
-            hidden = [value for key, value in item.items() if key.startswith('_hidden')]
-            logger.debug('prune_item: hidden={}'.format(', '.join(hidden)))
-        newitem = OrderedDict()
+            hidden = ['{}: {}'.format(str(key), str(value)) for key, value in item.items()
+                      if key.startswith('_hidden')]
+            logger.debug('prune_item: hiding information: ' + '; '.join(hidden))
+        new_item = OrderedDict()
         for key, field in item.items():
+            path = key.split('.')
+            depth = int(path[1]) if len(path) >= 2 else 0
             if key.startswith('_'):
-                newitem[key] = field
+                new_item[key] = field
             else:
-                excluded = (key.count('.') > depth) or (key in hidden) or \
-                           (form and field['meta']['schema'] == 'itemref')
+                excluded = (depth > max_depth) or (key in hidden) or \
+                           (in_form and field['meta']['schema'] == 'itemref')
                 if not excluded:
                     if clear: field['value'] = ''
-                    newitem[key] = field
-        newitem['_keys'] = [k for k in newitem.keys() if not k.startswith('_')]
-        self.data[nr] = newitem
+                    new_item[key] = field
+        new_item['_keys'] = [k for k in new_item.keys() if not k.startswith('_')]
+        self.data[nr] = new_item
 
-    def prune_items(self, depth=2, clear=False, form=False):
-        """P2rune all items in the render tree."""
+    def prune_items(self, max_depth=2, clear=False, in_form=False):
+        """Prune all items in the render tree."""
         if self.poly:
             for nr in range(len(self.data)):
-                self.prune_item(nr=nr, depth=depth, clear=clear, form=form)
+                self.prune_item(nr=nr, max_depth=max_depth, clear=clear, in_form=in_form)
         else:
             for nr, item in enumerate(self.data):
                 hidden = item['_hidden']
-                newitem = OrderedDict()
+                new_item = OrderedDict()
                 for key, field in item.items():
+                    path = key.split('.')
+                    depth = int(path[1]) if len(path) >= 2 else 0
                     if key.startswith('_'):
-                        newitem[key] = field
+                        new_item[key] = field
                     else:
                         field_meta = field['meta']
-                        excluded = (key.split('.')[1] >= depth) or (key in hidden) or \
+                        excluded = (depth >= max_depth) or (key in hidden) or \
                                    field_meta['multiple'] or field_meta['auto'] or \
                                    field_meta['schema'] in ('text', 'memo', 'itemref')
-                        if not excluded: newitem[key] = field
-                newitem['_keys'] = [k for k in newitem.keys() if not k.startswith('_')]
-                self.data[nr] = newitem
+                        if not excluded: new_item[key] = field
+                new_item['_keys'] = [k for k in new_item.keys() if not k.startswith('_')]
+                self.data[nr] = new_item
 
     def add_buttons(self, buttons):
         """Add buttons (normal and delete) to render tree."""
@@ -809,7 +813,7 @@ class ItemView(BareItemView):
         tree = self.tree
         tree.add_item(item_or_id)
         tree.add_buttons(self.buttons(['id'], ignore='show'))
-        tree.flatten_item()
+        tree.display_item()
         tree.prune_item()
         tree.dump('show_item')
         return tree()
@@ -821,16 +825,10 @@ class ItemView(BareItemView):
         buttons = self.buttons(['id'])[0:self.item_buttons]
         tree.add_items(buttons)
         tree.add_buttons(self.buttons([]))
-        tree.flatten_items()
-        tree.prune_items(depth=1)
+        tree.display_items()
+        tree.prune_items(max_depth=1)
         tree.dump('show_items')
         return tree()
-
-    def extract_item(self, prefix=None, model=None):
-        """Convert unflattened form to item."""
-        # TODO: needs adjustment.
-        selection = self.form.get(prefix.rstrip('.'), {}) if prefix else self.form
-        return (model or self.model).convert(selection)
 
     @route('/{id:objectid}', template='show')
     def show(self):
@@ -844,13 +842,14 @@ class ItemView(BareItemView):
 
     @route('/search', template='form')
     def search(self):
-        """Make a search form."""
+        """Make a search form, using an empty item to populate the form."""
         tree = self.tree
         tree.add_item(self.model())
         tree.add_search_button('match')
-        tree.flatten_item()
-        tree.prune_item(clear=True, form=True)
+        tree.display_item()
+        tree.prune_item(clear=True, in_form=True)
         tree.cookies.append(Cookie('search-origin', self.request.referer, path='/', expires=120))
+        tree.dump('search')
         return tree()
 
     @route('/match', method='GET,POST', template='index')
@@ -858,18 +857,35 @@ class ItemView(BareItemView):
         """Show the result list of a search."""
         return self.show_items('match')
 
-    def convert_form(self, keep_empty=False):
-        """Convert request parameters to unflattened document."""
-        raw_form = {key:value for key, value in self.request.params.items()
-                              if (value or keep_empty) and not key.startswith('_')}
-        self.form = self.model.convert(raw_form)
-        if setting.debug > 1:
-            print('convert_form: raw')
-            for key, value in raw_form.items():
-                print('  {:<20}: {}'.format(key, value))
-            print('convert_form: converted')
-            for key, value in self.form.items():
-                print('  {:<20}: {}'.format(key, value))
+    def convert_form(self, model, prefix=None, keep_empty=False):
+        """Convert (part of) form to document. This method is used by the
+        build_form() method - see below - but can also be used by applications.
+        In simple forms, the raw form contains for example
+
+            marriageplace.0.s: s1
+            husbandname.0.s  : s2
+
+        In this case, convert_form should be called with prefix='' or None.
+        In composite forms, the raw form contains for example
+
+            family.marriageplace.0.s: s1
+            family.husbandname.0.s  : s2
+            partner.firstname.0.s   : s3
+            partner.birthplace.0.s  : s4
+
+        In that case, convert_form should be called twice, once with prefix='family.'
+        and once with prefix='partner.'.
+        """
+        params = self.request.params
+        if prefix:
+            raw_form = {key.replace(prefix, '', 1):value for key, value in params.items()
+                        if (value or keep_empty) and key.startswith(prefix) and
+                        not key.startswith(prefix+'_')}
+        else:
+            raw_form = {key:value for key, value in params.items()
+                        if (value or keep_empty) and not key.startswith('_')}
+        logger.debug('convert_form: raw form=%s', show_dict(raw_form))
+        return model.convert(raw_form)
 
     def build_form(self, description, action, bound=False, postproc=None, method='POST',
                    clear=False, keep_empty=False, diff=False):
@@ -894,20 +910,26 @@ class ItemView(BareItemView):
         """
         tree = self.tree
         validation = []
+        # keys to be deleted prior to writing
+        delete_keys = ['_buttons', '_hidden', '_hide', '_prefix']
         if bound:
-            self.convert_form(keep_empty=keep_empty)
             delta = []
             for item in tree.data:
                 old = item.copy()
                 if not item['_hide']:
-                    item.update(self.extract_item(prefix=item['_prefix'], model=type(item)))
-                    new = item
-                    delta.append(format_json_diff(old, new))
+                    result = self.convert_form(model=type(item), prefix=item['_prefix'],
+                                               keep_empty=keep_empty)
+                    item.update(result)
+                    logger.debug('build_form: updated item=%s', show_dict(item))
+                    delta.append(format_json_diff(old, item))
                     validation.append(item.validate(item))
-            if all([v['status']==SUCCESS for v in validation]):
+            if all([v['status'] == SUCCESS for v in validation]):
                 if callable(postproc):
                     postproc(tree)
                 for item in tree.data:
+                    # cleaning up: remove the keys we added temporarily
+                    for key in delete_keys:
+                        if key in item: del item[key]
                     item.write(validate=False)
                 tree.title = ''
                 tree.message = '{} {}. '.format(description, str(tree.data[0]))
@@ -920,8 +942,8 @@ class ItemView(BareItemView):
                                format(description, str(tree.data[0]), errors)
                 tree.style = 1
         tree.add_form_buttons(action, method)
-        tree.flatten_items(form=True)
-        tree.prune_items(form=True, clear=clear)
+        tree.display_items(in_form=True)
+        tree.prune_items(in_form=True, clear=clear)
         tree.dump('build_form')
         return tree()
 
