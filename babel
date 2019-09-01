@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+
+cd covert
+pybabel extract *.py engine/*.py -o locales/covert.pot
+pybabel update -i locales/covert.pot -D'covert' -d locales
