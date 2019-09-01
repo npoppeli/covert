@@ -30,6 +30,9 @@ For development Mercurial is needed as well.
 - *Chameleon*
 - either *MongoDB* (with *PyMongo*) or *RethinkDB*
 
+#### Optional
+- jsondiff
+
 About
 -----
 
