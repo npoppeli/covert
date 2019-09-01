@@ -19,7 +19,6 @@ model.py
 * tools for adding, modifying and deleting linked items (references)
 * tools for adding, modifying and deleting embedded items
 * item revisions (add 'key' and 'rev' attributes)
-* make labels in BareItem language-dependent (I18N)
 * 'active' attribute in BareItem is not 'auto', but has a default (True)
 * images: keep thumbnail in db as binary date field
   show with
