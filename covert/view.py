@@ -15,12 +15,11 @@ from datetime import datetime
 from inspect import getmembers, isclass, isfunction
 from itertools import chain
 from urllib.parse import urlencode
-from .atom import empty_atom
+from .atom import empty_scalar, empty_dict, empty_list
 from .common import SUCCESS, write_file, logger, str2int, show_dict
-from .common import encode_dict, show_dict, CATEGORY_READ, format_json_diff
+from .common import encode_dict, CATEGORY_READ, format_json_diff
 from .model import empty_reference
 from .event import event
-from .model import mapdoc
 from . import common as c
 from . import setting
 
@@ -423,17 +422,21 @@ class Cursor:
             elif value:
                 form[key] = value
         if initial_post:
-            # logger.debug("cursor_init: raw       form=\n"+show_document(form))
+            logger.debug("cursor_init: raw       form=\n"+show_dict(form))
+            # Note: model.convert() starts from an empty document, which means that
+            # converted_form can contain default values
             converted_form = model.convert(form)
-            # logger.debug("cursor_init: converted form=\n"+show_document(converted_form))
+            logger.debug("cursor_init: converted form=\n"+show_dict(converted_form))
             for key, value in converted_form.items():
-                if empty_atom(value) or empty_reference(value) or value == []:
-                    continue # ignore empty values
+                # ignore empty values
+                if empty_scalar(value) or empty_reference(value) or \
+                   empty_dict(value) or empty_list(value):
+                    continue
                 operator = model.qmap[key]
                 # if value is a list, use the first element
                 actual_value = value[0] if isinstance(value, list) else value
                 self.form[key] = (operator, actual_value)
-            # logger.debug("cursor_init: form+operators=\n"+show_document(self.form))
+            logger.debug("cursor_init: form+operators=\n"+show_dict(self.form))
 
     def __str__(self):
         d = dict([(key, getattr(self, key, '')) for key in self.__slots__])
@@ -442,7 +445,6 @@ class Cursor:
     def __call__(self):
         d = dict([(key, getattr(self, key, '')) for key in self.__slots__])
         return d
-
 
 class Cookie:
     """Instances of this class define basic cookies as constituents of the render tree.
@@ -529,6 +531,7 @@ class RenderTree:
         term (if present) needs to be looked at for possible adjustment.
         """
         cursor = self.cursor
+        logger.debug("move_cursor: cursor.form = {}".format(cursor.form))
         initial_post = '_skip' not in self.request.params
         if initial_post and not cursor.filter:
            # cursor.form contains query specifications with real values
@@ -539,6 +542,7 @@ class RenderTree:
            filter_spec.update(cursor.form)
            # translate filter dictionary to expression
            terms = []
+           logger.debug("move_cursor (initial): filter_spec = {}".format(filter_spec))
            for key, value in filter_spec.items():
                emap = self.model.emap.get(key, None)
                if len(value) == 3:
@@ -566,7 +570,10 @@ class RenderTree:
 
     def add_item(self, oid_or_item, prefix='', hide=None):
         """Add item to render tree."""
-        item = self.model.lookup(oid_or_item) if isinstance(oid_or_item, str) else oid_or_item
+        if isinstance(oid_or_item, str):
+            item = self.model.lookup(oid_or_item)
+        else:
+            item = oid_or_item
         event('additem:init', item, self)
         item['_buttons'] = []
         item['_prefix'] = prefix+'.' if prefix else ''
@@ -609,13 +616,24 @@ class RenderTree:
             if key.startswith('_'):
                 new_item[key] = value
                 continue
-            # path is built up like this: [field].[sequence_number].[atom_type](#[index])?
-            path, multiple = key.split('.'), '#' in key
+            # path structure is: [field].[sequence_number].[atom_type](#[index])?
+            path = key.split('.')
             field = path[0]
-            depth = int(path[1]) if len(path) >= 2 else 0
+            field_meta = item_meta[field]
+            multiple = field_meta.multiple
             button_list = []
-            if multiple and depth < 2: # add push/pop buttons
-                index = int(key[key.find('#')+1])
+            if multiple: # add push/pop buttons (in certain conditions)
+                # < !-- simulate relations: {'role': '', 'name': ''}, including
+                # buttons
+                # or do
+                # that in logic
+                # layer?
+                # -->
+
+                if '#' in key:
+                    index = int(key[key.find('#')+1])
+                else: # defined as multiple, but value is empty list
+                    index = 0
                 if in_form and (index == 0) and not has_buttons[field]:
                     # add buttons to first element in group (examples: notes.0.s#0)
                     # TODO: view_name + '_' + action_name -> function
@@ -626,15 +644,13 @@ class RenderTree:
                     has_buttons[field] = True
                 # set label and metadata
                 if field not in item_meta:
-                    # logger.info('display_item: discard extra field {}={} (multiple)'.format(key, value))
+                    logger.info('display_item: discard extra field {}={} (multiple)'.format(key, value))
                     continue
-                field_meta = item_meta[field]
                 label = field_meta.label if index == 0 else str(index)
             else:
                 if field not in item_meta:
-                    # logger.info('display_item: discard extra field {}={} (not multiple)'.format(key, value))
+                    logger.info('display_item: discard extra field {}={} (not multiple)'.format(key, value))
                     continue
-                field_meta = item_meta[field]
                 label = field_meta.label
             proplist = {'label': label, 'enum': field_meta.enum, 'schema': field_meta.schema,
                         'multiple': field_meta.multiple,
@@ -646,11 +662,10 @@ class RenderTree:
 
     def display_items(self, in_form=False):
         """Display all items in the render tree."""
-        logger.debug('display_items: render tree contains {} items'.format(len(self.data)))
         for nr in range(len(self.data)):
             self.display_item(nr=nr, in_form=in_form)
 
-    def prune_item(self, nr=0, max_depth=2, clear=False, in_form=False):
+    def prune_item(self, nr=0, clear=False, in_form=False):
         """Prune one item in the render tree."""
         item = self.data[nr]
         if '_hidden.0.a' in item:
@@ -661,12 +676,10 @@ class RenderTree:
             logger.debug('prune_item: hiding information: ' + '; '.join(hidden))
         new_item = OrderedDict()
         for key, field in item.items():
-            path = key.split('.')
-            depth = int(path[1]) if len(path) >= 2 else 0
             if key.startswith('_'):
                 new_item[key] = field
             else:
-                excluded = (depth > max_depth) or (key in hidden) or \
+                excluded = key in hidden or \
                            (in_form and field['meta']['schema'] == 'itemref')
                 if not excluded:
                     if clear: field['value'] = ''
@@ -674,26 +687,26 @@ class RenderTree:
         new_item['_keys'] = [k for k in new_item.keys() if not k.startswith('_')]
         self.data[nr] = new_item
 
-    def prune_items(self, max_depth=2, clear=False, in_form=False):
+    def prune_items(self, clear=False, in_form=False):
         """Prune all items in the render tree."""
         if self.poly:
             for nr in range(len(self.data)):
-                self.prune_item(nr=nr, max_depth=max_depth, clear=clear, in_form=in_form)
+                self.prune_item(nr=nr, clear=clear, in_form=in_form)
         else:
             for nr, item in enumerate(self.data):
                 hidden = item['_hidden']
                 new_item = OrderedDict()
                 for key, field in item.items():
                     path = key.split('.')
-                    depth = int(path[1]) if len(path) >= 2 else 0
                     if key.startswith('_'):
                         new_item[key] = field
                     else:
                         field_meta = field['meta']
-                        excluded = (depth >= max_depth) or (key in hidden) or \
-                                   field_meta['multiple'] or field_meta['auto'] or \
+                        excluded = key in hidden or field_meta['multiple'] or \
+                                   field_meta['auto'] or path[1] != '0' or \
                                    field_meta['schema'] in ('text', 'memo', 'itemref')
-                        if not excluded: new_item[key] = field
+                        if not excluded:
+                            new_item[key] = field
                 new_item['_keys'] = [k for k in new_item.keys() if not k.startswith('_')]
                 self.data[nr] = new_item
 
@@ -749,10 +762,10 @@ class RenderTree:
         return result
 
     def dump(self, name):
-        if setting.debug > 1:
+        if setting.debug:
             d = self()
-            postfix = datetime.now().strftime('_%H%M%S.json')
-            write_file(name+postfix, show_dict(d))
+            timestamp = datetime.now().strftime('_%H%M%S') if setting.debug > 1 else ''
+            write_file(name+timestamp+'.json', show_dict(d))
 
 
 class BareItemView:
@@ -826,7 +839,7 @@ class ItemView(BareItemView):
         tree.add_items(buttons)
         tree.add_buttons(self.buttons([]))
         tree.display_items()
-        tree.prune_items(max_depth=1)
+        tree.prune_items()
         tree.dump('show_items')
         return tree()
 
@@ -884,7 +897,7 @@ class ItemView(BareItemView):
         else:
             raw_form = {key:value for key, value in params.items()
                         if (value or keep_empty) and not key.startswith('_')}
-        logger.debug('convert_form: raw form=%s', show_dict(raw_form))
+        # logger.debug('convert_form: raw form=%s', show_dict(raw_form))
         return model.convert(raw_form)
 
     def build_form(self, description, action, bound=False, postproc=None, method='POST',
@@ -920,7 +933,7 @@ class ItemView(BareItemView):
                     result = self.convert_form(model=type(item), prefix=item['_prefix'],
                                                keep_empty=keep_empty)
                     item.update(result)
-                    logger.debug('build_form: updated item=%s', show_dict(item))
+                    # logger.debug('build_form: updated item=%s', show_dict(item))
                     delta.append(format_json_diff(old, item))
                     validation.append(item.validate(item))
             if all([v['status'] == SUCCESS for v in validation]):
@@ -994,7 +1007,9 @@ class ItemView(BareItemView):
         inactive. Permanent removal can be done by a clean-up routine, if necessary.
         """
         item = self.model.lookup(self.params['id'])
+        event('delete:pre', item, self)
         result = item.set_field('active', False)
+        event('delete:post', item, self)
         if result['status'] == SUCCESS:
             result['data'] = 'item {} set to inactive'.format(str(item))
         else:

@@ -38,6 +38,7 @@ class Atom:
             schema   (class):    class of atom, used for item validation
             convert  (callable): convert string representation to actual type
             query    (str):      standard operator in queries (default: ==)
+            expr     (str):      convert string representation to type used in query expression
             display  (callable): convert to string representation
             formtype (str):      HTML form type
             enum     (list):     range of allowed values for enumerated type
@@ -79,9 +80,18 @@ EMPTY_TIME     = time(0, 0, 0)
 EMPTY_DATE     = date(MINYEAR, 1, 1)
 MIDNIGHT       = time(0, 0, 0, 0)
 
-def empty_atom(a):
+def empty_scalar(a):
     return a == '' or a is None or a == 0 or \
            a == EMPTY_DATE or a == EMPTY_DATETIME or a == EMPTY_TIME
+
+def empty_dict(d):
+    return isinstance(d, dict) and not any(d.values())
+
+def empty_list(l):
+    if isinstance(l, list):
+        return l == [] or (len(l) == 1 and (empty_scalar(l[0]) or empty_dict(l[0])))
+    else:
+        return False
 
 true_strings = ('j', 'ja')
 # TODO I18N EN: yes/no or y/n, SV: ja/nej

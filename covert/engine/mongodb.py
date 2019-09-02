@@ -47,6 +47,7 @@ class Translator(ast.NodeVisitor):
         raise NotImplementedError(c._('Translator: no method for ')+n.__class__.__name__)
     # auxiliaries
     def visit_elts        (self, n): return [self.visit(elt) for elt in n.elts]
+    def visit_keys        (self, n): return [self.visit(elt) for elt in n.keys]
     def visit_values      (self, n): return [self.visit(elt) for elt in n.values]
     # simple nodes
     def visit_And         (self, n): return '$and'
@@ -67,6 +68,8 @@ class Translator(ast.NodeVisitor):
     def visit_List        (self, n): return self.visit_elts(n)
     def visit_Tuple       (self, n): return self.visit_elts(n)
     # complex nodes
+    def visit_Dict(self, n):
+        return dict(zip(self.visit_keys(n), self.visit_values(n)))
     def visit_BinOp(self, n):
         key, value = self.visit(n.left), self.visit(n.right)
         return {key: {self.visit(n.op): self.V_(key, value)}}
@@ -79,7 +82,10 @@ class Translator(ast.NodeVisitor):
             return {key: {'$gte': self.V_(key, value1), '$lte': self.V_(key, value2)}}
         else:
             value1 = self.visit(n.comparators[0])
-            return {key: {oper: self.V_(key, value1)}}
+            if isinstance(value1, dict):
+                return {key+'.'+k: self.V_(k, v) for k, v in value1.items()}
+            else:
+                return {key: {oper: self.V_(key, value1)}}
 
 def init_storage():
     """Initialize storage engine."""
@@ -145,6 +151,7 @@ class Item(BareItem):
         translator = Translator(cls.cmap, cls.wmap)
         try:
             result = translator.visit(root.body)
+            # logger.debug(str(result))
             return result
         except Exception as e:
             logger.debug(str(e))

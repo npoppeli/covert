@@ -171,6 +171,8 @@ def format_item(item):
     """Default format function for Item"""
     return item._format.format(**item)
 
+# I18N: this list is needless, but helps us get the labels in the I18N framework
+bareitem_labels = [c._('Sort by'), c._('Created'), c._('Modified'), c._('Active')]
 
 class BareItem(dict):
     """Base class for Item.
@@ -206,12 +208,12 @@ class BareItem(dict):
     wmap = {}
     # metadata
     meta = OrderedDict()
-    meta['id']     = Field(label='Id',          code='s', schema='string',  formtype='hidden',  auto=True)
-    meta['_skey']  = Field(label='Sort by',     code='s', schema='string',  formtype='hidden',  auto=True)
-    meta['active'] = Field(label=c._('Active'), code='b', schema='boolean', formtype='boolean', auto=False,
+    meta['id']     = Field(label='Id',       code='s', schema='string',  formtype='hidden',  auto=True)
+    meta['_skey']  = Field(label='Sort by',  code='s', schema='string',  formtype='hidden',  auto=True)
+    meta['active'] = Field(label='Active',   code='b', schema='boolean', formtype='boolean', auto=False,
                            enum=bool_atom.enum, control=bool_atom.control)
-    meta['ctime']  = Field(label=c._('Created'),  code='x', schema='datetime', formtype='hidden', auto=True)
-    meta['mtime']  = Field(label=c._('Modified'), code='x', schema='datetime', formtype='hidden', auto=True)
+    meta['ctime']  = Field(label='Created',  code='x', schema='datetime', formtype='hidden', auto=True)
+    meta['mtime']  = Field(label='Modified', code='x', schema='datetime', formtype='hidden', auto=True)
 
     def __init__(self, doc=None):
         """Initialize item.
@@ -739,7 +741,7 @@ def parse_model_def(model_def, model_defs, transl):
         if field_type[0] == '_': # embedded model (comparable to inner class)
             embedded = parse_model_def(model_defs[field_type], model_defs, transl)
             if multiple_field:
-                pm.empty[field_name] = [] if optional_field else [embedded.empty]
+                pm.empty[field_name] = [embedded.empty] # if not optional_field else []
             elif not optional_field:
                 pm.empty[field_name] = embedded.empty
             pm.schema[schema_key] = [embedded.schema] if multiple_field else embedded.schema
@@ -752,7 +754,7 @@ def parse_model_def(model_def, model_defs, transl):
             pm.dmap[field_name] = dict
             pm.rmap[field_name] = dict
             pm.wmap[field_name] = dict
-            pm.qmap[field_name] = None
+            pm.qmap[field_name] = '=='
             pm.emap[field_name] = None
             pm.cmap.update(embedded.cmap)
             pm.dmap.update(embedded.dmap)
@@ -833,6 +835,9 @@ def read_models(model_defs):
     locale_dir = realpath(join(setting.site, 'locales'))
     model_trans = gettext.translation('model', localedir=locale_dir, languages=[setting.language])
     model_names = [name for name in model_defs.keys() if name[0].isalpha()]
+    # I18N: translate the labels of the BareItem model
+    for key in BareItem.fields:
+        BareItem.meta[key].label = c._(BareItem.meta[key].label)
     # construct reference classes
     for model_name in model_names:
         ref_name = model_name+'Ref'
