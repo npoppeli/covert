@@ -422,11 +422,8 @@ class Cursor:
             elif value:
                 form[key] = value
         if initial_post:
-            logger.debug("cursor_init: raw       form=\n"+show_dict(form))
-            # Note: model.convert() starts from an empty document, which means that
-            # converted_form can contain default values
-            converted_form = model.convert(form)
-            logger.debug("cursor_init: converted form=\n"+show_dict(converted_form))
+            # Note: the result of model.convert() can contain empty values
+            converted_form = model.convert(form, partial=True)
             for key, value in converted_form.items():
                 # ignore empty values
                 if empty_scalar(value) or empty_reference(value) or \
@@ -436,7 +433,6 @@ class Cursor:
                 # if value is a list, use the first element
                 actual_value = value[0] if isinstance(value, list) else value
                 self.form[key] = (operator, actual_value)
-            logger.debug("cursor_init: form+operators=\n"+show_dict(self.form))
 
     def __str__(self):
         d = dict([(key, getattr(self, key, '')) for key in self.__slots__])
@@ -898,7 +894,7 @@ class ItemView(BareItemView):
             raw_form = {key:value for key, value in params.items()
                         if (value or keep_empty) and not key.startswith('_')}
         # logger.debug('convert_form: raw form=%s', show_dict(raw_form))
-        return model.convert(raw_form)
+        return model.convert(raw_form, partial=True)
 
     def build_form(self, description, action, bound=False, postproc=None, method='POST',
                    clear=False, keep_empty=False, diff=False):

@@ -240,19 +240,24 @@ class BareItem(dict):
         visitor.visit(self)
 
     @classmethod
-    def convert(cls, doc):
-        """Convert a document in flat structure to one in application structure.
+    def convert(cls, doc, partial=False):
+        """Convert a document in flat structure to a document in application structure,
+        or a partial document, i.e. a dictionary, depending on the parameter `partial`.
 
         Arguments:
-            * doc (OrderedDict): flattened document
+            * doc     (OrderedDict): flattened document
+            * partial (bool)       : partial or full document?
 
         Returns:
-            instance of current class
+            instance of current class, or dictionary
         """
         result = cls._convert(doc, 0)
-        doc = cls()
-        doc.update(result)
-        return doc
+        if partial:
+            return result
+        else:
+            doc = cls()
+            doc.update(result)
+            return doc
 
     @classmethod
     def _convert(cls, doc, parent):
