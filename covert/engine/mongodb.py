@@ -23,9 +23,10 @@ def report_db_action(result):
         logger.debug(message)
 
 class Translator(ast.NodeVisitor):
-    """Translate query to form suitable for this storage engine.
+    """Instances of this class translate a filter in the form of a compiled
+    Python expression to a dictionary with a MongoDB query specification.
 
-    A filter is a restricted form of Python expression. EXPAND ...
+    A filter is a restricted form of Python expression.
     Field names are written as variables. Constants are always strings.
     Allowed boolean operators: and, not.
     Allowed binary operators: ==, ~=, <, <=, >, >=, in, % (match regex).
@@ -76,8 +77,8 @@ class Translator(ast.NodeVisitor):
     def visit_BoolOp(self, n):
         return {self.visit(n.op): self.visit_values(n)}
     def visit_Compare(self, n):
-        key, oper = self.visit(n.left), self.visit(n.ops[0])
-        if oper == '$in':
+        key, operator = self.visit(n.left), self.visit(n.ops[0])
+        if operator == '$in':
             value1, value2 = self.visit(n.comparators[0])
             return {key: {'$gte': self.V_(key, value1), '$lte': self.V_(key, value2)}}
         else:
@@ -85,7 +86,7 @@ class Translator(ast.NodeVisitor):
             if isinstance(value1, dict):
                 return {key+'.'+k: self.V_(k, v) for k, v in value1.items()}
             else:
-                return {key: {oper: self.V_(key, value1)}}
+                return {key: {operator: self.V_(key, value1)}}
 
 def init_storage():
     """Initialize storage engine."""
@@ -145,18 +146,17 @@ class Item(BareItem):
         try:
             root = compile(expr, '', 'eval', ast.PyCF_ONLY_AST)
         except SyntaxError as e:
-            logger.debug(c._("Item.filter: expr={}").format(expr))
+            logger.debug(c._("Item.filter: expr = {}").format(expr))
             logger.debug(c._("Exception '{}'").format(e))
             raise
         translator = Translator(cls.cmap, cls.wmap)
         try:
             result = translator.visit(root.body)
-            # logger.debug(str(result))
             return result
         except Exception as e:
             logger.debug(str(e))
-            logger.debug(c._("Item.filter: expr={}").format(expr))
-            logger.debug(c._("Item.filter: root={}").format(ast.dump(root)))
+            logger.debug(c._("Item.filter: expr = {}").format(expr))
+            logger.debug(c._("Item.filter: root = {}").format(ast.dump(root)))
             return None
 
     @classmethod
