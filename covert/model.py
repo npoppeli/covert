@@ -161,6 +161,9 @@ class Field:
         self.atomic   = atomic
         self.enum     = enum
 
+    def __repr__(self):
+        return "Field({})".format(', '.join('{}: {}'.format(k, self.__getattribute__(k)) for k in self.__slots__))
+
 bool_atom     = atom_map['boolean']
 string_atom   = atom_map['string']
 datetime_atom = atom_map['datetime']
@@ -299,7 +302,10 @@ class BareItem(dict):
             elif atom_type == 'z':
                 value = None
             elif atom_type == 'a':
-                value = []
+                if value and value != '.':
+                    value = [value]
+                else:
+                    value = []
             elif atom_type == '^':  # item reference
                 ref_classname, object_id = value[-1].split('.')
                 ref_class = setting.models[ref_classname]
