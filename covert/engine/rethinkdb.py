@@ -5,6 +5,7 @@ This module defines the Item class and an initialization function for the storag
 The Item class encapsulates the details of the storage engine.
 """
 
+import ast
 from datetime import datetime
 import rethinkdb as r
 from ..common import SUCCESS, ERROR, FAIL, logger, InternalError
@@ -21,60 +22,100 @@ def report_db_action(result):
     if setting.debug > 1:
         logger.debug(message)
 
-class Translator(Visitor):
-    """Translate query to form suitable for this storage engine.
+class Translator(ast.NodeVisitor):
+    """Instances of this class translate a filter in the form of a compiled
+    Python expression to an instance of the RqlQuery class.
 
-    A filter is a sequence of terms or nested clauses (and, or). A term is a tuple (op, value) or
-    (op, value1, value2), where 'op' is a 2-character string specifying a filter operator.
-    Fields with 'multiple' property (list-valued fields) have a normal query condition.
-    RethinkDB makes a distinction between search scalar field  and search list field, so
-    this needs rewriting.
-
-    TODO: add possibility to search through array fields
+    A filter is a restricted form of Python expression.
+    Field names are written as variables. Constants are always strings.
+    Allowed boolean operators: and, not.
+    Allowed binary operators: ==, ~=, <, <=, >, >=, in, % (match regex).
+    Fields with 'multiple' property (list-valued fields) have a special query condition,
+    since RethinkDB makes a distinction between search scalar field  and search list field.
     """
-    def  __init__(self, wmap, name):
+    def  __init__(self, cmap, wmap, meta):
+        self.cmap = cmap
         self.wmap = wmap
-        self.chain = r.table(name)
+        self.meta = meta
 
-    def visit_filter(self, node):
-        for term in node.terms:
-            new_term = self.visit(term)
-            for field, cond in new_term.items():
-                operator = cond[0]
-                if operator   in ('==', 'eq'):
-                    self.chain = self.chain.filter(r.row[field] == cond[1])
-                elif operator in ('<>', '!='):
-                    self.chain = self.chain.filter(r.row[field] != cond[1])
-                elif operator in ('=~', 're'):
-                    self.chain = self.chain.filter(r.row[field].match(cond[1]))
-                elif operator in ('[]', 'in'):
-                    self.chain = self.chain.filter((r.row[field] >= cond[1]) & (r.row[field] <= cond[2]))
-                elif operator in ('<', 'lt'):
-                    self.chain = self.chain.filter(r.row[field] < cond[1])
-                elif operator in ('<=', 'le'):
-                    self.chain = self.chain.filter(r.row[field] <= cond[1])
-                elif operator in ('>', 'gt'):
-                    self.chain = self.chain.filter(r.row[field] > cond[1])
-                elif operator in ('>=', 'ge'):
-                    self.chain = self.chain.filter(r.row[field] >= cond[1])
-        return self.chain
+    def V_(self, key, value):
+        """Convert string value to real value for database query: wmap(cmap(value))"""
+        v1 = self.cmap[key](value) if value and (key in self.cmap) else value
+        v2 = self.wmap[key](v1) if v1 and (key in self.wmap) else v1
+        return v2
 
-    def visit_and(self, node):
-        logger.debug('Translator: visit_and not implemented yet')
-        return {}
-
-    def visit_or(self, node):
-        logger.debug('Translator: visit_or not implemented yet')
-        return {}
-
-    def visit_term(self, node):
-        field = node.field
-        operator = node.operator
-        wmap = self.wmap
-        value1 = wmap[field](node.value1) if (node.value1 and field in wmap) else node.value1
-        value2 = wmap[field](node.value2) if (node.value2 and field in wmap) else node.value2
-        return {field: (operator, value1, value2)}
-
+    # default method
+    def generic_visit(self, n):
+        raise NotImplementedError(c._('Translator: no method for ')+n.__class__.__name__)
+    # auxiliaries
+    def visit_elts        (self, n): return [self.visit(elt) for elt in n.elts]
+    def visit_keys        (self, n): return [self.visit(elt) for elt in n.keys]
+    def visit_values      (self, n): return [self.visit(elt) for elt in n.values]
+    # simple nodes
+    def visit_And         (self, n): return '$and'
+    def visit_Eq          (self, n): return '$eq'
+    def visit_NotEq       (self, n): return '$ne'
+    def visit_Lt          (self, n): return '$lt'
+    def visit_LtE         (self, n): return '$lte'
+    def visit_Gt          (self, n): return '$gt'
+    def visit_GtE         (self, n): return '$gte'
+    def visit_Expr        (self, n): return self.visit(n.value)
+    def visit_In          (self, n): return '$in'
+    def visit_Mod         (self, n): return '$regex'
+    def visit_Name        (self, n): return n.id
+    def visit_NameConstant(self, n): return n.value
+    def visit_Num         (self, n): return n.n
+    def visit_Or          (self, n): return '$or'
+    def visit_Str         (self, n): return n.s
+    def visit_List        (self, n): return self.visit_elts(n)
+    def visit_Tuple       (self, n): return self.visit_elts(n)
+    # complex nodes
+    def visit_Dict(self, n):
+        return dict(zip(self.visit_keys(n), self.visit_values(n)))
+    def visit_BinOp(self, n):
+        key, value = self.visit(n.left), self.visit(n.right)
+        operator = self.visit(n.op)
+        return self.CompareOrBin(key, operator, self.V_(key, value))
+    def visit_BoolOp(self, n):
+        operator = self.visit(n.op)
+        args = self.visit_values(n)
+        if operator == '$or':
+            result = args[0] | args[1]
+            for arg in args[2:]:
+                result = result | arg
+        else: # operator = '$and'
+            result = args[0] & args[1]
+            for arg in args[2:]:
+                result = result & arg
+        return result
+    def visit_Compare(self, n):
+        key, operator = self.visit(n.left), self.visit(n.ops[0])
+        if operator == '$in':
+            value1, value2 = self.visit(n.comparators[0])
+            return (r.row[key] >= self.V_(key, value1)) & (r.row[key] <= self.V_(key, value2))
+        else:
+            value1 = self.visit(n.comparators[0])
+            return self.CompareOrBin(key, operator, self.V_(key, value1))
+    def CompareOrBin(self, key, operator, value):
+        if self.meta[key].multiple:
+            if   operator == '$eq':    func = lambda r: r.row[key] == value
+            elif operator == '$ne':    func = lambda r: r.row[key] != value
+            elif operator == '$regex': func = lambda r: r.row[key].match(value)
+            elif operator == '$lt':    func = lambda r: r.row[key] <  value
+            elif operator == '$le':    func = lambda r: r.row[key] <= value
+            elif operator == '$gt':    func = lambda r: r.row[key] >  value
+            # else: operator == '$ge'
+            else:                      func = lambda r: r.row[key] >= value
+            return r.row[key].contains(func)
+        else:
+            if   operator == '$eq':    return r.row[key] == value
+            elif operator == '$ne':    return r.row[key] != value
+            elif operator == '$regex': return r.row[key].match(value)
+            elif operator == '$lt':    return r.row[key] <  value
+            elif operator == '$le':    return r.row[key] <= value
+            elif operator == '$gt':    return r.row[key] >  value
+            # else: operator == '$ge'
+            else:                      return r.row[key] >= value
 
 def init_storage():
     """Initialize storage engine."""
@@ -136,8 +177,21 @@ class Item(BareItem):
         """
         if not expr:
             return None
-        translator = Translator(cls.wmap, cls.name)
-        return translator.visit(expr)
+        try:
+            root = compile(expr, '', 'eval', ast.PyCF_ONLY_AST)
+        except SyntaxError as e:
+            logger.debug(c._("Item.filter: expr = {}").format(expr))
+            logger.debug(c._("Exception '{}'").format(e))
+            raise
+        translator = Translator(cls.cmap, cls.wmap, cls.meta)
+        try:
+            result = translator.visit(root.body)
+            return result
+        except Exception as e:
+            logger.debug(str(e))
+            logger.debug(c._("Item.filter: expr = {}").format(expr))
+            logger.debug(c._("Item.filter: root = {}").format(ast.dump(root)))
+            return None
 
     @classmethod
     def max(cls, field):
@@ -165,8 +219,11 @@ class Item(BareItem):
         Returns:
             int: number of matching items.
         """
-        cursor = cls.filter(fltr)
-        return cursor.count().run(setting.store_connection)
+        rql_query = cls.filter(fltr)
+        query = r.table(cls.name).filter(rql_query)
+        result = query.count().run(setting.store_connection)
+        logger.debug('Item.count: query gives {} items'.format(result))
+        return result
 
     @classmethod
     def find(cls, fltr=None, skip=0, limit=0, sort=None):
@@ -184,16 +241,19 @@ class Item(BareItem):
         Returns:
             list: list of 'cls' instances.
         """
-        cursor = cls.filter(fltr)
-        if skip:  cursor = cursor.skip(skip)
-        if limit: cursor = cursor.limit(limit)
+        rql_query = cls.filter(fltr)
+        query = r.table(cls.name).filter(rql_query)
+        if skip:  query = query.skip(skip)
+        if limit: query = query.limit(limit)
         if sort:
             sort_spec = [r.asc(el[0]) if el[1] == 1 else r.desc(el[0]) for el in sort]
         else:
             sort_spec = [r.asc('_skey')]
-        cursor = cursor.order_by(*sort_spec)
-        result = cursor.run(setting.store_connection)
-        return [cls(item) for item in result]
+        query = query.order_by(*sort_spec)
+        count = query.count().run(setting.store_connection)
+        logger.debug('Item.find: query gives {} items'.format(count))
+        cursor = query.run(setting.store_connection)
+        return [cls(item) for item in cursor]
 
     @classmethod
     def project(cls, field, fltr, sort=None, bare=False):
@@ -212,24 +272,27 @@ class Item(BareItem):
             list: list of field values, tuples or dictionaries
         """
         mono = isinstance(field, str)
-        cursor = cls.filter(fltr)
+        rql_query = cls.filter(fltr)
+        query = r.table(cls.name).filter(rql_query)
+        if query is None:
+            logger.debug('project: query is None')
         if sort:
             sort_spec = [r.asc(el[0]) if el[1] == 1 else r.desc(el[0]) for el in sort]
         else:
             sort_spec = [r.asc('_skey')]
         if mono:
-            cursor = cursor.pluck(field)
+            query = query.pluck(field)
         else:
-            cursor = cursor.pluck(*field)
-        cursor = cursor.order_by(*sort_spec)
-        result = cursor.run(setting.store_connection)
+            query = query.pluck(*field)
+        query = query.order_by(*sort_spec)
+        cursor = query.run(setting.store_connection)
         if bare:
             if mono:
-                return [doc[field] for doc in result]
+                return [doc[field] for doc in cursor]
             else:
-                return [tuple(doc[f] for f in field) for doc in result]
+                return [tuple(doc[f] for f in field) for doc in cursor]
         else:
-            return list(result)
+            return list(cursor)
 
     @classmethod
     def lookup(cls, oid):
@@ -263,7 +326,9 @@ class Item(BareItem):
         Returns:
             'cls' instance.
         """
-        result = list(r.table(cls.name).filter(cls.filter(doc)).run(setting.store_connection))
+        rql_query = cls.filter(doc)
+        query = r.table(cls.name).filter(rql_query)
+        result = list(query.run(setting.store_connection))
         if len(result) == 0:
             return None
         else:
