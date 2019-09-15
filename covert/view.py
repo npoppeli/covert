@@ -9,7 +9,7 @@ In the present implementation, form validation is performed on the server. Alter
 do form validation in the client, using Parsley.js (jQuery) for example.
 """
 
-import re
+import calendar, re
 from collections import OrderedDict, defaultdict
 from datetime import datetime
 from inspect import getmembers, isclass, isfunction
@@ -360,6 +360,60 @@ def read_views(module):
     # absorbed by {id} or other components of the regex patterns
     setting.routes.sort(key=lambda r: r.pattern, reverse=True)
 
+re_year = re.compile('^\d{4}$')
+re_year_month = re.compile('^\d{4}-\d{2}$')
+re_year_month_day = re.compile('^\d{4}-\d{2}-\d{2}$')
+
+def preprocess_form(form):
+    """Preprocess form
+     1. convert parameters of date type, e.g. '1720' becomes '1720-01-01'.
+     2. remove empty values
+
+    Returns: set of date parameters."""
+    # Step 1: convert parameters of date type
+    date_params = set()
+    form_keys = sorted(form.keys())
+    for key in form_keys:
+        path = key.split('.')
+        if len(path) > 1 and path[2].startswith('d'):
+            date_params.add(path[0])
+    for date_param in date_params:
+        params = [key for key in form_keys if key.startswith(date_param)]
+        if len(params) == 2: # convert to proper date range
+            begin, end = form[params[0]], form[params[1]]
+            byear, bmonth, bday = '', '', ''
+            if re_year_month_day.match(begin):
+                byear = begin.split('-')[0]
+            elif re_year_month.match(begin):
+                byear, bmonth = begin.split('-')
+                form[params[0]] += '-01'
+            elif re_year.match(begin):
+                byear = begin
+                form[params[0]] += '-01-01'
+            if re_year_month_day.match(end):
+                pass # no need to adjust anything
+            elif re_year_month.match(end):
+                eyear, emonth = end.split('-')
+                eday = str(calendar.monthrange(int(eyear), int(emonth))[1])
+                form[params[1]] = '{}-{}'.format(end, eday)
+            elif re_year.match(end):
+                eyear = end
+                emonth = int(bmonth) if bmonth else 12
+                eday = str(calendar.monthrange(int(eyear), emonth)[1])
+                emonth = str(emonth).zfill(2)
+                form[params[1]] = '{}-{}-{}'.format(end, emonth, eday)
+            elif end == '' and byear:
+                eyear = byear
+                emonth = int(bmonth) if bmonth else 12
+                eday = str(calendar.monthrange(int(eyear), emonth)[1])
+                emonth = str(emonth).zfill(2)
+                form[params[1]] = '{}-{}-{}'.format(eyear, emonth, eday)
+    # Step 2: remove empty (key, value) pairs
+    for key in form_keys:
+        if not form[key]:
+            del form[key]
+    return date_params
+
 class Cursor:
     """Representation of the state of browsing through a collection of items.
 
@@ -419,20 +473,22 @@ class Cursor:
                 form[key] = value
             elif key.startswith('_'):
                 setattr(self, key[1:], str2int(value) if key[1:] in self.default else value)
-            elif value:
+            else:
                 form[key] = value
         if initial_post:
-            # Note: the result of model.convert() can contain empty values
+            # Preprocess form: take care of empty values, and parameters of date type
+            date_params = preprocess_form(form)
             converted_form = model.convert(form, partial=True)
             for key, value in converted_form.items():
-                # ignore empty values
+                # ignore values that are empty in a functional sense
                 if empty_scalar(value) or empty_reference(value) or \
                    empty_dict(value) or empty_list(value):
                     continue
-                operator = model.qmap[key]
-                # if value is a list, use the first element
-                actual_value = value[0] if isinstance(value, list) else value
-                self.form[key] = (operator, actual_value)
+                if key in date_params:
+                    self.form[key] = ('in', value[0], value[1])
+                else:  # if value is a list, use the first element
+                    actual_value = value[0] if isinstance(value, list) else value
+                    self.form[key] = (model.qmap[key], actual_value)
 
     def __str__(self):
         d = dict([(key, getattr(self, key, '')) for key in self.__slots__])
@@ -627,7 +683,7 @@ class RenderTree:
                 # -->
 
                 if '#' in key:
-                    index = int(key[key.find('#')+1])
+                    index = int(key[key.find('#')+1:])
                 else: # defined as multiple, but value is empty list
                     index = 0
                 if in_form and (index == 0) and not has_buttons[field]:
@@ -642,7 +698,7 @@ class RenderTree:
                 if field not in item_meta:
                     logger.info('display_item: discard extra field {}={} (multiple)'.format(key, value))
                     continue
-                label = field_meta.label if index == 0 else str(index)
+                label = field_meta.label if index == 0 else str(index+1)
             else:
                 if field not in item_meta:
                     logger.info('display_item: discard extra field {}={} (not multiple)'.format(key, value))
@@ -707,7 +763,7 @@ class RenderTree:
                 self.data[nr] = new_item
 
     def add_buttons(self, buttons):
-        """Add buttons (normal and delete) to render tree."""
+        """Add buttons to render tree."""
         if self.data:
             item = self.data[0]
             for button in buttons:
@@ -801,8 +857,8 @@ class ItemView(BareItemView):
     view_name = 'item'
     item_buttons = 3
 
-    def buttons(self, vars=None, ignore=None):
-        """Make list of buttons for this view."""
+    def buttons(self, vars=None, ignore=[]):
+        """Make list of buttons for this view. Ignore buttons in `ignore`"""
         selection = [button for key, button in setting.buttons.items()
                      if button.method not in ('PUT', 'POST') and
                         key.startswith(self.view_name)]
@@ -813,7 +869,8 @@ class ItemView(BareItemView):
             sub_selection = [button for button in selection
                              if set(button.vars) == set() and not button.param]
         if ignore:
-            sub_selection = [button for button in sub_selection if not button.uid.endswith(ignore)]
+            sub_selection = [button for button in sub_selection
+                             if button.uid.split('_')[-1] not in ignore]
         sub_selection = sorted(sub_selection, key=lambda b: b.order)
         return sub_selection
 
@@ -821,7 +878,7 @@ class ItemView(BareItemView):
         """Prepare render tree for showing one item."""
         tree = self.tree
         tree.add_item(item_or_id)
-        tree.add_buttons(self.buttons(['id'], ignore='show'))
+        tree.add_buttons(self.buttons(['id'], ignore=['show', 'delete']))
         tree.display_item()
         tree.prune_item()
         tree.dump('show_item')
@@ -893,7 +950,7 @@ class ItemView(BareItemView):
         else:
             raw_form = {key:value for key, value in params.items()
                         if (value or keep_empty) and not key.startswith('_')}
-        # logger.debug('convert_form: raw form=%s', show_dict(raw_form))
+        logger.debug('convert_form: raw form=%s', show_dict(raw_form))
         return model.convert(raw_form, partial=True)
 
     def build_form(self, description, action, bound=False, postproc=None, method='POST',
