@@ -84,6 +84,9 @@ from .event import event
 from . import common as c
 from . import setting
 
+# I18N: translator for model
+model_transl = None
+
 def mapdoc(fnmap, doc):
     """Map item (document) by applying functions in function map.
 
@@ -521,9 +524,14 @@ class BareItem(dict):
         """
         diff = json_diff(self, other, syntax='explicit')
         result = {}
-        ignore = [f for f in self.fields if self.meta[f].auto]
+        meta = self.meta
+        ignore = [f for f in self.fields if meta[f].auto]
+        # for the I18N translation of field names in dictionary comprehension below
+        transl = model_transl.gettext
         for key, value in diff.items():
-            details = {k: v for k, v in value.items() if k not in ignore}
+            # prune details
+            details = {transl(meta[k].label): v for k, v in value.items() if k not in ignore}
+            # add details iff for insert, update or delete
             if str(key) in ('$insert', '$update', '$delete'):
                 result[str(key)] = details
         return result
@@ -843,13 +851,14 @@ def read_models(model_defs):
     setting.models['Item'] = Item
 
     # I18N: find the message catalog (.mo) for the model
+    global model_transl
     locale_dir = realpath(join(setting.site, 'locales'))
-    model_trans = gettext.translation('model', localedir=locale_dir, languages=[setting.language])
-    model_names = [name for name in model_defs.keys() if name[0].isalpha()]
+    model_transl = gettext.translation('model', localedir=locale_dir, languages=[setting.language])
     # I18N: translate the labels of the BareItem model
     for key in BareItem.fields:
         BareItem.meta[key].label = c._(BareItem.meta[key].label)
     # construct reference classes
+    model_names = [name for name in model_defs.keys() if name[0].isalpha()]
     for model_name in model_names:
         ref_name = model_name+'Ref'
         ref_class = type(ref_name, (ItemRef,), {})
@@ -860,7 +869,7 @@ def read_models(model_defs):
     for model_name in model_names:
         model_def = model_defs[model_name]
         class_dict = {}
-        pm = parse_model_def(model_def, model_defs, model_trans.gettext)
+        pm = parse_model_def(model_def, model_defs, model_transl.gettext)
         pm.names.extend(Item.fields)
         index = BareItem.index.copy()
         index.extend(pm.index)
