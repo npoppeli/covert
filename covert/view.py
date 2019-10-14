@@ -720,12 +720,14 @@ class RenderTree:
     def prune_item(self, nr=0, clear=False, in_form=False):
         """Prune one item in the render tree."""
         item = self.data[nr]
+        for key in item.keys():
+            if key.startswith('_hidden'):
+                logger.debug('prune_item: hiding information: ' + key)
         if '_hidden.0.a' in item:
             hidden = []
         else:
-            hidden = ['{}: {}'.format(str(key), str(value)) for key, value in item.items()
-                      if key.startswith('_hidden')]
-            logger.debug('prune_item: hiding information: ' + '; '.join(hidden))
+            hidden = item['_hidden']
+        logger.debug('prune_item: hidden fields: ' + '; '.join(hidden))
         new_item = OrderedDict()
         for key, field in item.items():
             if key.startswith('_'):
@@ -950,7 +952,7 @@ class ItemView(BareItemView):
         else:
             raw_form = {key:value for key, value in params.items()
                         if (value or keep_empty) and not key.startswith('_')}
-        logger.debug('convert_form: raw form=%s', show_dict(raw_form))
+        # logger.debug('convert_form: raw form=%s', show_dict(raw_form))
         return model.convert(raw_form, partial=True)
 
     def build_form(self, description, action, bound=False, postproc=None, method='POST',
