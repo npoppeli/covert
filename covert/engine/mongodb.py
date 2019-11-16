@@ -7,7 +7,7 @@ The Item class encapsulates the details of the storage engine.
 
 import ast
 from datetime import datetime
-from pymongo import MongoClient
+from pymongo import MongoClient, DESCENDING, ASCENDING
 from ..common import SUCCESS, ERROR, FAIL, logger, InternalError, show_dict
 from .. import common as c
 from ..event import event
@@ -125,8 +125,7 @@ class Item(BareItem):
             None
         """
         collection = setting.store_db[cls.name]
-        for item in index_keys:
-            collection.create_index(item[0], unique=False)
+        collection.create_index(index_keys)
 
     @classmethod
     def filter(cls, expr):
