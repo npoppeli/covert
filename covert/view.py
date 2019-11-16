@@ -675,13 +675,8 @@ class RenderTree:
             multiple = field_meta.multiple
             button_list = []
             if multiple: # add push/pop buttons (in certain conditions)
-                # < !-- simulate relations: {'role': '', 'name': ''}, including
-                # buttons
-                # or do
-                # that in logic
-                # layer?
-                # -->
-
+                # TODO: simulate relations: {'role': '', 'name': ''}, including
+                # buttons or do that in logic layer?
                 if '#' in key:
                     index = int(key[key.find('#')+1:])
                 else: # defined as multiple, but value is empty list
@@ -741,8 +736,9 @@ class RenderTree:
         new_item['_keys'] = [k for k in new_item.keys() if not k.startswith('_')]
         self.data[nr] = new_item
 
-    def prune_items(self, clear=False, in_form=False):
+    def prune_items(self, clear=False, in_form=False, omit=None):
         """Prune all items in the render tree."""
+        omit_from_index = [] if omit is None else omit
         if self.poly:
             for nr in range(len(self.data)):
                 self.prune_item(nr=nr, clear=clear, in_form=in_form)
@@ -756,7 +752,8 @@ class RenderTree:
                         new_item[key] = field
                     else:
                         field_meta = field['meta']
-                        excluded = key in hidden or field_meta['multiple'] or \
+                        excluded = key in hidden or key in omit_from_index or \
+                                   field_meta['multiple'] or \
                                    field_meta['auto'] or path[1] != '0' or \
                                    field_meta['schema'] in ('text', 'memo', 'itemref')
                         if not excluded:
@@ -858,6 +855,7 @@ class ItemView(BareItemView):
     model = 'Item'
     view_name = 'item'
     item_buttons = 3
+    omit_from_index = []
 
     def buttons(self, vars=None, ignore=[]):
         """Make list of buttons for this view. Ignore buttons in `ignore`"""
@@ -894,7 +892,7 @@ class ItemView(BareItemView):
         tree.add_items(buttons)
         tree.add_buttons(self.buttons([]))
         tree.display_items()
-        tree.prune_items()
+        tree.prune_items(omit=self.omit_from_index)
         tree.dump('show_items')
         return tree()
 
