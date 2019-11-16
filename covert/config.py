@@ -52,6 +52,7 @@ def parse_cmdline():
 config_default = dict(content='content', layout='layout', media='media',
                       dbname='test', dbtype='mongodb',
                       host='localhost', port='8080',
+                      username='', password='',
                       models='models', views='views', language='en')
 
 def read_configuration():
@@ -72,22 +73,21 @@ def read_configuration():
     else:
         logger.error(c._("Current directory does not contain a 'config' file"))
         sys.exit()
-    if 'debug'   in config: setting.debug   = config['debug']
-    if 'nostore' in config: setting.nostore = config['nostore']
-    if 'verbose' in config: setting.verbose = config['verbose']
-    if 'host'    in config: setting.host    = config['host']
-    if 'port'    in config: setting.port    = config['port']
-    setting.content = join(setting.site, config['content'])
-    setting.layout  = join(setting.site, config['layout'])
-    setting.media   = join(setting.site, config['media'])
-    setting.store_dbname  = config['dbname']
-    setting.dbtype  = config['dbtype']
+    if 'debug'    in config: setting.debug    = config['debug']
+    if 'nostore'  in config: setting.nostore  = config['nostore']
+    if 'verbose'  in config: setting.verbose  = config['verbose']
+    setting.content      = join(setting.site, config['content'])
+    setting.layout       = join(setting.site, config['layout'])
+    setting.media        = join(setting.site, config['media'])
+    setting.host         = config['host']
+    setting.port         = config['port']
+    setting.username     = config['username']
+    setting.password     = config['password']
+    setting.store_dbname = config['dbname']
+    setting.dbtype       = config['dbtype']
 
     # I18N
-    if config['language'] in setting.languages:
-        setting.language = config['language']
-    else:
-        setting.language = config_default['language']
+    setting.language = config['language']
     if setting.language != 'en':  # switch to application language
         app_trans = gettext.translation('covert', localedir=setting.locales,
                                         languages=[setting.language])
@@ -121,7 +121,7 @@ def initialize_kernel():
     elif setting.dbtype == 'rethinkdb':
         from .engine.rethinkdb import init_storage
     else:
-        raise InternalError(c._('Unknown storage engine: only MongoDB and RethinkDB are supported'))
+        raise InternalError(c._('Unknown storage engine: MongoDB and RethinkDB are supported'))
     init_storage()
     # initialize media storage
     if not exists(setting.media):
