@@ -410,8 +410,10 @@ class BareItem(dict):
         if key in self.fields:
             meta = self.meta[key]
             if meta.schema == 'itemref':
-                return [r.lookup() for r in self[key]] if meta.multiple else \
-                        self[key].lookup()
+                if meta.multiple:
+                    return [ref.lookup() for ref in self[key]]
+                else:
+                    return self[key].lookup()
             else:
                 return None
         else:
