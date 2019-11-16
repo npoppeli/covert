@@ -1,0 +1,113 @@
+#!/usr/bin/env python3
+
+from datetime import datetime
+import sqlite3
+from os import getcwd
+from os.path import exists, isfile, join
+from covert import read_yaml_file
+
+config_file = join(getcwd(), 'config')
+if exists(config_file) and isfile(config_file):
+    config = read_yaml_file(config_file)
+    if config['dbname'] == 'familytree':
+        dbname = 'familytree.db'
+    else:
+        dbname = 'test.db'
+else:
+    dbname = 'test.db'
+
+db_file = join(getcwd(), 'content', dbname)
+conn = sqlite3.connect(db_file)
+conn.row_factory = sqlite3.Row
+db = conn.cursor()
+
+fields_person = ['id', 'firstname', 'patronym', 'prefix', 'lastname', 'nickname', 'birthdate',
+                 'birthplace', 'baptismdate', 'baptismplace', 'deceased', 'deathdate',
+                 'deathplace', 'burialdate', 'burialplace', 'gender', 'family', 'religion', 'pid']
+
+fields_person_extra = ['marriages', 'notes', 'sources', 'tags']
+
+def report(label, start, stop):
+    elapsed = stop - start
+    print('{:<60}: {:>2d}.{:06d}'.format(label, elapsed.seconds, elapsed.microseconds))
+
+# adjust indexes
+# pass
+
+# Test 1: cache tables with list-valued fields 125 s
+# Test 2: don't cache, just do SQL query 215 s
+# Test 3: list-valued fields are flattened in person table
+
+def query_table(table, refid):
+    query = "SELECT * FROM {} WHERE refid = {}".format(table, refid)
+    db.execute(query)
+    return [row['value'] for row in db.fetchall()]
+
+def complete_person(p):
+    result = {}
+    for key in fields_person:
+        result[key] = p[key]
+    for key in fields_person_extra:
+        result[key] = [p[k] for k in p.keys() if k.startswith(key) and p[k] is not None]
+    return result
+
+# get first 1000 records
+start = datetime.now()
+query = "SELECT * FROM Person"
+db.execute(query)
+result = []
+for r in list(db.fetchmany(1000)):
+   p = complete_person(r)
+   print('{}: {}'.format(p['pid'], p))
+stop = datetime.now()
+report('Get first 1000 records', start, stop)
+
+# get first 1000 records, sorted by birthdate (indexed)
+start = datetime.now()
+query = "SELECT * FROM Person ORDER BY birthdate"
+db.execute(query)
+result = list(db.fetchmany(1000))
+stop = datetime.now()
+report('Get first 1000 records sorted by birthdate (indexed)', start, stop)
+#
+# get first 1000 records, sorted by birthplace (not indexed)
+start = datetime.now()
+query = "SELECT * FROM Person ORDER BY birthplace"
+db.execute(query)
+result = list(db.fetchmany(1000))
+stop = datetime.now()
+report('Get first 1000 records sorted by birthplace (not indexed)', start, stop)
+
+# get all records that obey a query
+start = datetime.now()
+query = "SELECT * FROM Person WHERE birthplace = 'Waspik'"
+db.execute(query)
+result = list(db.fetchall())
+stop = datetime.now()
+report('Get all records that obey a query', start, stop)
+
+# get all records, only 2 columns
+start = datetime.now()
+query = "SELECT lastname, birthplace FROM Person"
+db.execute(query)
+result = list(db.fetchall())
+stop = datetime.now()
+report('Get all records, only 2 columns', start, stop)
+
+# update first 1000 records
+start = datetime.now()
+query = "SELECT * FROM Person"
+db.execute(query)
+persons = list(db.fetchmany(1000))
+update = "UPDATE Person SET {} WHERE id = {}"
+for p in persons:
+    changes = []
+    for f in fields_person:
+        if isinstance(p[f], int):
+            changes.append("{}={}".format(f, p[f]))
+        else:
+            changes.append("{}='{}'".format(f, p[f].replace("'", "")))
+    cmd = update.format(','.join(changes), p['id'])
+    db.execute(cmd)
+stop = datetime.now()
+report('Update first 1000 records', start, stop)

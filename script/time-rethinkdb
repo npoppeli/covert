@@ -1,0 +1,56 @@
+#!/usr/bin/env python3
+
+from datetime import datetime
+import rethinkdb as r
+
+conn   = r.connect(db='test')
+db     = r.db('test')
+person = r.table('Person')
+
+def report(label, start, stop):
+    elapsed = stop - start
+    print('{:<60}: {:>2d}.{:06d}'.format(label, elapsed.seconds, elapsed.microseconds))
+
+# adjust indexes
+try:
+    person.index_create('birthdate').run(conn)
+except:
+    print('Index on birthdate already exists')
+
+# get first 1000 records
+start = datetime.now()
+result = list(person.limit(1000).run(conn))
+stop = datetime.now()
+report('Get first 1000 records', start, stop)
+
+# get first 1000 records, sorted by birthdate (indexed)
+start = datetime.now()
+result = list(person.limit(1000).order_by(r.asc('birthdate')).run(conn))
+stop = datetime.now()
+report('Get first 1000 records sorted by birthdate (indexed)', start, stop)
+
+# get first 1000 records, sorted by birthplace (not indexed)
+start = datetime.now()
+result = list(person.limit(1000).order_by(r.asc('birthplace')).run(conn))
+stop = datetime.now()
+report('Get first 1000 records sorted by birthplace (not indexed)', start, stop)
+
+# get all records that obey a query
+start = datetime.now()
+result = list(person.filter(r.row['birthplace'] == 'Waspik').run(conn))
+stop = datetime.now()
+report('Get all records that obey a query', start, stop)
+
+# get all records, only 2 columns
+start = datetime.now()
+result = list(person.pluck('lastname', 'birthplace').run(conn))
+stop = datetime.now()
+report('Get all records, only 2 columns', start, stop)
+
+# update first 1000 records
+start = datetime.now()
+for p in person.limit(1000).run(conn):
+    p['tags'] = []
+    result = person.get(p['id']).update({'tags': []}).run(conn)
+stop = datetime.now()
+report('Update first 1000 records', start, stop)

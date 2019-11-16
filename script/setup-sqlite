@@ -1,0 +1,141 @@
+#!/usr/bin/env python3
+
+from os import getcwd
+from os.path import join, exists, isfile
+from covert import read_yaml_file
+import argparse
+import sqlite3
+
+config_file = join(getcwd(), 'config')
+if exists(config_file) and isfile(config_file):
+    config = read_yaml_file(config_file)
+    if config['dbname'] == 'familytree':
+        dbname = 'familytree.db'
+    else:
+        dbname = 'test.db'
+else:
+    dbname = 'test.db'
+
+db_file = join(getcwd(), 'content', dbname)
+conn = sqlite3.connect(db_file)
+db = conn.cursor()
+
+def create_table(table_name, create_cmd, index_keys):
+    db.execute('DROP TABLE IF EXISTS '+table_name)
+    db.execute(create_cmd)
+    for key in index_keys:
+        db.execute('CREATE INDEX IF NOT EXISTS index_{0}_{1} ON {0}({1})'.\
+                   format(table_name, key))
+    conn.commit()
+
+create_person = """CREATE TABLE Person (
+    id             integer  PRIMARY KEY, 
+    firstname      text     NOT NULL,
+    patronym       text     NOT NULL,
+    prefix         text     NOT NULL,
+    lastname       text     NOT NULL,
+    nickname       text     NOT NULL,
+    birthdate      text     NOT NULL,
+    birthplace     text     NOT NULL,
+    baptismdate    text     NOT NULL,
+    baptismplace   text     NOT NULL,
+    deceased       integer  NOT NULL,
+    deathdate      text     NOT NULL,
+    deathplace     text     NOT NULL,
+    burialdate     text     NOT NULL,
+    burialplace    text     NOT NULL,
+    gender         integer  NOT NULL,
+    family         text     NOT NULL,
+    religion       text     NOT NULL,
+    pid            integer  NOT NULL,
+    marriages_0    text,
+    marriages_1    text,
+    marriages_2    text,
+    marriages_3    text,
+    marriages_4    text,
+    marriages_5    text,
+    marriages_6    text,
+    marriages_7    text,
+    marriages_8    text,
+    marriages_9    text,
+    notes_0        text,
+    notes_1        text,
+    notes_2        text,
+    notes_3        text,
+    notes_4        text,
+    notes_5        text,
+    notes_6        text,
+    notes_7        text,
+    notes_8        text,
+    notes_9        text,
+    sources_0      text,
+    sources_1      text,
+    sources_2      text,
+    sources_3      text,
+    sources_4      text,
+    sources_5      text,
+    sources_6      text,
+    sources_7      text,
+    sources_8      text,
+    sources_9      text,
+    tags_0         text,
+    tags_1         text,
+    tags_2         text,
+    tags_3         text,
+    tags_4         text,
+    tags_5         text,
+    tags_6         text,
+    tags_7         text,
+    tags_8         text,
+    tags_9         text
+);"""
+index_person = ['firstname', 'lastname', 'birthdate', 'deathdate']
+
+create_family = """CREATE TABLE Family (
+    id             integer  PRIMARY KEY, 
+    marriagedate   text     NOT NULL,
+    marriageplace  text     NOT NULL,
+    husband        text     NOT NULL,
+    husbandname    text     NOT NULL,
+    wife           text     NOT NULL,
+    wifename       text     NOT NULL,
+    children       text     NOT NULL,
+    religion       text     NOT NULL,
+    notes          text     NOT NULL,
+    sources        text     NOT NULL,
+    tags           text     NOT NULL,
+    fid            integer  NOT NULL
+);"""
+index_family = ['husbandname', 'wifename', 'marriagedate']
+
+create_source = """CREATE TABLE Source (
+    id             integer  PRIMARY KEY, 
+    type           text     NOT NULL,
+    place          text     NOT NULL,
+    book           text     NOT NULL,
+    document       text     NOT NULL,
+    event          integer  NOT NULL,
+    eventdate      text     NOT NULL,
+    relations      text     NOT NULL,
+    text           text     NOT NULL,
+    persons        text     NOT NULL,
+    families       text     NOT NULL,
+    guid           text     NOT NULL,
+    sid            integer  NOT NULL
+);"""
+index_source = []
+
+create_dataset = """CREATE TABLE Dataset (
+    id             integer  PRIMARY KEY, 
+    importdate     text     NOT NULL,
+    format         text     NOT NULL,
+    tag            text     NOT NULL,
+    text           text     NOT NULL
+);"""
+index_dataset = []
+
+if __name__=="__main__":
+    create_table('Person',  create_person,  index_person)
+    create_table('Family',  create_family,  index_family)
+    create_table('Source',  create_source,  index_source)
+    create_table('Dataset', create_dataset, index_dataset)

@@ -1,0 +1,52 @@
+#!/usr/bin/env python3
+
+import argparse, os, json, subprocess
+from datetime import datetime, tzinfo, timedelta
+
+def convert_json(dir_name, file_name, file_date):
+    """files: read DIR/FILE.DATE, write /tmp/FILE
+    MongoDB export file: each document is a dictionary, on one line.
+    ArangoDB export file: each document is a dictionary, on one line.
+    JSON files for MongoDB have datetime fields of the following form:
+      "ctime": {"$date":"2016-06-11T14:39:46.791Z"}
+    For ArangoDB such fields need to be converted, since it uses pure JSON
+      "ctime": "2016-06-11T14:39:46"
+    """
+    backup_file = os.path.join(dir_name, file_name)+'.'+file_date
+    print('Converting ', backup_file)
+    in_file =  open(backup_file, 'r')
+    out_file = open(os.path.join('/tmp',   file_name), 'w')
+    for line in in_file:
+        doc = json.loads(line)
+        del doc['_id']
+        for key in doc.keys():
+            value = doc[key]
+            if isinstance(value, dict) and '$date' in value:
+                doc[key] = value['$date']
+        print(json.dumps(doc), file=out_file)
+    in_file.close()
+    out_file.close()
+
+def import_table(db_name, table_name, file_name):
+    command = ['arangoimport', '--file', file_name, '--type', 'jsonl',
+               '--overwrite', 'true', '--server.password', 'K1rigaardb',
+               '--collection', table_name, '--server.database', db_name]
+    result = subprocess.run(command)
+    print(('OK    ' if result.returncode == 0 else 'NOK   ') + ' '.join(command))
+
+if __name__=="__main__":
+    # parse command line and read configuration file
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--db',   help='database', action='store')
+    parser.add_argument('--date', help='date',     action='store')
+    args = parser.parse_args()
+    # convert JSON files in to new files in /tmp
+    convert_json('../backup', 'person.json',  args.date)
+    convert_json('../backup', 'family.json',  args.date)
+    convert_json('../backup', 'source.json',  args.date)
+    convert_json('../backup', 'dataset.json', args.date)
+    # import converted JSON into ArangoDB
+    import_table(args.db, 'Person',  '/tmp/person.json')
+    import_table(args.db, 'Family',  '/tmp/family.json')
+    import_table(args.db, 'Source',  '/tmp/source.json')
+    import_table(args.db, 'Dataset', '/tmp/dataset.json')

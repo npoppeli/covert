@@ -1,0 +1,65 @@
+#!/usr/bin/env python3
+
+from datetime import datetime
+from pymongo import MongoClient
+from copy import deepcopy
+from jsondiff import diff as json_diff
+
+conn   = MongoClient()
+db     = conn.test
+person = db.Person
+
+def report(label, start, stop):
+    elapsed = stop - start
+    print('{:<60}: {:>2d}.{:06d}'.format(label, elapsed.seconds, elapsed.microseconds))
+
+# adjust indexes
+person.create_index('birthdate')
+
+# get first 1000 records
+start = datetime.now()
+result = list(person.find(limit=1000))
+stop = datetime.now()
+report('Get first 1000 records', start, stop)
+
+# get first 1000 records, sorted by birthdate (indexed)
+start = datetime.now()
+result = list(person.find(limit=1000, sort= [('birthdate',1)]))
+stop = datetime.now()
+report('Get first 1000 records sorted by birthdate (indexed)', start, stop)
+
+# get first 1000 records, sorted by birthplace (not indexed)
+start = datetime.now()
+result = list(person.find(limit=1000, sort= [('birthplace',1)]))
+stop = datetime.now()
+report('Get first 1000 records sorted by birthplace (not indexed)', start, stop)
+
+# get all records that obey a query
+start = datetime.now()
+result = list(person.find(filter={'birthplace':'Waspik'}))
+stop = datetime.now()
+report('Get all records that obey a query', start, stop)
+
+# get all records, only 2 columns
+start = datetime.now()
+result = list(person.find(projection={'lastname': 1, 'birthplace': 1}))
+stop = datetime.now()
+report('Get all records, only 2 columns', start, stop)
+
+# update first 1000 records (full)
+start = datetime.now()
+for p in person.find(limit=1000):
+    p['tags'] = []
+    result = person.replace_one({'_id': p['_id']}, p)
+stop = datetime.now()
+report('Update first 1000 records (full)', start, stop)
+
+# update first 1000 records (partial)
+start = datetime.now()
+for p in person.find(limit=1000):
+    save = deepcopy(p)
+    p['tags'] = []
+    diff = json_diff(save, p, syntax='explicit')
+    result = person.update_one({'_id': p['_id']}, {'$set':{'tags':[]}})
+stop = datetime.now()
+report('Update first 1000 records (partial)', start, stop)

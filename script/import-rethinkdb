@@ -1,0 +1,60 @@
+#!/usr/bin/env python3
+
+import argparse, os, json, subprocess
+from datetime import datetime, tzinfo, timedelta
+import rethinkdb as r
+
+def convert_json(dir_name, file_name, file_date):
+    """files: read DIR/FILE.DATE, write /tmp/FILE
+    MongoDB export file: each document is a dictionary, on one line.
+    RethinkDB export file: each document is a dictionary, on one line.
+    JSON files for MongoDB have datetime fields of the following form:
+      "ctime": {"$date":"2016-06-11T14:39:46.791Z"}
+    For RethinkDB such fields need to be converted
+      "ctime": {"$reql_type$": "TIME", "epoch_time": 1465652386.791, "timezone": "+01:00"},
+    epoch_time takes a number as first argument, equal to the number of seconds since epoch
+    which can be computed as dt.timestamp() if dt is an instance of datetime.datetime
+    """
+    backup_file = os.path.join(dir_name, file_name)+'.'+file_date
+    print('Converting ', backup_file)
+    in_file =  open(backup_file, 'r')
+    out_file = open(os.path.join('/tmp',   file_name), 'w')
+    for line in in_file:
+        doc = json.loads(line)
+        del doc['_id']
+        for key in doc.keys():
+            value = doc[key]
+            if isinstance(value, dict) and '$date' in value:
+                dt_value = datetime.strptime(value['$date'], "%Y-%m-%dT%H:%M:%S.%fZ")
+                try:
+                    doc[key] = {"$reql_type$": "TIME", "epoch_time": dt_value.timestamp(),
+                                "timezone": "+01:00"}
+                except ValueError as e:
+                    print('Error in ', line)
+        print(json.dumps(doc), file=out_file)
+
+def import_table(db_name, table_name, file_name):
+    # drop table first
+    conn = r.connect(db=db_name)
+    r.db(db_name).table_drop(table_name).run(conn)
+    # then import via CLI
+    command = ['rethinkdb', 'import', '-f', file_name, '--table', db_name+'.'+table_name, '--force']
+    result = subprocess.run(command)
+    print(('OK    ' if result.returncode == 0 else 'NOK   ') + ' '.join(command))
+
+if __name__=="__main__":
+    # parse command line and read configuration file
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--db',   help='database', action='store')
+    parser.add_argument('--date', help='date',     action='store')
+    args = parser.parse_args()
+    # convert JSON files in to new files in /tmp
+    convert_json('../backup', 'person.json',  args.date)
+    convert_json('../backup', 'family.json',  args.date)
+    convert_json('../backup', 'source.json',  args.date)
+    convert_json('../backup', 'dataset.json', args.date)
+    # import converted JSON into RethinkDB
+    import_table(args.db, 'Person',  '/tmp/person.json')
+    import_table(args.db, 'Family',  '/tmp/family.json')
+    import_table(args.db, 'Source',  '/tmp/source.json')
+    import_table(args.db, 'Dataset', '/tmp/dataset.json')

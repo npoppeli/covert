@@ -1,0 +1,71 @@
+#!/usr/bin/env python3
+
+import argparse, os, json, subprocess
+from couchbase.cluster import Cluster
+from couchbase.cluster import PasswordAuthenticator
+
+def convert_json(dir_name, file_name, file_date, table_name):
+    """files: read DIR/FILE.DATE, write /tmp/FILE
+    MongoDB export file: each document is a dictionary, on one line.
+    Couchbase export file: each document is a dictionary, on one line.
+    JSON files for MongoDB have datetime fields of the following form:
+      "ctime": {"$date":"2016-06-11T14:39:46.791Z"}
+    For Couchbase such fields need to be converted, since it uses pure JSON
+      "ctime": "2016-06-11T14:39:46"
+    """
+    backup_file = os.path.join(dir_name, file_name)+'.'+file_date
+    print('Converting ', backup_file)
+    in_file =  open(backup_file, 'r')
+    out_file = open(os.path.join('/tmp',   file_name), 'w')
+    for line in in_file:
+        doc = json.loads(line)
+        del doc['_id']
+        if '_buttons' in doc: del doc['_buttons']
+        if '_prefix' in doc: del doc['_prefix']
+        if '_hide' in doc: del doc['_hide']
+        if '_hidden' in doc: del doc['_hidden']
+        doc['_type'] = table_name
+        for key in doc.keys():
+            value = doc[key]
+            if isinstance(value, dict) and '$date' in value:
+                doc[key] = value['$date']
+        print(json.dumps(doc), file=out_file)
+    in_file.close()
+    out_file.close()
+
+def import_table(db_name, file_name):
+    # TODO: cbimport not yet available in community edition
+    # command = ['cbimport', 'json', '-d', 'file://'+file_name, '-f', 'lines',
+    #            '-u', 'familytree', '-p', 'familytree',
+    #            '-b', db_name]
+    # result = subprocess.run(command)
+    # print(('OK    ' if result.returncode == 0 else 'NOK   ') + ' '.join(command))
+    cluster = Cluster('couchbase://localhost')
+    authenticator = PasswordAuthenticator('familytree', 'familytree')
+    cluster.authenticate(authenticator)
+    cb = cluster.open_bucket(db_name)
+    print('Importing ', file_name)
+    in_file =  open(file_name, 'r')
+    for line in in_file:
+        doc = json.loads(line)
+        result = cb.upsert(doc['id'], doc)
+        if result.rc != 0:
+            print('Error {} on upserting {}'.format(result.errstr, doc['id']))
+    in_file.close()
+
+if __name__=="__main__":
+    # parse command line and read configuration file
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--db',   help='database', action='store')
+    parser.add_argument('--date', help='date',     action='store')
+    args = parser.parse_args()
+    # convert JSON files in to new files in /tmp
+    convert_json('../backup', 'person.json',  args.date, 'Person')
+    convert_json('../backup', 'family.json',  args.date, 'Family')
+    convert_json('../backup', 'source.json',  args.date, 'Source')
+    convert_json('../backup', 'dataset.json', args.date, 'Dataset')
+    # import converted JSON into Couchbase
+    import_table(args.db, '/tmp/person.json')
+    import_table(args.db, '/tmp/family.json')
+    import_table(args.db, '/tmp/source.json')
+    import_table(args.db, '/tmp/dataset.json')

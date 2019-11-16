@@ -1,0 +1,153 @@
+#!/usr/bin/env python3
+
+import argparse, json
+from os import getcwd
+from os.path import exists, isfile, join
+from covert import read_yaml_file
+import argparse
+import sqlite3
+
+config_file = join(getcwd(), 'config')
+if exists(config_file) and isfile(config_file):
+    config = read_yaml_file(config_file)
+    if config['dbname'] =='familytree':
+        dbname = 'familytree.db'
+    else:
+        dbname = 'test.db'
+else:
+    dbname = 'test.db'
+
+db_file = join(getcwd(),'content', dbname)
+conn = sqlite3.connect(db_file)
+db = conn.cursor()
+
+fields_person = ['id', 'firstname', 'patronym', 'prefix', 'lastname', 'nickname', 'birthdate',
+                 'birthplace', 'baptismdate', 'baptismplace', 'deceased', 'deathdate',
+                 'deathplace', 'burialdate', 'burialplace', 'gender', 'family', 'religion', 'pid']
+
+fields_person_extra = ['marriages', 'notes', 'sources', 'tags']
+
+fields_family = ['id', 'marriagedate', 'marriageplace', 'husband', 'husbandname', 'wife',
+                 'wifename', 'children', 'religion', 'notes', 'sources', 'tags', 'fid']
+
+fields_source = ['id', 'type', 'place', 'book', 'document', 'event', 'eventdate', 'relations',
+                'text', 'persons', 'families', 'guid', 'sid']
+
+fields_dataset = ['id', 'importdate', 'format', 'tag', 'text']
+
+fields_person_expanded = [
+    'marriages_0', 'marriages_1', 'marriages_2', 'marriages_3', 'marriages_4',
+    'marriages_5', 'marriages_6', 'marriages_7', 'marriages_8', 'marriages_9',
+    'notes_0', 'notes_1', 'notes_2', 'notes_3', 'notes_4',
+    'notes_5', 'notes_6', 'notes_7', 'notes_8', 'notes_9',
+    'sources_0', 'sources_1', 'sources_2', 'sources_3', 'sources_4',
+    'sources_5', 'sources_6', 'sources_7', 'sources_8', 'sources_9',
+    'tags_0', 'tags_1', 'tags_2', 'tags_3', 'tags_4',
+    'tags_5', 'tags_6', 'tags_7', 'tags_8', 'tags_9'
+]
+
+def convert_json(dir_name, file_name, file_date):
+    """files: read DIR/FILE.DATE, write /tmp/FILE
+    MongoDB export file: each document is a dictionary, on one line.
+    Couchbase export file: each document is a dictionary, on one line.
+    JSON files for MongoDB have datetime fields of the following form:
+      "ctime": {"$date":"2016-06-11T14:39:46.791Z"}
+    For SQLitesuch fields need to be converted, since it uses ISO8601 strings
+      "ctime": "2016-06-11T14:39:46"
+    """
+    backup_file = join(dir_name, file_name)+'.'+file_date
+    print('Converting', backup_file)
+    in_file =  open(backup_file,'r')
+    out_file = open(join('/tmp',   file_name),'w')
+    counter = 0
+    for line in in_file:
+        doc = json.loads(line)
+        del doc['_id']
+        doc['id'] = counter
+        counter += 1
+        if'_buttons' in doc: del doc['_buttons']
+        if'_prefix' in doc: del doc['_prefix']
+        if'_hide' in doc: del doc['_hide']
+        if'_hidden' in doc: del doc['_hidden']
+        for key in doc.keys():
+            value = doc[key]
+            if isinstance(value, dict) and'$date' in value:
+                doc[key] = value['$date'].replace('Z','')
+        print(json.dumps(doc), file=out_file)
+
+def convert(old, ignore_list=False):
+    new = {}
+    for key, value in old.items():
+        if isinstance(value, bool):
+            new[key] = int(value)
+        elif value is None:
+            new[key] = ''
+        elif isinstance(value, list) and not ignore_list:
+            new[key] = '||'.join(str(v) for v in value)
+        else:
+            new[key] = value
+    return new
+
+class SQLTable:
+    def __init__(self, name, columns):
+        self.name    = name
+        self.columns = columns
+        self.counter = 0
+        params = len(columns) * ['?']
+        self.cmd = "INSERT INTO {}({}) VALUES({})".\
+                    format(name, ','.join(columns), ','.join(params))
+
+    def insert(self, values):
+        try:
+            self.counter += 1
+            values[0] = self.counter # assumption: 'id' is always the first column
+            db.execute(self.cmd, values)
+        except (sqlite3.InterfaceError, sqlite3.DatabaseError) as e:
+            print('Error {} on {} {}'.format(e, self.cmd, repr(values)))
+
+def list10(l):
+    result = [None]*10
+    for x, y in enumerate(l):
+        result[x] = y
+    return result
+
+def import_person(fields, fields_extra, file_name):
+    person = SQLTable('Person', fields+fields_person_expanded)
+    print('Importing', file_name)
+    in_file =  open(file_name,'r')
+    for line in in_file:
+        doc = convert(json.loads(line), ignore_list=True)
+        values = [doc[key] for key in fields]
+        for key in fields_extra:
+            if len(doc[key]) > 10:
+                print('{}: > 10 elements in {} -> {}'.format(doc['pid'], key, doc[key]))
+            values.extend(list10(doc[key]))
+        person.insert(values)
+    conn.commit()
+    in_file.close()
+
+def import_table(table_name, fields, file_name):
+    table = SQLTable(table_name, fields)
+    print('Importing', file_name)
+    in_file =  open(file_name,'r')
+    for line in in_file:
+        doc = convert(json.loads(line))
+        table.insert([doc[key] for key in fields])
+    conn.commit()
+    in_file.close()
+
+if __name__=="__main__":
+    # parse command line and read configuration file
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--date', help='date',     action='store')
+    args = parser.parse_args()
+    # convert JSON files in to new files in /tmp
+    convert_json('../backup', 'person.json',  args.date)
+    convert_json('../backup', 'family.json',  args.date)
+    convert_json('../backup', 'source.json',  args.date)
+    convert_json('../backup', 'dataset.json', args.date)
+    # import converted JSON into SQLite
+    import_person(fields_person,  fields_person_extra, '/tmp/person.json')
+    import_table('Family',  fields_family,  '/tmp/family.json')
+    import_table('Source',  fields_source,  '/tmp/source.json')
+    import_table('Dataset', fields_dataset, '/tmp/dataset.json')

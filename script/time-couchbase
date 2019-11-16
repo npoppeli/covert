@@ -1,0 +1,70 @@
+#!/usr/bin/env python3
+
+from datetime import datetime
+from couchbase.cluster import Cluster
+from couchbase.cluster import PasswordAuthenticator
+
+cluster = Cluster('couchbase://localhost')
+authenticator = PasswordAuthenticator('familytree', 'familytree')
+cluster.authenticate(authenticator)
+cb = cluster.open_bucket('test')
+
+def report(label, start, stop):
+    elapsed = stop - start
+    print('{:<60}: {:>2d}.{:06d}'.format(label, elapsed.seconds, elapsed.microseconds))
+
+# adjust indexes
+manager = cb.bucket_manager()
+manager.n1ql_index_create_primary(ignore_exists=True)
+manager.n1ql_index_create('index-birthdate', fields=['birthdate'], ignore_exists=True)
+
+# database: mongodb, driver: pymongo
+# task	                                                    time
+# get first 1000 records	                                0,016424
+# get first 1000 records sorted by birthdate (indexed)	    0,017911
+# get first 1000 records sorted by birthplace (not indexed)	0,062072
+# get all records that obey a query	                        0,027084
+# get all records, only 2 columns	                        0,137918
+# update first 1000 records	                                0,360714
+
+# get first 1000 records
+start = datetime.now()
+query = "SELECT * FROM `test` WHERE _type = 'Person' LIMIT 1000"
+result = list(cb.n1ql_query(query))
+stop = datetime.now()
+report('Get first 1000 records', start, stop)
+
+# get first 1000 records, sorted by birthdate (indexed)
+start = datetime.now()
+query = "SELECT * FROM `test` WHERE _type = 'Person' ORDER by birthdate LIMIT 1000 "
+result = list(cb.n1ql_query(query))
+stop = datetime.now()
+report('Get first 1000 records sorted by birthdate (indexed)', start, stop)
+#
+# get first 1000 records, sorted by birthplace (not indexed)
+start = datetime.now()
+query = "SELECT * FROM `test` WHERE _type = 'Person' ORDER by birthplace LIMIT 1000 "
+result = list(cb.n1ql_query(query))
+stop = datetime.now()
+report('Get first 1000 records sorted by birthplace (not indexed)', start, stop)
+
+# get all records that obey a query
+start = datetime.now()
+query = "SELECT * FROM `test` WHERE _type = 'Person' AND birthplace = 'Waspik'"
+result = list(cb.n1ql_query(query))
+stop = datetime.now()
+report('Get all records that obey a query', start, stop)
+#
+# # get all records, only 2 columns
+# start = datetime.now()
+# result = list(db.aql.execute('FOR p in Person RETURN {lastname: p.lastname, birthplace: p.birthplace}'))
+# stop = datetime.now()
+# report('Get all records, only 2 columns', start, stop)
+#
+# # update first 1000 records
+# start = datetime.now()
+# for p in person.find(filters={}, limit=1000):
+#     p['tags'] = []
+#     result = person.update(p)
+# stop = datetime.now()
+# report('Update first 1000 records', start, stop)

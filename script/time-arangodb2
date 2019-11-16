@@ -1,0 +1,53 @@
+#!/usr/bin/env python3
+
+from datetime import datetime
+from arango import ArangoClient
+
+client = ArangoClient(hosts='http://localhost:8529')
+db     = client.db('test', username='familytree', password='familytree')
+person = db.collection('Person')
+
+def report(label, start, stop):
+    elapsed = stop - start
+    print('{:<60}: {:>2d}.{:06d}'.format(label, elapsed.seconds, elapsed.microseconds))
+
+# adjust indexes
+person.add_hash_index(['birthdate'])
+
+# get first 1000 records
+start = datetime.now()
+result = list(person.find(filters={}, limit=1000))
+stop = datetime.now()
+report('Get first 1000 records', start, stop)
+
+# get first 1000 records, sorted by birthdate (indexed)
+start = datetime.now()
+result = list(db.aql.execute('FOR p in Person SORT p.birthdate LIMIT 1000 RETURN p'))
+stop = datetime.now()
+report('Get first 1000 records sorted by birthdate (indexed)', start, stop)
+
+# get first 1000 records, sorted by birthplace (not indexed)
+start = datetime.now()
+result = list(db.aql.execute('FOR p in Person SORT p.birthplace LIMIT 1000 RETURN p'))
+stop = datetime.now()
+report('Get first 1000 records sorted by birthplace (not indexed)', start, stop)
+
+# get all records that obey a query
+start = datetime.now()
+result = list(db.aql.execute('FOR p in Person FILTER p.birthplace == "Waspik" RETURN p'))
+stop = datetime.now()
+report('Get all records that obey a query', start, stop)
+
+# get all records, only 2 columns (leads to swap death)
+start = datetime.now()
+result = list(db.aql.execute('FOR p in Person RETURN {lastname: p.lastname, birthplace: p.birthplace}'))
+stop = datetime.now()
+report('Get all records, only 2 columns', start, stop)
+
+# update first 1000 records
+start = datetime.now()
+for p in person.find(filters={}, limit=1000):
+    p['tags'] = []
+    result = person.update(p)
+stop = datetime.now()
+report('Update first 1000 records', start, stop)
