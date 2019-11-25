@@ -76,15 +76,15 @@ def read_configuration():
     if 'debug'    in config: setting.debug    = config['debug']
     if 'nostore'  in config: setting.nostore  = config['nostore']
     if 'verbose'  in config: setting.verbose  = config['verbose']
-    setting.content      = join(setting.site, config['content'])
-    setting.layout       = join(setting.site, config['layout'])
-    setting.media        = join(setting.site, config['media'])
-    setting.host         = config['host']
-    setting.port         = config['port']
-    setting.username     = config['username']
-    setting.password     = config['password']
-    setting.store_dbname = config['dbname']
-    setting.dbtype       = config['dbtype']
+    setting.content  = join(setting.site, config['content'])
+    setting.layout   = join(setting.site, config['layout'])
+    setting.media    = join(setting.site, config['media'])
+    setting.host     = config['host']
+    setting.port     = config['port']
+    setting.username = config['username']
+    setting.password = config['password']
+    setting.dbname   = config['dbname']
+    setting.dbtype   = config['dbtype']
 
     # I18N
     setting.language = config['language']
@@ -127,7 +127,7 @@ def initialize_kernel():
     if not exists(setting.media):
         mkdir(setting.media)
         logger.debug(c._('Created new folder for media storage: {}').format(setting.media))
-    setting.store_mdb = HashFS(setting.media)
+    setting.media_db = HashFS(setting.media)
     if setting.debug >= 2:
         logger.debug(c._('Initialized content-addressable media storage'))
 

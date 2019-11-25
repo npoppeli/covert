@@ -25,28 +25,28 @@ views       = {}
 icons       = {}
 language    = ''
 languages   = ['en', 'nl', 'sv']
-config      = {} # configuration dictionary
-host        = ''
-port        = 0
-username    = ''
-password    = ''
+config      = {}       # configuration dictionary
 config_file = 'config' # name of configuration file
-dbtype      = 'mongodb'
 debug       = 0
-nostore     = False # for 'dry runs'
 tables      = False
 verbose     = 0
 
 # storage
-store_connection = None    # connection for item database
-store_db         = None    # item database
-store_dbname     = ''      # name of item database
-store_mdb        = None    # media database (CAS)
+dbtype      = 'mongodb'
+dbname      = ''      # name of item database
+connection  = None    # connection for item database
+item_db     = None    # item database
+media_db    = None    # media database (CAS)
+host        = ''      # host for item database
+port        = 0       # port for item database
+username    = ''      # username for item database
+password    = ''      # password for item database
+nostore     = False   # for 'dry runs'
 
 # routes and buttons
-routes    = []
-patterns  = {}
-templates = {}
-labels    = {}
-icons     = {}
-buttons   = {}
+routes      = []
+patterns    = {}
+templates   = {}
+labels      = {}
+icons       = {}
+buttons     = {}

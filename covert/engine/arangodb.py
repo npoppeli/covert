@@ -106,9 +106,9 @@ def time_write(x):
 
 def init_storage():
     """Initialize storage engine."""
-    setting.store_connection = Connection(username=setting.username, password=setting.password)
-    dbname = setting.store_dbname
-    setting.store_db = setting.store_connection[dbname]
+    setting.connection = Connection(username=setting.username, password=setting.password)
+    dbname = setting.dbname
+    setting.item_db = setting.connection[dbname]
     if setting.debug >= 2:
         logger.debug(c._("Create ArangoDB connection, set database to '{}'").format(dbname))
     # TODO: move database-dependent atom definitions to database module
@@ -136,9 +136,9 @@ class Item(BareItem):
         Returns:
             None
         """
-        coll_list = setting.store_db.collection_names()
+        coll_list = setting.item_db.collection_names()
         if cls.name not in coll_list:
-            setting.store_db.create_collection(cls.name)
+            setting.item_db.create_collection(cls.name)
 
     @classmethod
     def create_index(cls, index_keys):
@@ -152,7 +152,7 @@ class Item(BareItem):
         Returns:
             None
         """
-        collection = setting.store_db[cls.name]
+        collection = setting.item_db[cls.name]
         for item in index_keys:
             collection.create_index(item[0], unique=False)
 
@@ -198,7 +198,7 @@ class Item(BareItem):
         Returns:
             any: maximum value.
         """
-        cursor = setting.store_db[cls.name].find().sort([(field, -1)]).limit(1)
+        cursor = setting.item_db[cls.name].find().sort([(field, -1)]).limit(1)
         return cursor[0][field]
 
     @classmethod
@@ -213,7 +213,7 @@ class Item(BareItem):
         Returns:
             int: number of matching items.
         """
-        cursor = setting.store_db[cls.name].find(filter=cls.filter(expr))
+        cursor = setting.item_db[cls.name].find(filter=cls.filter(expr))
         return cursor.count()
 
     @classmethod
@@ -233,8 +233,8 @@ class Item(BareItem):
             list: list of 'cls' instances.
         """
         sort_spec = sort if sort else [('_skey',1)]
-        cursor = setting.store_db[cls.name].find(filter=cls.filter(expr),
-                                                 skip=skip, limit=limit, sort=sort_spec)
+        cursor = setting.item_db[cls.name].find(filter=cls.filter(expr),
+                                                skip=skip, limit=limit, sort=sort_spec)
         return [cls(item) for item in cursor]
 
     @classmethod
@@ -256,8 +256,8 @@ class Item(BareItem):
         mono = isinstance(field, str)
         sort_spec = sort if sort else [('_skey',1)]
         proj_spec = {field: 1} if mono else dict.fromkeys(field, 1)
-        cursor = setting.store_db[cls.name].find(filter=cls.filter(expr),
-                                                 projection=proj_spec, sort=sort_spec)
+        cursor = setting.item_db[cls.name].find(filter=cls.filter(expr),
+                                                projection=proj_spec, sort=sort_spec)
         if bare:
             if mono:
                 return [doc[field] for doc in cursor]
@@ -279,7 +279,7 @@ class Item(BareItem):
         Returns:
             'cls' instance
         """
-        item = setting.store_db[cls.name].find_one({'id':oid})
+        item = setting.item_db[cls.name].find_one({'id':oid})
         if item is None:
             return item
         else:
@@ -298,7 +298,7 @@ class Item(BareItem):
         Returns:
             'cls' instance.
         """
-        item = setting.store_db[cls.name].find_one(cls.filter(doc))
+        item = setting.item_db[cls.name].find_one(cls.filter(doc))
         if item is None:
             return item
         else:
@@ -346,7 +346,7 @@ class Item(BareItem):
                 return result
         doc = {key: value for key, value in mapdoc(self.wmap, self).items()
                           if not key.startswith('__')}
-        collection = setting.store_db[self.name]
+        collection = setting.item_db[self.name]
         if setting.nostore: # do not write anything to the database
             reply = {'status':SUCCESS, 'data':'simulate '+('insert' if new else 'update')}
             report_db_action(reply)
@@ -385,7 +385,7 @@ class Item(BareItem):
                   {'status':FAIL, 'data':None}.
         """
         item_id = self['_id']
-        collection = setting.store_db[self.name]
+        collection = setting.item_db[self.name]
         if setting.nostore: # don't write to the database
             reply = {'status': SUCCESS, 'data': 'simulate update'}
             report_db_action(reply)
@@ -418,7 +418,7 @@ class Item(BareItem):
                   {'status':FAIL, 'data':None}.
         """
         item_id = self['_id']
-        collection = setting.store_db[self.name]
+        collection = setting.item_db[self.name]
         if setting.nostore: # don't write to the database
             reply = {'status': SUCCESS, 'data': 'simulate update'}
             report_db_action(reply)
@@ -449,7 +449,7 @@ class Item(BareItem):
                   {'status':FAIL, 'data':None}.
         """
         item_id = self['_id']
-        collection = setting.store_db[self.name]
+        collection = setting.item_db[self.name]
         result = collection.delete_one({'_id':item_id})
         reply = {'status':SUCCESS if result.deleted_count == 1 else FAIL, 'data': item_id}
         report_db_action(reply)

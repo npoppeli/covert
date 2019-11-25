@@ -2,7 +2,9 @@ Version 0.11
 ------------
 
 ### Features
-- API changes: completely new convert/display approach; improved button handling
+- API change: completely new convert/display approach
+- API change: improved button handling
+- API change: several setting parameters were renamed
 
 Version 0.10
 ------------

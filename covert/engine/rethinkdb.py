@@ -119,9 +119,9 @@ class Translator(ast.NodeVisitor):
 
 def init_storage():
     """Initialize storage engine."""
-    setting.store_connection = r.connect(db=setting.store_dbname).repl()
-    dbname = setting.store_dbname
-    setting.store_db = r.db(dbname)
+    setting.connection = r.connect(db=setting.dbname).repl()
+    dbname = setting.dbname
+    setting.item_db = r.db(dbname)
     if setting.debug >= 2:
         logger.debug(c._("Create RethinkDB connection, set database to '{}'").format(dbname))
 
@@ -137,9 +137,9 @@ class Item(BareItem):
         Returns:
             None
         """
-        coll_list = r.table_list().run(setting.store_connection)
+        coll_list = r.table_list().run(setting.connection)
         if cls.name not in coll_list:
-            r.table_create(cls.name).run(setting.store_connection)
+            r.table_create(cls.name).run(setting.connection)
 
     @classmethod
     def create_index(cls, index_keys):
@@ -156,9 +156,9 @@ class Item(BareItem):
         for el in index_keys:
             if el[0] != 'id':
                 table = r.table(cls.name)
-                index_list = table.index_list().run(setting.store_connection)
+                index_list = table.index_list().run(setting.connection)
                 if el[0] not in index_list:
-                    table.index_create(el[0]).run(setting.store_connection)
+                    table.index_create(el[0]).run(setting.connection)
 
     @classmethod
     def filter(cls, expr):
@@ -204,7 +204,7 @@ class Item(BareItem):
         Returns:
             any: maximum value.
         """
-        result = r.table(cls.name).max(field).run(setting.store_connection)
+        result = r.table(cls.name).max(field).run(setting.connection)
         return result[field]
 
     @classmethod
@@ -221,7 +221,7 @@ class Item(BareItem):
         """
         rql_query = cls.filter(fltr)
         query = r.table(cls.name).filter(rql_query)
-        result = query.count().run(setting.store_connection)
+        result = query.count().run(setting.connection)
         logger.debug('Item.count: query gives {} items'.format(result))
         return result
 
@@ -250,9 +250,9 @@ class Item(BareItem):
         else:
             sort_spec = [r.asc('_skey')]
         query = query.order_by(*sort_spec)
-        count = query.count().run(setting.store_connection)
+        count = query.count().run(setting.connection)
         logger.debug('Item.find: query gives {} items'.format(count))
-        cursor = query.run(setting.store_connection)
+        cursor = query.run(setting.connection)
         return [cls(item) for item in cursor]
 
     @classmethod
@@ -285,7 +285,7 @@ class Item(BareItem):
         else:
             query = query.pluck(*field)
         query = query.order_by(*sort_spec)
-        cursor = query.run(setting.store_connection)
+        cursor = query.run(setting.connection)
         if bare:
             if mono:
                 return [doc[field] for doc in cursor]
@@ -307,7 +307,7 @@ class Item(BareItem):
         Returns:
             'cls' instance
         """
-        item = r.table(cls.name).get(oid).run(setting.store_connection)
+        item = r.table(cls.name).get(oid).run(setting.connection)
         if item is None:
             return item
         else:
@@ -328,7 +328,7 @@ class Item(BareItem):
         """
         rql_query = cls.filter(doc)
         query = r.table(cls.name).filter(rql_query)
-        result = list(query.run(setting.store_connection))
+        result = list(query.run(setting.connection))
         if len(result) == 0:
             return None
         else:
@@ -382,10 +382,10 @@ class Item(BareItem):
             return reply
         try:
             if new:
-                result = collection.insert(doc).run(setting.store_connection)
+                result = collection.insert(doc).run(setting.connection)
                 reply= {'status':SUCCESS, 'data':self['id'], 'message':str(result.inserted)}
             else:
-                result = collection.get(self['_id']).replace(doc).run(setting.store_connection)
+                result = collection.get(self['_id']).replace(doc).run(setting.connection)
                 reply = {'status':SUCCESS, 'data':self['id'], 'message':str(result.replaced)}
             report_db_action(reply)
             # This event handler can be used to notify other items that the present item has
@@ -419,7 +419,7 @@ class Item(BareItem):
             return reply
         doc = mapdoc(self.wmap, {key:value})
         try:
-            result = collection.get(item_id).update({key:doc[key]}).run(setting.store_connection)
+            result = collection.get(item_id).update({key:doc[key]}).run(setting.connection)
             reply = {'status':SUCCESS if result.changes == 1 else FAIL,
                      'data': item_id, 'message':str(result.replaced)}
             report_db_action(reply)
@@ -452,7 +452,7 @@ class Item(BareItem):
             return reply
         doc = mapdoc(self.wmap, {key:value})
         try:
-            result = collection.get(item_id).update({key:r.row[key].append(doc[key])}).run(setting.store_connection)
+            result = collection.get(item_id).update({key:r.row[key].append(doc[key])}).run(setting.connection)
             reply = {'status':SUCCESS if result.changes == 1 else FAIL,
                      'data': item_id, 'message':str(result.replaced)}
             report_db_action(reply)
@@ -477,7 +477,7 @@ class Item(BareItem):
         """
         item_id = self['id']
         collection = r.table(self.name)
-        result = collection.get(item_id).delete().run(setting.store_connection)
+        result = collection.get(item_id).delete().run(setting.connection)
         reply = {'status':SUCCESS if result.deleted == 1 else FAIL, 'data': item_id}
         report_db_action(reply)
         return reply

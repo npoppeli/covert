@@ -1,8 +1,8 @@
 Covert
 ======
 
-Covert (COntent as VERsatile uniTs) is a publishing framework based on Webob and Chameleon, and a
- variety of storage engines, e.g. RethinkDB and MongoDB.
+Covert (COntent as VERsatile uniTs) is a publishing framework based on Webob and
+Chameleon, and a variety of storage engines.
 
 Documentation
 -------------
@@ -28,7 +28,7 @@ For development Mercurial is needed as well.
 - *WebOb*
 - *Waitress*
 - *Chameleon*
-- either *MongoDB* (with *PyMongo*) or *RethinkDB*
+- either *MongoDB* or *RethinkDB*
 
 #### Optional
 - jsondiff
