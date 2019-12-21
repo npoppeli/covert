@@ -9,7 +9,7 @@ Waitress package is one of the dependencies, we can re-use the logger object of 
 The Waitress logger does not define handlers itself. It inherits the handler from the root logger.
 """
 
-import gettext, json, logging
+import gettext, json, logging, sys, traceback
 from os.path import dirname, join
 from . import setting
 from urllib.parse import urlparse, urljoin
@@ -28,6 +28,32 @@ except ImportError:
 # does nothing if the root logger already has handlers configured for it.
 logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
 logger = logging.getLogger('waitress')
+
+def exception_report(exc, ashtml=True):
+    """Generate exception traceback, as plain text or HTML
+
+    Arguments:
+        exc    (Exception): exception object
+        ashtml (bool)     : render as HTML (True) or plain text (False)
+
+    Returns:
+        str: exception report as plain or HTML text
+    """
+    exc_type, exc_value, exc_trace = sys.exc_info()
+    title = _('Internal error')
+    head = _('Traceback (most recent call last)')
+    if ashtml:
+        body = []
+        for line in traceback.format_tb(exc_trace):
+            body.extend(line.splitlines())
+        tail = '{0}: {1}'.format(exc_type.__name__, str(exc_value))
+        tree = {'title': title, 'head':head, 'body':body, 'tail':tail}
+        return setting.templates['error'](tree)
+    else:
+        head = [title + '. ' + head]
+        body = traceback.format_tb(exc_trace)
+        tail = ['{0}: {1}'.format(exc_type.__name__, str(exc_value))]
+        return '\n'.join(head+body+tail)
 
 # I18N
 # After every update that involves strings:

@@ -7,7 +7,7 @@ depending on the request parameters.
 The mapping router creates a response object based on route patterns.
 """
 
-import re, sys, traceback, waitress
+import re, waitress
 from datetime import datetime
 # we use BaseRequest instead of Request because of performance reasons
 from webob import BaseRequest as Request, Response
@@ -15,7 +15,8 @@ from webob.static import DirectoryApp
 from collections import deque
 from . import setting
 from . import common as c
-from .common import encode_dict, logger
+from .common import encode_dict, logger, exception_report
+from .layout import templates_changed, reload_templates
 
 def http_server(app, **kwarg):
     """HTTP server for development purposes"""
@@ -27,32 +28,6 @@ def not_found(environ, start_response):
     """Function that can be called by WSGI dispatcher if no URL matches"""
     start_response('404 Not Found', [('Content-Type', 'text/plain')])
     return ['Not Found']
-
-def exception_report(exc, ashtml=True):
-    """Generate exception traceback, as plain text or HTML
-
-    Arguments:
-        exc    (Exception): exception object
-        ashtml (bool)     : render as HTML (True) or plain text (False)
-
-    Returns:
-        str: exception report as plain or HTML text
-    """
-    exc_type, exc_value, exc_trace = sys.exc_info()
-    title = c._('Internal error')
-    head = c._('Traceback (most recent call last)')
-    if ashtml:
-        body = []
-        for line in traceback.format_tb(exc_trace):
-            body.extend(line.splitlines())
-        tail = '{0}: {1}'.format(exc_type.__name__, str(exc_value))
-        tree = {'title': title, 'head':head, 'body':body, 'tail':tail}
-        return setting.templates['error'].render(this=tree)
-    else:
-        head = [title + '. ' + head]
-        body = traceback.format_tb(exc_trace)
-        tail = ['{0}: {1}'.format(exc_type.__name__, str(exc_value))]
-        return '\n'.join(head+body+tail)
 
 # Auxiliary functions for CondRouter
 regex_is_file = re.compile('/\w+\.\w+')
@@ -154,7 +129,9 @@ class MapRouter:
         self.history = deque(maxlen=5)
 
     def serialize(self, result, template):
-        return setting.templates[template].render(this=result)
+        if setting.debug and templates_changed():
+            reload_templates()
+        return setting.templates[template](result)
 
     def finalize(self, result):
         return result
@@ -181,12 +158,12 @@ class MapRouter:
                 view_obj = view_cls(request, match.groupdict(),
                                     setting.models[view_cls.model], route_name)
                 route_method = getattr(view_obj, route_name)
-                result = route_method()
-                template = route_templates[result.get('style', 0)]
-                for cookie in result.get('cookies', []):
+                render_tree = route_method()
+                template = route_templates[render_tree.get('style', 0)]
+                for cookie in render_tree.get('cookies', []):
                     response.set_cookie(cookie.name, value=cookie.value,
                                         path=cookie.path, max_age=cookie.expires)
-                result = self.serialize(result, template)
+                result = self.serialize(render_tree, template)
                 response.cache_control.max_age = 0
             except Exception as e:
                 result = exception_report(e, ashtml=(self.content_type=='text/html'))
@@ -222,7 +199,7 @@ class PageRouter(MapRouter):
     def finalize(self, result):
         """Add finishing touches to the result. This includes whitespace removal."""
         render_tree = {'content': result, 'debug': setting.debug, 'verbose': setting.verbose}
-        page = setting.templates[self.template].render(this=render_tree)
+        page = setting.templates[self.template](render_tree)
         lines = [line.lstrip() for line in page.splitlines() if line and not line.isspace()]
         return '\n'.join(lines)
 
