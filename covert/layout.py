@@ -7,48 +7,95 @@ Other template engines can be added by the application.
 """
 
 import sys
+from datetime import datetime
 from os import walk
-from os.path import join, splitext, relpath
+from os.path import join, splitext, relpath, getmtime
 from . import setting
 from . import common as c
-from .common import logger
-from .controller import exception_report
+from .common import logger, exception_report
 
-# By default, there is one template factory: chameleon.PageTemplateFile. This is associated
-# with the file extension '.pt'. Other template factories can be defined, provided they
-# implement the following interface:
+# By default, there is two template factories: ComaTemplateFile (built-in) and
+# chameleon.PageTemplateFile.
+# Other template factories can be defined, provided they implement the following interface:
 #   - filename -> template: template = template_factory(filename)
-#   - context  -> string: template.render(this=context) returns HTML page for context 'this' (dict)
+#   - context  -> string: template.render(tree) returns HTML page for context tree 'tree' (dict)
 # Template factories are stored in a dictionary 'template_factory', with the extension as key.
 
-template_factory = {}
+template_loader = {}
 
-def add_template_type(extension, factory):
-    """Add template factory for given suffix.
+def add_template_type(loader):
+    """Add template loader.
 
     Arguments:
-      extension (str)     : file extension (.foo)
-      factory   (callable): template factory
+      loader (class): template loader
 
     Returns:
         None
     """
-    if extension in template_factory:
-        logger.debug(c._('Cannot redefine template type %s'), extension)
+    if loader.extension in template_loader:
+        logger.debug(c._('Cannot redefine template type %s'), loader.extension)
     else:
-        template_factory[extension] = factory
+        template_loader[loader.extension] = loader
         if setting.debug >= 2:
-            logger.debug(c._('Define new template type %s'), extension)
+            logger.debug(c._('Define new template type %s'), loader.extension)
 
+class TemplateLoader:
+    """Instances of this class define a template loader.
 
-try:
-    from chameleon import PageTemplateFile
-    add_template_type('.pt', PageTemplateFile)
-except ImportError as e:
-    logger.critical(c._('Chameleon template engine not available (%s)'), e)
-    sys.exit(1)
+    Attributes:
+        * extension: file extension of templates
+        * factory  : callable object that generates a template, which must be a callable too.
+    """
+    def __init__(self, extension, factory):
+        self.extension = extension
+        self.factory   = factory
+        self.template  = {}
+        self.timestamp = datetime.now()
+        self.reload    = False
+    def find(self):
+        for (dirpath, __, filenames) in walk(setting.layout):
+            prefix = relpath(dirpath, setting.layout)
+            for filename in filenames:
+                name, extension = splitext(filename)
+                if extension == self.extension:
+                    if prefix == '.':
+                        template_name = name
+                    else:
+                        template_name = prefix.replace('/', '_') + '_' + name
+                    filepath = join(dirpath, filename)
+                    if setting.debug > 1:
+                        logger.debug(c._("Template {} is in file {}").\
+                                     format(template_name, relpath(filepath, setting.layout)))
+                    self.template[template_name] = filepath
+    def changed(self):
+        """return True if any template of this type has changed since self.timestamp"""
+        for key, value in self.template.items():
+            if datetime.fromtimestamp(getmtime(value)) > self.timestamp:
+                logger.debug('Template {} has changed'.format(relpath(value, setting.layout)))
+                self.reload = True
+                return True
+        return False
+    def compile(self):
+        for name, path in self.template.items():
+            try:
+                with open(path) as f:
+                    text = f.read()
+                setting.templates[name] = self.factory(text)
+            except Exception as e:
+                logger.error(c._("Error in template '{0}' in file {1}").format(name, path))
+                # logger.error(exception_report(e, ashtml=False))
+    def load(self, all=False):
+        if self.reload or all:
+            self.find()
+            self.compile()
+        self.timestamp = datetime.now()
+        self.reload = False
 
-def read_templates():
+def templates_changed():
+    """return True if any template of this type has changed since self.timestamp"""
+    return any(loader.changed() for loader in template_loader.values())
+
+def load_templates():
     """Read templates from layout directory.
 
     Read templates, compile them and store compiled templates in global variable 'templates'.
@@ -56,24 +103,59 @@ def read_templates():
     Returns:
         None
     """
-    template_types = list(template_factory.keys())
+    template_types = list(template_loader.keys())
     if setting.debug > 1:
         logger.debug(c._('Scanning for templates in {0}').format(setting.layout))
         logger.debug(c._('Template types: {0}').format(' '.join(template_types)))
-    for (dirpath, __, filenames) in walk(setting.layout):
-        prefix = relpath(dirpath, setting.layout)
-        for filename in filenames:
-            name, extension = splitext(filename)
-            if extension in template_types:
-                if prefix == '.':
-                    template_name = name
-                else:
-                    template_name = prefix.replace('/', '_')+'_'+name
-                file_path = join(dirpath, filename)
-                try:
-                    setting.templates[template_name] = template_factory[extension](file_path)
-                    if setting.tables and setting.debug > 1:
-                        logger.debug(c._("Template {} is in file {}").format(template_name, relpath(file_path, setting.layout)))
-                except Exception as e:
-                    logger.error(c._("Error in template '{0}' in file {1}").format(template_name, file_path))
-                    logger.error(exception_report(e, ashtml=False))
+    for loader in template_loader.values():
+        loader.load(all=True)
+
+def reload_templates():
+    """Reload templates from layout directory.
+
+    Reload templates, compile them again and overwrite templates compiled earlier'.
+
+    Returns:
+        None
+    """
+    if setting.debug:
+        logger.debug(c._('Reloading templates'))
+    for loader in template_loader.values():
+        loader.load()
+
+# COMA template engine
+from .coma import parse, Template
+
+class ComaTemplateLoader(TemplateLoader):
+    def compile(self):
+        # partials are: _partials/FOO.hb => name = 'FOO'
+        # templates are: FOO/bar.hb      => name = 'FOO_bar'
+        for key, path in self.template.items():
+            if key.startswith('_partial_'):
+                name = key.replace('_partial_', '')
+            else:
+                name = key
+            try:
+                with open(path) as f:
+                    text = f.read()
+                setting.templates[name] = parse(text, name)
+                if setting.tables and setting.debug > 1:
+                    logger.debug(_("Template {} is in file {}"). \
+                                 format(key, relpath(path, setting.layout)))
+            except Exception as e:
+                logger.error(_("Error in template '{0}' in file {1}").format(name, path))
+                # logger.error(exception_report(e, ashtml=False))
+
+add_template_type(ComaTemplateLoader('.hb', Template))
+
+# Chameleon template engine
+try:
+    from chameleon import PageTemplate
+except ImportError as e:
+    logger.critical(c._('Chameleon template engine not available (%s)'), e)
+    sys.exit(1)
+
+class ChameleonTemplate(PageTemplate):
+    def __call__(self, context):
+        return self.render(this=context)
+add_template_type(TemplateLoader('.pt', ChameleonTemplate))

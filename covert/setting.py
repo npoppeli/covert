@@ -12,7 +12,7 @@ Only in cases where performance matters, save one dictionary lookup with:
 """
 
 # version number of package
-__version__ = '0.11'
+__version__ = '0.12'
 
 # configuration
 content     = '' # path to static content

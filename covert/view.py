@@ -488,6 +488,7 @@ class Cursor:
                     self.form[key] = ('in', value[0], value[1])
                 else:  # if value is a list, use the first element
                     actual_value = value[0] if isinstance(value, list) else value
+                    logger.debug('Cursor.init: key={} actual_value={}'.format(key, actual_value))
                     self.form[key] = (model.qmap[key], actual_value)
 
     def __str__(self):
@@ -676,7 +677,7 @@ class RenderTree:
             button_list = []
             if multiple: # add push/pop buttons (in certain conditions)
                 # TODO: simulate relations: {'role': '', 'name': ''}, including
-                # buttons or do that in logic layer?
+                # TODO  buttons or do that in logic layer?
                 if '#' in key:
                     index = int(key[key.find('#')+1:])
                 else: # defined as multiple, but value is empty list
@@ -700,7 +701,7 @@ class RenderTree:
                     continue
                 label = field_meta.label
             proplist = {'label': label, 'enum': field_meta.enum, 'schema': field_meta.schema,
-                        'multiple': field_meta.multiple,
+                        'multiple': field_meta.multiple, 'scalar': field_meta.schema!='itemref',
                         'formtype': 'hidden' if field_meta.auto else field_meta.formtype,
                         'auto': field_meta.auto, 'control': field_meta.control}
             new_item[key] = {'value':value, 'meta':proplist, 'buttons':button_list}

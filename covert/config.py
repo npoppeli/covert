@@ -13,7 +13,7 @@ from os.path import join, exists, isfile, splitext
 from . import setting
 from .model import read_models
 from .view import read_views, Button
-from .layout import read_templates
+from .layout import load_templates
 from .common import read_yaml_file, InternalError, logger
 from . import common as c
 from .engine.hashfs import HashFS
@@ -144,7 +144,7 @@ def initialize_kernel():
         setting.icons.update(setting.config['icons'])
 
     # read templates
-    read_templates()
+    load_templates()
 
     # import models
     if isinstance(setting.config['models'], list):
