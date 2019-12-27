@@ -63,9 +63,6 @@ class TemplateLoader:
                     else:
                         template_name = prefix.replace('/', '_') + '_' + name
                     filepath = join(dirpath, filename)
-                    if setting.debug > 1:
-                        logger.debug(c._("Template {} is in file {}").\
-                                     format(template_name, relpath(filepath, setting.layout)))
                     self.template[template_name] = filepath
     def changed(self):
         """return True if any template of this type has changed since self.timestamp"""
