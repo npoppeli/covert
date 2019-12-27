@@ -717,14 +717,13 @@ class RenderTree:
     def prune_item(self, nr=0, clear=False, in_form=False):
         """Prune one item in the render tree."""
         item = self.data[nr]
-        for key in item.keys():
-            if key.startswith('_hidden'):
-                logger.debug('prune_item: hiding information: ' + key)
+        #for key in item.keys():
+        #    if key.startswith('_hidden'):
+        #        logger.debug('prune_item: hiding information: ' + key)
         if '_hidden.0.a' in item:
             hidden = []
         else:
             hidden = item['_hidden']
-        logger.debug('prune_item: hidden fields: ' + '; '.join(hidden))
         new_item = OrderedDict()
         for key, field in item.items():
             if key.startswith('_'):
