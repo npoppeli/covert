@@ -696,6 +696,7 @@ class RenderTree:
                     continue
                 label = field_meta.label if index == 0 else str(index+1)
             else:
+                index = -1
                 if field not in item_meta:
                     logger.info('display_item: discard extra field {}={} (not multiple)'.format(key, value))
                     continue
@@ -703,7 +704,7 @@ class RenderTree:
             proplist = {'label': label, 'enum': field_meta.enum, 'schema': field_meta.schema,
                         'multiple': field_meta.multiple, 'scalar': field_meta.schema!='itemref',
                         'formtype': 'hidden' if field_meta.auto else field_meta.formtype,
-                        'auto': field_meta.auto, 'control': field_meta.control}
+                        'auto': field_meta.auto, 'control': field_meta.control, 'index': index+1}
             new_item[key] = {'value':value, 'meta':proplist, 'buttons':button_list}
         new_item['_keys'] = [k for k in new_item.keys() if not k.startswith('_')]
         self.data[nr] = new_item
