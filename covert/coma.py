@@ -59,7 +59,7 @@ def split_path(path, sep):
 def get_value(path, context, default=None):
     if path == '':
         raise ValueError("Cannot lookup value with empty path")
-    # logger.debug('get_value: path={}'.format(str(path)))
+    if setting.debug>1: logger.debug('get_value: path={}'.format(str(path)))
     parts = split_path(path, ':;/.')
     value = context
     for part in parts:
@@ -179,18 +179,22 @@ class Expr(Node):
     def __str__(self):
         return "{} {}".format(self.kind, self.path)
     def __call__(self, context, children):
-        # logger.debug(str(self))
+        if setting.debug>1: logger.debug(str(self))
         if special_variable.match(self.path):
             value = context[self.path]
         else:
             value = get_value(self.path, context, default=self.path)
         if isinstance(value, tuple):
+            if setting.debug > 1:
+                logger.debug("Expr.call: {}".format(str(value)))
             return "{0} <a href='{2}'>{1}</a> {3}".format(*value)
         else:
             return str(value)
 
     def expand(self, params):
         if self.path.startswith('_'):
+            if setting.debug > 1: logger.debug("expr_expand: path={} params={}".\
+                                               format(self.path, str(params)))
             exp_path = params[self.path]
         else:
             exp_path = self.path
@@ -214,19 +218,17 @@ class Block(Node):
         l = [str(arg) for arg in self.args]
         return "{} #{} {}".format(self.kind, self.name, ' '.join(l))
     def __call__(self, context, children, *args):
-        # logger.debug(str(self))
+        if setting.debug>1: logger.debug(str(self))
         if self.name not in setting.templates:
             raise KeyError("No definition for '{}'".format(self.name))
         template = setting.templates[self.name]
         args = evaluate(self.args, context)
         if isfunction(template):
-            # logger.debug('  Block: call function, args='+str(args))
+            if setting.debug>1: logger.debug('  Block: call function, args='+str(args))
             return template(context, self.children, *args)
         else:
             params = make_params(args)
             expanded_template = template.expand(params)
-            # fmt = expanded_template.format()
-            # # logger.debug('  Block: call expanded template\n{}'.format('\n'.join(fmt)))
             return expanded_template(context, self.children)
     def expand(self, params):
         # # logger.debug('  Block.expand: args={}'.format(str(args)))
@@ -246,19 +248,17 @@ class Partial(Node):
     def __str__(self):
         return "{} >{} {}".format(self.kind, self.name, ' '.join(self.args))
     def __call__(self, context, children, *args):
-        # logger.debug(str(self))
+        if setting.debug>1: logger.debug(str(self))
         if self.name not in setting.templates:
             raise KeyError("No definition for '{}'".format(self.name))
         template = setting.templates[self.name]
         args = evaluate(self.args, context)
         if isfunction(template):
-            # logger.debug('  Partial: call function, args='+str(args))
+            if setting.debug>1: logger.debug('  Partial: call function, args='+str(args))
             return template(context, [], *args)
         else:
             params = make_params(args)
             expanded_template = template.expand(params)
-            # fmt = expanded_template.format()
-            # logger.debug('  Partial: call expanded template\n{}'.format('\n'.join(fmt)))
             return expanded_template(context, self.children)
     def expand(self, params):
         # logger.debug('  Partial.expand: args={}'.format(str(args)))
@@ -271,13 +271,13 @@ class Partial(Node):
 
 def if_block(context, children, *args):
     arg = args[0]
-    if not arg:
+    if arg == '':
         return ''
     elif isinstance(arg, bool):
         value = arg
     else:
         value = get_value(arg, context)
-    # logger.debug('if: arg={}'.format(arg))
+    if setting.debug>1: logger.debug('if: arg={}'.format(arg))
     if bool(value):
         return ''.join(child(context, children) for child in children)
     else:
@@ -285,13 +285,13 @@ def if_block(context, children, *args):
 
 def unless_block(context, children, *args):
     arg = args[0]
-    if not arg:
+    if arg == '':
         return ''
     elif isinstance(arg, bool):
         value = arg
     else:
         value = get_value(arg, context)
-    # logger.debug('unless: arg={}'.format(arg))
+    if setting.debug>1: logger.debug('unless: arg={}'.format(arg))
     if bool(value):
         return ''
     else:
@@ -299,7 +299,7 @@ def unless_block(context, children, *args):
 
 def with_block(context, children, *args):
     arg = args[0]
-    # logger.debug('with: arg={}'.format(arg))
+    if setting.debug>1: logger.debug('with: arg={}'.format(arg))
     new_context = get_value(arg, context)
     for key in context.keys():
         if special_variable.match(key):
@@ -315,14 +315,12 @@ def each_block(context, children, *args):
     if isinstance(sequence, list):
         result = []
         if isinstance(sequence[0], dict):
-            # logger.debug("each_block: dict list")
             for element in sequence:
-                # logger.debug('each: element={}'.format(element))
+                if setting.debug>1: logger.debug('each (d): element={}'.format(element))
                 result.append(''.join(child(element, children) for child in children))
         else:
-            # logger.debug("each_block: scalar list")
             for k, element in enumerate(sequence):
-                # logger.debug('each: k, element={}, {}'.format(k, element))
+                if setting.debug>1: logger.debug('each (s): k, element={}, {}'.format(k, element))
                 context['@0'] = element
                 context['@first'] = k == 0
                 context['@index'] = k
