@@ -70,10 +70,15 @@ def get_value(path, context, root):
             value = value[part]
         elif isinstance(value, list) and part.isnumeric():
             value = value[int(part)]
+        elif isinstance(value, tuple) and part.isnumeric():
+            value = value[int(part)]
         else:
             route = ':'.join(path_2)
-            raise KeyError("No '{}' in context {} (part={})".format(route, short(context), part))
-        # logger.debug('get_value (3): path={} value={}'.format(path, str(value)))
+            logger.error("No {} in context {}\npath={} part={} value={}".\
+                           format(route, short(context), str(path_2), part, str(value)))
+            raise KeyError("No {} in context {}".format(route, short(context)))
+    #if path[0] not in ('content', 'verbose'):
+    #    logger.debug('get_value (3): path={} value={}'.format(path, str(value)))
     return value
 
 # Node classes for parse tree
@@ -228,19 +233,19 @@ def ne_block(context, children, args, root):
 setting.templates['ne'] = ne_block
 
 def gt_block(context, children, args, root):
-    return compare_block(context, children, args, root, operator.eq, 'gt')
+    return compare_block(context, children, args, root, operator.gt, 'gt')
 setting.templates['gt'] = gt_block
 
 def ge_block(context, children, args, root):
-    return compare_block(context, children, args, root, operator.eq, 'ge')
+    return compare_block(context, children, args, root, operator.ge, 'ge')
 setting.templates['ge'] = ge_block
 
 def lt_block(context, children, args, root):
-    return compare_block(context, children, args, root, operator.eq, 'lt')
+    return compare_block(context, children, args, root, operator.lt, 'lt')
 setting.templates['lt'] = lt_block
 
 def le_block(context, children, args, root):
-    return compare_block(context, children, args, root, operator.eq, 'le')
+    return compare_block(context, children, args, root, operator.le, 'le')
 setting.templates['le'] = le_block
 
 def if_unless_block(context, children, args, root, reverse=False):
