@@ -48,11 +48,10 @@ def get_value(path, context, root):
             if isinstance(step, UserList):
                 path_1.extend(step)
             else:
-                logger.debug('get_value: path={} value={}'.format(path, str(step)))
+                # logger.debug('get_value (1): path={} value={}'.format(path, str(step)))
                 return step
         else:
             path_1.append(part)
-    # logger.debug('  get_value: after 1st expansion='+str(path_1))
     path_2 = UserList()
     for part in path_1:
         if repeat_variable.match(part):
@@ -60,11 +59,10 @@ def get_value(path, context, root):
             if isinstance(step, UserList):
                 path_2.extend(step)
             else:
-                logger.debug('get_value: path={} value={}'.format(path, str(step)))
+                # logger.debug('get_value (2): path={} value={}'.format(path, str(step)))
                 return step
         else:
             path_2.append(part)
-    # logger.debug('  get_value: after 2nd expansion='+str(path_2))
     for part in path_2:
         if part[0] == '[' and part[-1] == ']':
             part = part[1:-1]
@@ -75,8 +73,7 @@ def get_value(path, context, root):
         else:
             route = ':'.join(path_2)
             raise KeyError("No '{}' in context {} (part={})".format(route, short(context), part))
-    if setting.debug > 1:
-        logger.debug('get_value: path={} value={}'.format(path, str(value)))
+        # logger.debug('get_value (3): path={} value={}'.format(path, str(value)))
     return value
 
 # Node classes for parse tree
@@ -140,7 +137,6 @@ class Expr(Node):
         return "{} {}".format(self.kind(), self.source)
     def __call__(self, context, children, args):
         arg, arg_type = self.arg, argtype(self.arg)
-        # logger.debug('Expr: arg={} arg type={}'.format(arg, arg_type))
         if arg_type == 'number':
             return str(arg)
         elif arg_type == 'string':
@@ -149,8 +145,10 @@ class Expr(Node):
         value = get_value(arg, context, self.root)
         if isinstance(value, tuple):
             if self.raw:
+                # logger.debug('Expr raw: value={}'.format(str(value)))
                 return "{0} {1} {3}".format(*value)
             else:
+                # logger.debug('Expr not raw: value={}'.format(str(value)))
                 return "{0} <a href='{2}'>{1}</a> {3}".format(*value)
         else:
             return str(value)
@@ -212,11 +210,11 @@ def compare_block(context, children, args, root, oper, name):
             value1 = get_value(arg1, context, root)
         else:
             raise ValueError("{}: incorrect 2nd argument {}".format(name, str(arg1)))
-        if oper(value0, arg1):
-            logger.debug('{}: condition true'.format(name))
+        if oper(value0, value1):
+            # logger.debug('{} {}={} {}={}: condition true'.format(name, arg0, value0, arg1, value1))
             return ''.join(child(context, children, args) for child in children)
         else:
-            logger.debug('{}: condition false'.format(name))
+            # logger.debug('{} {}={} {}={}: condition false'.format(name, arg0, value0, arg1, value1))
             return ''
     else:
         raise ValueError("{}: incorrect 1st argument {}".format(name, str(arg0)))
