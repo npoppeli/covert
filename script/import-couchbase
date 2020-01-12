@@ -22,8 +22,6 @@ def convert_json(dir_name, file_name, file_date, table_name):
         del doc['_id']
         if '_buttons' in doc: del doc['_buttons']
         if '_prefix' in doc: del doc['_prefix']
-        if '_hide' in doc: del doc['_hide']
-        if '_hidden' in doc: del doc['_hidden']
         doc['_type'] = table_name
         for key in doc.keys():
             value = doc[key]
