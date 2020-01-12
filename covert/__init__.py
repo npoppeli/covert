@@ -4,9 +4,6 @@
 Copyright: ...
 License: ...
 
-Attributes:
-    * setting:        module object with global settings
-
 Functions:
     * read_configuration:    read configuration file
     * parse_cmdline:  parse command line
@@ -35,7 +32,7 @@ Classes:
 
 from .           import setting
 from .atom       import EMPTY_DATE, EMPTY_DATETIME, EMPTY_TIME, define_atom, atom_codemap
-from .coma       import parse, get_value
+from .coma       import parse, get_value, argtype, convert_arg
 from .common     import *
 from .config     import read_configuration, parse_cmdline, initialize_kernel, add_argument
 from .controller import http_server, CondRouter, MapRouter, PageRouter, JSONRouter, exception_report

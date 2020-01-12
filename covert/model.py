@@ -352,19 +352,27 @@ class BareItem(dict):
         self._display = []
         self._dict_number = 0
         self._display_dict(self, 0)
-        return OrderedDict(self._display)
+        result = OrderedDict(self._display)
+        if result.get('_hidden', []):
+            hidden = []
+            for field in result['_hidden']:
+                hidden.append([key for key in result.keys()
+                       if key.startswith(field+'.')][0])
+            logger.debug('display: hidden (before)={}'.format(', '.join(result['_hidden'])))
+            result['_hidden'] = hidden
+            logger.debug('display: hidden (after )={}'.format(', '.join(result['_hidden'])))
+        return result
 
     def _display_dict(self, dct, parent, index=''):
         # process dictionary in model order
         declared_keys = [key for key in self.fields if key in dct.keys()]
         extra_keys = [key for key in dct.keys() if key not in self.fields]
-        for key in declared_keys + extra_keys:
+        for key in extra_keys:
             value = dct[key]
-            # treat extra keys the same way as keys declared in the model,
-            # with two exceptions: value is a list or value is a dictionary
-            if key in extra_keys and (isinstance(value, list) or isinstance(value, dict)):
-                self._display.append((key, value))
-            elif isinstance(value, dict):
+            self._display.append((key, value))
+        for key in declared_keys:
+            value = dct[key]
+            if isinstance(value, dict):
                 self._dict_number += 1
                 object_label = 'o'+str(self._dict_number)
                 self._display.append(('{}.{}.o{}{}'.\
@@ -802,7 +810,7 @@ def parse_model_def(model_def, model_defs, transl):
                 pm.empty[field_name] = empty_ref
             pm.schema[schema_key] = [ref_class] if multiple_field else ref_class
             pm.meta[field_name] = Field(label=field_label, schema='itemref',
-                                        formtype='hidden', control='input',
+                                        formtype='text', control='input',
                                         auto=False, atomic=False, code='^',
                                         optional=optional_field, multiple=multiple_field)
         else: # atom class

@@ -40,9 +40,9 @@ class Atom:
             query    (str):      standard operator in queries (default: ==)
             expr     (str):      convert string representation to type used in query expression
             display  (callable): convert to string representation
-            formtype (str):      HTML form type
+            formtype (str):      HTML form input type
             enum     (list):     range of allowed values for enumerated type
-            control  (str):      HTML input type
+            control  (str):      HTML form element (input, radio or textarea)
         """
         self.code     = code
         self.schema   = schema
@@ -104,7 +104,7 @@ define_atom('boolean',
             convert  = boolean_convert,
             display  = lambda x: bool_repr[x],
             default  = False,
-            formtype = 'boolean',
+            formtype = 'radio',
             enum     = ['nee', 'ja'],
             control  = 'radio'
             )
@@ -195,7 +195,7 @@ define_atom('memo',
             query    = '%',
             expr     = str_display,
             default  = '',
-            formtype = 'memo',
+            formtype = 'text',
             control  = 'textarea'
             )
 

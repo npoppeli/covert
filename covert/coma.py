@@ -6,27 +6,23 @@ COvert's Mustache Analog (COMA) is a template engine that superficially resemble
 Mustache and Handlebars but under the hood is quite different.
 
 Conventions:
-* loop handlers (e.g. each) put the loop variables in @0, @1, ... in the context
+* loop handlers (e.g. each) put the repeat variables @0, @1, @2, ...,
+  @first and @index in the context (local scope)
 * templates that are used as macros have implicit arguments _0, _1, ...,
-  which get their values from the context
+  which get their values from the argument list of the template root (global scope)
 """
 
-import re, string
+import operator, re, string
 from inspect import isfunction
+from collections import UserList
 from . import setting
-from . import common as c
+# TODO: I18N from . import common as c
 from .common import logger
 
 multiple_newline = re.compile(r'\n *\n')
 list_index = re.compile(r'\[\d+\]')
-bracketed = re.compile(r'\[.+?\]')
-word = re.compile(r'\w+')
 
 # various auxiliary functions
-def split_tag(tag):
-    s = tag[1:].strip().split()
-    return s
-
 def abbrev(s):
     s0 = s.strip().replace('\n', ' ')
     return s0[0:50] + '...' if len(s0)>50 else s0
@@ -34,57 +30,332 @@ def abbrev(s):
 def short(context):
     return "{}".format(', '.join(context.keys()))
 
-def split_path(path, sep):
-    """consume bracketed or word-like parts until we meet something in sep"""
-    result, original = [], path
-    # logger.debug('split_path: path={}'.format(str(path)))
-    while path:
-        mo1 = bracketed.match(path)
-        mo2 = word.match(path)
-        if mo1:
-            path = path.replace(mo1.group(0), '', 1)
-            result.append(mo1.group(0)[1:-1])
-        elif mo2:
-            path = path.replace(mo2.group(0), '', 1)
-            result.append(mo2.group(0))
-        else:
-            raise ValueError(c._("Incorrect path '{}'").format(original))
-        if path: # there is text left, so check the separator
-            if path[0] in sep:
-                path = path[1:]
-            else:
-                raise ValueError(c._("Incorrect separator '{}' in path '{}'").format(path[0], original))
-    return result
+macro_parameter = re.compile(r'^_(?:\d)$')
+repeat_variable = re.compile(r'^@(?:\d|index|first)$')
 
-def get_value(path, context, default=None):
-    if path == '':
-        raise ValueError("Cannot lookup value with empty path")
-    if setting.debug>1: logger.debug('get_value: path={}'.format(str(path)))
-    parts = split_path(path, ':;/.')
+def get_value(path, context, root):
+    """This function performs most of the magic of retrieving information
+    to use in templates. Each path goes through a two-part expansion process:
+    in the first part, macro parameters are expanded, and in the second
+    part repeat variables are expanded.
+    Path: an object of type UserList(str).
+    """
     value = context
-    for part in parts:
-        if part in value:
+    path_1 = UserList()
+    for part in path:
+        if macro_parameter.match(part):
+            step = root.args[part]
+            if isinstance(step, UserList):
+                path_1.extend(step)
+            else:
+                logger.debug('get_value: path={} value={}'.format(path, str(step)))
+                return step
+        else:
+            path_1.append(part)
+    # logger.debug('  get_value: after 1st expansion='+str(path_1))
+    path_2 = UserList()
+    for part in path_1:
+        if repeat_variable.match(part):
+            step = context[part]
+            if isinstance(step, UserList):
+                path_2.extend(step)
+            else:
+                logger.debug('get_value: path={} value={}'.format(path, str(step)))
+                return step
+        else:
+            path_2.append(part)
+    # logger.debug('  get_value: after 2nd expansion='+str(path_2))
+    for part in path_2:
+        if part[0] == '[' and part[-1] == ']':
+            part = part[1:-1]
+        if isinstance(value, dict) and part in value:
             value = value[part]
         elif isinstance(value, list) and part.isnumeric():
             value = value[int(part)]
-        elif default:
-            value = default
         else:
-            raise KeyError("No '{}' in context {} (part={})".format(path, short(context), part))
+            route = ':'.join(path_2)
+            raise KeyError("No '{}' in context {} (part={})".format(route, short(context), part))
+    if setting.debug > 1:
+        logger.debug('get_value: path={} value={}'.format(path, str(value)))
     return value
 
-special_variable = re.compile(r'^@(?:\d+|index|first)$')
-def evaluate(args, context):
-    if any(arg is None for arg in args):
-        logger.debug("evaluate: args={}".format(str(args)))
-    return [context[arg] if special_variable.match(arg) else arg for arg in args]
+# Node classes for parse tree
+class Node:
+    """Base class for Template, Text, Expr, Partial and Block"""
+    def __init__(self):
+        self.children = []
+        self.parent = None
+        self.root = None
+    def kind(self):
+        return self.__class__.__name__
+    def add(self, node):
+        node.parent = self
+        node.root = self.root
+        self.children.append(node)
+    def format(self, level=0):
+        result = [('  '*level) + str(self)]
+        for child in self.children:
+            result.extend(child.format(level+1))
+        return result
 
-# Lexical analyzer (simple)
+def argument_list(args):
+    """Create dictionary {'_0':arg0, '_1':arg1, '_2':None, ...}"""
+    result = {'_' + digit: None for digit in string.digits}
+    for k, arg in enumerate(args):
+        result['_' + str(k)] = arg
+    return result
+
+class Template(Node):
+    def __init__(self, name):
+        super().__init__()
+        self.name = name
+        self.args = []
+    def __str__(self):
+        return '{} {}'.format(self.kind(), self.name)
+    def __call__(self, context, children=None, args=None):
+        if args:
+            self.args = argument_list(args)
+        result = []
+        for child in self.children:
+            fragment = child(context, self.children, self.args)
+            result.append(fragment)
+        return multiple_newline.sub('\n', ''.join(result))
+
+class Text(Node):
+    def __init__(self, text):
+        super().__init__()
+        self.text = text
+    def __str__(self):
+        return "{} {}".format(self.kind(), abbrev(self.text))
+    def __call__(self, context, children, args):
+        return self.text
+
+class Expr(Node):
+    def __init__(self, arg, source, raw=False):
+        super().__init__()
+        self.arg = arg
+        self.source = source
+        self.raw = raw
+    def __str__(self):
+        return "{} {}".format(self.kind(), self.source)
+    def __call__(self, context, children, args):
+        arg, arg_type = self.arg, argtype(self.arg)
+        # logger.debug('Expr: arg={} arg type={}'.format(arg, arg_type))
+        if arg_type == 'number':
+            return str(arg)
+        elif arg_type == 'string':
+            return arg
+        # so it's a path-like argument
+        value = get_value(arg, context, self.root)
+        if isinstance(value, tuple):
+            if self.raw:
+                return "{0} {1} {3}".format(*value)
+            else:
+                return "{0} <a href='{2}'>{1}</a> {3}".format(*value)
+        else:
+            return str(value)
+
+class Block(Node):
+    def __init__(self, name, args, source):
+        super().__init__()
+        self.name = name
+        self.source = source
+        self.args = args
+    def __str__(self):
+        return "{} #{} {}".format(self.kind(), self.name, self.source)
+    def __call__(self, context, children, args):
+        if self.name not in setting.templates:
+            raise KeyError("Unknown block '{}'".format(self.name))
+        template = setting.templates[self.name]
+        if isfunction(template):
+            return template(context, self.children, self.args, self.root)
+        else:
+            return template(context, self.children, self.args)
+
+class Partial(Node):
+    def __init__(self, name, args, source):
+        super().__init__()
+        self.name = name
+        self.source = source
+        self.args = args
+    def __str__(self):
+        return "{} >{} {}".format(self.kind(), self.name, self.source)
+    def __call__(self, context, children, args):
+        if self.name not in setting.templates:
+            raise KeyError("Unknown partial '{}'".format(self.name))
+        template = setting.templates[self.name]
+        if isfunction(template):
+            return template(context, self.children, self.args, self.root)
+        else:
+            return template(context, self.children, self.args)
+
+# Built-in helpers
+def ifdef_block(context, children, args, root):
+    arg, arg_type = args[0], argtype(args[0])
+    if arg_type != 'path':
+        raise ValueError("ifdef: incorrect argument '{}'".format(str(arg)))
+    arg = get_value(arg, context, root)
+    if arg is None:
+        return ''
+    else:
+        return ''.join(child(context, children, args) for child in children)
+setting.templates['ifdef'] = ifdef_block
+
+def compare_block(context, children, args, root, oper, name):
+    arg0, arg_type0 = args[0], argtype(args[0])
+    arg1, arg_type1 = args[1], argtype(args[1])
+    if arg_type0 == 'path':
+        value0 = get_value(arg0, context, root)
+        if arg_type1 == 'string' or arg_type1 == 'number':
+            value1 = arg1
+        elif arg_type1 == 'path':
+            value1 = get_value(arg1, context, root)
+        else:
+            raise ValueError("{}: incorrect 2nd argument {}".format(name, str(arg1)))
+        if oper(value0, arg1):
+            logger.debug('{}: condition true'.format(name))
+            return ''.join(child(context, children, args) for child in children)
+        else:
+            logger.debug('{}: condition false'.format(name))
+            return ''
+    else:
+        raise ValueError("{}: incorrect 1st argument {}".format(name, str(arg0)))
+
+def eq_block(context, children, args, root):
+    return compare_block(context, children, args, root, operator.eq, 'eq')
+setting.templates['eq'] = eq_block
+
+def ne_block(context, children, args, root):
+    return compare_block(context, children, args, root, operator.ne, 'ne')
+setting.templates['ne'] = ne_block
+
+def gt_block(context, children, args, root):
+    return compare_block(context, children, args, root, operator.eq, 'gt')
+setting.templates['gt'] = gt_block
+
+def ge_block(context, children, args, root):
+    return compare_block(context, children, args, root, operator.eq, 'ge')
+setting.templates['ge'] = ge_block
+
+def lt_block(context, children, args, root):
+    return compare_block(context, children, args, root, operator.eq, 'lt')
+setting.templates['lt'] = lt_block
+
+def le_block(context, children, args, root):
+    return compare_block(context, children, args, root, operator.eq, 'le')
+setting.templates['le'] = le_block
+
+def if_unless_block(context, children, args, root, reverse=False):
+    arg, arg_type = args[0], argtype(args[0])
+    if arg_type == 'number' or arg_type == 'string':
+        value = arg
+    else:
+        value = get_value(arg, context, root)
+    condition = not bool(value) if reverse else bool(value)
+    if condition:
+        return ''.join(child(context, children, args) for child in children)
+    else:
+        return ''
+
+def if_block(context, children, args, root):
+    return if_unless_block(context, children, args, root)
+setting.templates['if'] = if_block
+
+def unless_block(context, children, args, root):
+    return if_unless_block(context, children, args, root, reverse=True)
+setting.templates['unless'] = unless_block
+
+def with_block(context, children, args, root):
+    arg, arg_type = args[0], argtype(args[0])
+    # logger.debug('With: arg={} ({})'.format(str(arg), arg_type))
+    if arg_type == 'number' or arg_type == 'string':
+        raise ValueError("with: incorrect argument '{}'".format(str(arg)))
+    new_context = get_value(arg, context, root)
+    if not isinstance(new_context, dict):
+        logger.error('with: arg={} old context={} new context={}'.\
+                     format(arg, short(context), str(new_context)))
+        raise ValueError('with: new context is not dictionary')
+    for key in context.keys():
+        if repeat_variable.match(key):
+            new_context[key] = context[key]
+    return ''.join(child(new_context, children, args) for child in children)
+setting.templates['with'] = with_block
+
+def repeat_block(context, children, args, root, before=None, after=None):
+    arg, arg_type = args[0], argtype(args[0])
+    if arg_type == 'number' or arg_type == 'string':
+        raise ValueError("each: incorrect argument '{}'".format(str(arg)))
+    result = []
+    sequence = get_value(arg, context, root)
+    if before is not None:
+        sequence = sequence[:before]
+    elif after is not None:
+        sequence = sequence[after+1:]
+    if isinstance(sequence, list):
+        for key, element in enumerate(sequence):
+            context['@0'] = element
+            context['@first'] = key == 0
+            context['@index'] = key
+            result.append(''.join(child(context, children, args) for child in children))
+        return ''.join(result)
+    elif isinstance(sequence, dict):
+        for key, element in sequence.items():
+            context['@0'] = element
+            context['@index'] = key
+            result.append(''.join(child(context, children, args) for child in children))
+        return ''.join(result)
+    else:
+        raise ValueError("each: component {} should be list or dict".format(arg))
+
+def each_block(context, children, args, root):
+    return repeat_block(context, children, args, root)
+setting.templates['each'] = each_block
+
+def after_block(context, children, args, root):
+    arg, arg_type = args[1], argtype(args[1])
+    if arg_type != 'number':
+        raise ValueError("after: incorrect argument '{}'".format(str(arg)))
+    return repeat_block(context, children, args, root, after=int(args[1]))
+setting.templates['after']  = after_block
+
+def before_block(context, children, args, root):
+    arg, arg_type = args[1], argtype(args[1])
+    if arg_type != 'number':
+        raise ValueError("before: incorrect argument '{}'".format(str(arg)))
+    return repeat_block(context, children, args, root, before=int(args[1]))
+setting.templates['before'] = before_block
+
+def foreach_block(context, children, args, root):
+    arg, arg_type = args[0], argtype(args[0])
+    if arg_type == 'number' or arg_type == 'string':
+        raise ValueError("foreach: incorrect argument '{}'".format(str(arg)))
+    result = []
+    sequence = get_value(arg, context, root)
+    if isinstance(sequence, list):
+        for key, element in enumerate(sequence):
+            context['@first'] = key == 0
+            context['@index'] = key
+            result.append(''.join(child(element, children, args) for child in children))
+        return ''.join(result)
+    else:
+        raise ValueError("foreach: component {} should be list of dict's".format(arg))
+setting.templates['foreach'] = foreach_block
+
+# Lexical analyzer
+def split_group(tag):
+    s = tag[1:].strip().split()
+    return s
+
 def tokenize(source):
     s = source
     trim = False
     while s:
-        if s.startswith('{{'):
+        if s.startswith('{{{'):
+            k = s.find('}}}')
+            result = s[3:k]
+            s = s[k+3:]
+            yield 'RAW', result.strip()
+        elif s.startswith('{{'):
             k = s.find('}}')
             result = s[2:k]
             if result.endswith('~'):
@@ -92,12 +363,12 @@ def tokenize(source):
                 result = result.rstrip('~')
             s = s[k+2:]
             if result[0] == '#':
-                yield ('STAG', *split_tag(result))
+                yield ('STAG', *split_group(result))
             elif result[0] == '/':
-                yield ('ETAG', *split_tag(result))
+                yield ('ETAG', *split_group(result))
             elif result[0] == '>':
-                yield ('ZTAG', *split_tag(result))
-            elif result[0] == '!':
+                yield ('ZTAG', *split_group(result))
+            elif result[0] == '!': # comment
                 continue
             else:
                 yield 'EXPR', result.strip()
@@ -114,263 +385,65 @@ def tokenize(source):
                 trim = False
             yield 'TEXT', result
 
-# Node classes for parse tree
-class Node:
-    """Base class for Template, Text, Expr, Partial and Block"""
-    def __init__(self):
-        self.kind = 'Node'
-        self.name = 'Node'
-        self.children = []
-        self.parent = None
-        self.root = None
-    def add(self, node):
-        """add child node"""
-        node.parent = self
-        node.root = self.root
-        self.children.append(node)
-    def format(self, level=0):
-        result = [('  '*level) + str(self)]
-        for child in self.children:
-            result.extend(child.format(level+1))
-        return result
-
-class Template(Node):
-    def __init__(self, name):
-        super().__init__()
-        self.kind = 'Template'
-        self.name = name
-    def __str__(self):
-        return '{} {}'.format(self.kind, self.name)
-    def __call__(self, context, children=None):
-        """TODO: restore args, assign this to self.args, and use these values
-        as substitutes for _[0-9] in all nodes of this tree"""
-        # logger.debug(str(self))
-        result = []
-        for child in self.children:
-            fragment = child(context, self.children)
-            result.append(fragment)
-        return multiple_newline.sub('\n', ''.join(result))
-    def expand(self, params):
-        expanded = Template(self.name)
-        for child in self.children:
-            expanded.children.append(child.expand(params))
-        return expanded
-
-class Text(Node):
-    def __init__(self, text):
-        super().__init__()
-        self.kind = 'Text'
-        self.name = 'Text'
-        self.text = text
-    def __str__(self):
-        return "{} {}".format(self.kind, abbrev(self.text))
-    def __call__(self, context, children):
-        # logger.debug(str(self))
-        return self.text
-    def expand(self, params):
-        return self
-
-class Expr(Node):
-    def __init__(self, path):
-        super().__init__()
-        self.kind = 'Expr'
-        self.name = 'Expr'
-        self.path = path
-    def __str__(self):
-        return "{} {}".format(self.kind, self.path)
-    def __call__(self, context, children):
-        if setting.debug>1: logger.debug(str(self))
-        if special_variable.match(self.path):
-            value = context[self.path]
-        else:
-            value = get_value(self.path, context, default=self.path)
-        if isinstance(value, tuple):
-            if setting.debug > 1:
-                logger.debug("Expr.call: {}".format(str(value)))
-            return "{0} <a href='{2}'>{1}</a> {3}".format(*value)
-        else:
-            return str(value)
-
-    def expand(self, params):
-        if self.path.startswith('_'):
-            if setting.debug > 1: logger.debug("expr_expand: path={} params={}".\
-                                               format(self.path, str(params)))
-            exp_path = params[self.path]
-        else:
-            exp_path = self.path
-        return Expr(exp_path)
-
-def make_params(args):
-    # result = {'_'+k:None for k in string.digits}
-    result = {'_'+k:'' for k in string.digits}
-    for k, value in enumerate(args):
-        result['_'+str(k)] = args[k]
-    return result
-
-class Block(Node):
-    def __init__(self, name, args):
-        """create Block node"""
-        super().__init__()
-        self.kind = 'Block'
-        self.name = name
-        self.args = args
-    def __str__(self):
-        l = [str(arg) for arg in self.args]
-        return "{} #{} {}".format(self.kind, self.name, ' '.join(l))
-    def __call__(self, context, children, *args):
-        if setting.debug>1: logger.debug(str(self))
-        if self.name not in setting.templates:
-            raise KeyError("No definition for '{}'".format(self.name))
-        template = setting.templates[self.name]
-        args = evaluate(self.args, context)
-        if isfunction(template):
-            if setting.debug>1: logger.debug('  Block: call function, args='+str(args))
-            return template(context, self.children, *args)
-        else:
-            params = make_params(args)
-            expanded_template = template.expand(params)
-            return expanded_template(context, self.children)
-    def expand(self, params):
-        # # logger.debug('  Block.expand: args={}'.format(str(args)))
-        expanded = Block(self.name, [])
-        for arg in self.args:
-            expanded.args.append(params[arg] if arg.startswith('_') else arg)
-        for child in self.children:
-            expanded.children.append(child.expand(params))
-        return expanded
-
-class Partial(Node):
-    def __init__(self, name, args):
-        super().__init__()
-        self.kind = 'Partial'
-        self.name = name
-        self.args = args
-    def __str__(self):
-        return "{} >{} {}".format(self.kind, self.name, ' '.join(self.args))
-    def __call__(self, context, children, *args):
-        if setting.debug>1: logger.debug(str(self))
-        if self.name not in setting.templates:
-            raise KeyError("No definition for '{}'".format(self.name))
-        template = setting.templates[self.name]
-        args = evaluate(self.args, context)
-        if isfunction(template):
-            if setting.debug>1: logger.debug('  Partial: call function, args='+str(args))
-            return template(context, [], *args)
-        else:
-            params = make_params(args)
-            expanded_template = template.expand(params)
-            return expanded_template(context, self.children)
-    def expand(self, params):
-        # logger.debug('  Partial.expand: args={}'.format(str(args)))
-        expanded = Partial(self.name, [])
-        for arg in self.args:
-            expanded.args.append(params[arg] if arg.startswith('_') else arg)
-        for child in self.children:
-            expanded.children.append(child.expand(params))
-        return expanded
-
-def if_block(context, children, *args):
-    arg = args[0]
-    if arg == '':
-        return ''
-    elif isinstance(arg, bool):
-        value = arg
+# Parser
+def convert_arg(arg):
+    """Convert block or partial argument to the right type: number, string or path"""
+    if arg.isnumeric():
+        return int(arg)
+    elif arg.startswith("'") and arg.endswith("'"):
+        return arg.strip("'")
+    elif arg.startswith('"') and arg.endswith('"'):
+        return arg.strip('"')
     else:
-        value = get_value(arg, context)
-    if setting.debug>1: logger.debug('if: arg={}'.format(arg))
-    if bool(value):
-        return ''.join(child(context, children) for child in children)
-    else:
-        return ''
+        return UserList(re.split(r'[:;/]', arg))
 
-def unless_block(context, children, *args):
-    arg = args[0]
-    if arg == '':
-        return ''
-    elif isinstance(arg, bool):
-        value = arg
+def argtype(arg):
+    """Determine type of argument: number, string, path or other(wise)"""
+    if isinstance(arg, int):
+        return 'number'
+    elif isinstance(arg, str):
+        return 'string'
+    elif isinstance(arg, UserList):
+        return 'path'
     else:
-        value = get_value(arg, context)
-    if setting.debug>1: logger.debug('unless: arg={}'.format(arg))
-    if bool(value):
-        return ''
-    else:
-        return ''.join(child(context, children) for child in children)
+        return 'other'
 
-def with_block(context, children, *args):
-    arg = args[0]
-    if setting.debug>1: logger.debug('with: arg={}'.format(arg))
-    new_context = get_value(arg, context)
-    for key in context.keys():
-        if special_variable.match(key):
-            new_context[key] = context[key]
-    return ''.join(child(new_context, children) for child in children)
-
-def each_block(context, children, *args):
-    arg = args[0]
-    if isinstance(arg, list):
-        sequence = arg
-    else:
-        sequence = get_value(arg, context)
-    if isinstance(sequence, list):
-        result = []
-        if isinstance(sequence[0], dict):
-            for element in sequence:
-                if setting.debug>1: logger.debug('each (d): element={}'.format(element))
-                result.append(''.join(child(element, children) for child in children))
-        else:
-            for k, element in enumerate(sequence):
-                if setting.debug>1: logger.debug('each (s): k, element={}, {}'.format(k, element))
-                context['@0'] = element
-                context['@first'] = k == 0
-                context['@index'] = k
-                result.append(''.join(child(context, children) for child in children))
-        return ''.join(result)
-    else:
-        raise ValueError(c._("Component '{}' in context {} is not a list").format(arg, short(context)))
-
-# Parser (also simple)
 def parse(source, name):
     """Parse template in string `source` and return instance of class TemplateNode"""
-    stack = []
-    # print('\nParse template '+name)
+    stack, level, indent = [], 0, '  '
     current_node = Template(name)
     current_node.root = current_node
-    for token in tokenize(source):
-        if token[0] == 'STAG':
-            # print(' '.join(token))
-            new_node = Block(token[1], list(token[2:]))
+    for group in tokenize(source): # tokenize() returns groups of tokens
+        if group[0] == 'STAG':
+            new_node = Block(group[1], [convert_arg(token) for token in group[2:]],
+                             ' '.join(group[1:]))
             current_node.add(new_node)
             stack.append(current_node)
+            level += 1
             current_node = new_node
-        elif token[0] == 'ETAG':
-            # print(' '.join(token))
-            if token[1] == current_node.name:
+        elif group[0] == 'ETAG':
+            if group[1] == current_node.name:
                 current_node = stack.pop()
+                level -= 1
             else:
-                raise ValueError(c_("Tag '{}' does not close current block '{}'").\
-                                 format(token[1], current_node.name))
-        elif token[0] == 'ZTAG':
-            # print(' '.join(token))
-            new_node = Partial(token[1], list(token[2:]))
+                raise ValueError("Tag '{}' does not close current block '{}'".\
+                                 format(group[1], current_node.name))
+        elif group[0] == 'ZTAG':
+            new_node = Partial(group[1], [convert_arg(token) for token in group[2:]],
+                               ' '.join(group[1:]))
             current_node.add(new_node)
-        elif token[0] == 'EXPR':
-            # print(' '.join(token))
-            new_node = Expr(token[1])
+        elif group[0] == 'EXPR':
+            new_node = Expr(convert_arg(group[1]), group[1])
             current_node.add(new_node)
-        elif token[0] == 'TEXT':
-            # print("{} {}".format(token[0], abbrev(token[1])))
-            new_node = Text(token[1])
+        elif group[0] == 'RAW':
+            new_node = Expr(convert_arg(group[1]), group[1], raw=True)
+            current_node.add(new_node)
+        elif group[0] == 'TEXT':
+            new_node = Text(group[1])
             current_node.add(new_node)
         else:
-            raise ValueError("Unrecognized token '{}'".format(token[0]))
+            raise ValueError("Unrecognized token '{}'".format(group[0]))
     if stack:
         raise ValueError("Missing closing tag(s): current block is '{}'". \
                          format(current_node.name))
     return current_node
-
-# blocks that are pre-defined as functions
-setting.templates['if']     = if_block
-setting.templates['unless'] = unless_block
-setting.templates['each']   = each_block
-setting.templates['with']   = with_block

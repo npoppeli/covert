@@ -75,7 +75,7 @@ class Button:
     __slots__ = ('uid', 'label', 'icon', 'action', 'method', 'vars',
                  'name', 'param', 'plabel', 'ptype', 'order')
 
-    def __init__(self, view_uid, action, vars=[], method='GET', name='',
+    def __init__(self, view_uid, action, vars=None, method='GET', name='',
                  param='', plabel='', ptype='', order=0):
         """Constructor method for Button.
 
@@ -95,7 +95,7 @@ class Button:
         self.label     = label_for(key)
         self.icon      = icon_for(key)
         self.action    = action
-        self.vars      = vars
+        self.vars      = [] if vars is None else vars
         self.method    = method
         self.name      = name
         self.param     = param
@@ -116,7 +116,6 @@ class Button:
         for key, value in kwarg.items():
             d[key] = value
         return d
-
 
 class Route:
     """Route definition.
@@ -379,36 +378,54 @@ def preprocess_form(form):
             date_params.add(path[0])
     for date_param in date_params:
         params = [key for key in form_keys if key.startswith(date_param)]
-        if len(params) == 2: # convert to proper date range
-            begin, end = form[params[0]], form[params[1]]
-            byear, bmonth, bday = '', '', ''
-            if re_year_month_day.match(begin):
-                byear = begin.split('-')[0]
-            elif re_year_month.match(begin):
-                byear, bmonth = begin.split('-')
-                form[params[0]] += '-01'
-            elif re_year.match(begin):
-                byear = begin
-                form[params[0]] += '-01-01'
-            if re_year_month_day.match(end):
-                pass # no need to adjust anything
-            elif re_year_month.match(end):
-                eyear, emonth = end.split('-')
-                eday = str(calendar.monthrange(int(eyear), int(emonth))[1])
-                form[params[1]] = '{}-{}'.format(end, eday)
-            elif re_year.match(end):
-                eyear = end
-                emonth = int(bmonth) if bmonth else 12
-                eday = str(calendar.monthrange(int(eyear), emonth)[1])
-                emonth = str(emonth).zfill(2)
-                form[params[1]] = '{}-{}-{}'.format(end, emonth, eday)
-            elif end == '' and byear:
-                eyear = byear
-                emonth = int(bmonth) if bmonth else 12
-                eday = str(calendar.monthrange(int(eyear), emonth)[1])
-                emonth = str(emonth).zfill(2)
-                form[params[1]] = '{}-{}-{}'.format(eyear, emonth, eday)
+        # TODO: remove old solution for date ranges
+        if len(params) == 1:
+            x, y = params[0] + '#0', params[0] + '#1'
+            value = form[params[0]]
+            if value:
+                logger.debug("{}: key='{}' value='{}'".format(date_param, params[0], value))
+                begin, end = re.split(r'[,;]', value)
+                begin = begin.strip()
+                end = end.strip()
+            else:
+                begin, end = '', ''
+            del form[params[0]]
+            form[x], form[y] = begin, end
+        elif len(params) == 2:
+            x, y = params[0], params[1]
+            begin, end = form[x].strip(), form[y].strip()
+        else:
+            raise ValueError('Date parameter has too many parts: '+date_param)
+        # convert to proper date range
+        byear, bmonth, bday = '', '', ''
+        if re_year_month_day.match(begin):
+            byear = begin.split('-')[0]
+        elif re_year_month.match(begin):
+            byear, bmonth = begin.split('-')
+            form[x] += '-01'
+        elif re_year.match(begin):
+            byear = begin
+            form[x] += '-01-01'
+        if re_year_month_day.match(end):
+            pass # no need to adjust anything
+        elif re_year_month.match(end):
+            eyear, emonth = end.split('-')
+            eday = str(calendar.monthrange(int(eyear), int(emonth))[1])
+            form[y] = '{}-{}'.format(end, eday)
+        elif re_year.match(end):
+            eyear = end
+            emonth = int(bmonth) if bmonth else 12
+            eday = str(calendar.monthrange(int(eyear), emonth)[1])
+            emonth = str(emonth).zfill(2)
+            form[y] = '{}-{}-{}'.format(end, emonth, eday)
+        elif end == '' and byear:
+            eyear = byear
+            emonth = int(bmonth) if bmonth else 12
+            eday = str(calendar.monthrange(int(eyear), emonth)[1])
+            emonth = str(emonth).zfill(2)
+            form[y] = '{}-{}-{}'.format(eyear, emonth, eday)
     # Step 2: remove empty (key, value) pairs
+    form_keys = sorted(form.keys())
     for key in form_keys:
         if not form[key]:
             del form[key]
@@ -521,6 +538,9 @@ class Cookie:
         self.value   = value
         self.path    = path
         self.expires = expires
+    def __str__(self):
+        return "Cookie(name='{}', value='{}', path='{}', expires='{}')".\
+                format(self.name, self.value, self.path, self.expires)
 
 regex_active = re.compile("\(active\s*=\s*'.+?'\)")
 regex_andand = re.compile('and\s*and')
@@ -621,7 +641,7 @@ class RenderTree:
         cursor.prev = cursor.skip>0
         cursor.next = cursor.skip+cursor.limit < cursor.count
 
-    def add_item(self, oid_or_item, prefix='', hide=None):
+    def add_item(self, oid_or_item, prefix='', label='', hide=None):
         """Add item to render tree."""
         if isinstance(oid_or_item, str):
             item = self.model.lookup(oid_or_item)
@@ -629,9 +649,9 @@ class RenderTree:
             item = oid_or_item
         event('additem:init', item, self)
         item['_buttons'] = []
-        item['_prefix'] = prefix+'.' if prefix else ''
-        item['_hide'] = hide == 'all'
-        item['_hidden'] = [] if hide is None or hide == 'all' else hide
+        item['_iprefix'] = prefix+'.' if prefix else ''
+        item['_ilabel'] = label
+        item['_hidden'] = [] if hide is None else hide
         event('additem:pre', item, self)
         self.data.append(item)
         event('additem:post', item, self)
@@ -647,8 +667,7 @@ class RenderTree:
                 item['_buttons'] = []
                 for button in buttons:
                     item['_buttons'].append(button(item))
-                item['_prefix'] = ''
-                item['_hide'] = False
+                item['_iprefix'] = ''
                 item['_hidden'] = []
                 event('additem:pre', item, self)
                 self.data.append(item)
@@ -658,11 +677,20 @@ class RenderTree:
             self.add_return_button(origin)
             self.message += 'Geen resultaten voor zoekopdracht:\n{}'.format(self.cursor.filter)
 
-    def display_item(self, nr=0, in_form=False):
-        """Display one item in the render tree."""
+    def display_item(self, nr=0, form_type=''):
+        """Display one item in the render tree.
+        The `form_type` parameter is used for additions to the render tree in a few cases:
+          - form_type '': no additions
+          - form_type 'modify': add push/pop buttons
+          - form_type 'search': scan form type of date fields.
+        """
         item = self.data[nr]
         item_meta = item.meta
         disp_item = item.display()
+        item_prefix = item.get('_iprefix', '')
+        # TODO: adding '.' should be done in one place
+        if item_prefix:
+            item_prefix += '.'
         new_item = OrderedDict()
         has_buttons = defaultdict(bool)
         for key, value in disp_item.items():
@@ -682,7 +710,7 @@ class RenderTree:
                     index = int(key[key.find('#')+1:])
                 else: # defined as multiple, but value is empty list
                     index = 0
-                if in_form and (index == 0) and not has_buttons[field]:
+                if form_type == 'modify' and index == 0 and not has_buttons[field]:
                     # add buttons to first element in group (examples: notes.0.s#0)
                     # TODO: view_name + '_' + action_name -> function
                     push = Button(self.view_name+'_push', action='', name='push')
@@ -701,48 +729,47 @@ class RenderTree:
                     logger.info('display_item: discard extra field {}={} (not multiple)'.format(key, value))
                     continue
                 label = field_meta.label
+            if field_meta.auto:
+                field_formtype = 'hidden'
+            elif form_type == 'search'  and field_meta.formtype == 'date':
+                field_formtype = 'daterange'
+            else:
+                field_formtype = field_meta.formtype
             proplist = {'label': label, 'enum': field_meta.enum, 'schema': field_meta.schema,
                         'multiple': field_meta.multiple, 'scalar': field_meta.schema!='itemref',
-                        'formtype': 'hidden' if field_meta.auto else field_meta.formtype,
+                        'formid': item_prefix + key, 'formtype': field_formtype,
                         'auto': field_meta.auto, 'control': field_meta.control, 'index': index+1}
             new_item[key] = {'value':value, 'meta':proplist, 'buttons':button_list}
         new_item['_keys'] = [k for k in new_item.keys() if not k.startswith('_')]
         self.data[nr] = new_item
 
-    def display_items(self, in_form=False):
+    def display_items(self, form_type=False):
         """Display all items in the render tree."""
         for nr in range(len(self.data)):
-            self.display_item(nr=nr, in_form=in_form)
+            self.display_item(nr=nr, form_type=form_type)
 
-    def prune_item(self, nr=0, clear=False, in_form=False):
+    def prune_item(self, nr=0, clear=False):
         """Prune one item in the render tree."""
         item = self.data[nr]
-        #for key in item.keys():
-        #    if key.startswith('_hidden'):
-        #        logger.debug('prune_item: hiding information: ' + key)
-        if '_hidden.0.a' in item:
-            hidden = []
-        else:
-            hidden = item['_hidden']
+        hidden = item['_hidden']
         new_item = OrderedDict()
         for key, field in item.items():
             if key.startswith('_'):
                 new_item[key] = field
             else:
-                excluded = key in hidden or \
-                           (in_form and field['meta']['schema'] == 'itemref')
+                excluded = key in hidden
                 if not excluded:
                     if clear: field['value'] = ''
                     new_item[key] = field
         new_item['_keys'] = [k for k in new_item.keys() if not k.startswith('_')]
         self.data[nr] = new_item
 
-    def prune_items(self, clear=False, in_form=False, omit=None):
+    def prune_items(self, clear=False, omit=None):
         """Prune all items in the render tree."""
         omit_from_index = [] if omit is None else omit
         if self.poly:
             for nr in range(len(self.data)):
-                self.prune_item(nr=nr, clear=clear, in_form=in_form)
+                self.prune_item(nr=nr, clear=clear)
         else:
             for nr, item in enumerate(self.data):
                 hidden = item['_hidden']
@@ -756,7 +783,7 @@ class RenderTree:
                         excluded = key in hidden or key in omit_from_index or \
                                    field_meta['multiple'] or \
                                    field_meta['auto'] or path[1] != '0' or \
-                                   field_meta['schema'] in ('text', 'memo', 'itemref')
+                                   field_meta['schema'] in ('text', 'memo')
                         if not excluded:
                             new_item[key] = field
                 new_item['_keys'] = [k for k in new_item.keys() if not k.startswith('_')]
@@ -794,6 +821,8 @@ class RenderTree:
         if self.data:
             item = self.data[0]
             # TODO: view_name + '_' + action_name should move to a function
+            # TODO: also add to item:
+            # TODO: _search=1, _placeholder='jjjj-mm-dd' I18N, label='t/m' I18N
             button = button_for(self.view_name+'_'+action)
             go = button(item, name='search', label=c._('Search'), icon=icon_for('search'))
             self.buttons.append(go)
@@ -810,7 +839,6 @@ class RenderTree:
         result = dict([(key, getattr(self, key)) for key in self.nodes])
         if result.get('cursor', None):
             result['cursor'] = result['cursor']()
-        result['data'] = [item for item in result['data'] if not item.get('_hide.0.s', False)]
         return result
 
     def dump(self, name):
@@ -913,8 +941,8 @@ class ItemView(BareItemView):
         tree = self.tree
         tree.add_item(self.model())
         tree.add_search_button('match')
-        tree.display_item()
-        tree.prune_item(clear=True, in_form=True)
+        tree.display_item(form_type='search')
+        tree.prune_item(clear=True)
         tree.cookies.append(Cookie('search-origin', self.request.referer, path='/', expires=120))
         tree.dump('search')
         return tree()
@@ -927,13 +955,13 @@ class ItemView(BareItemView):
     def convert_form(self, model, prefix=None, keep_empty=False):
         """Convert (part of) form to document. This method is used by the
         build_form() method - see below - but can also be used by applications.
-        In simple forms, the raw form contains for example
+        In simple forms, the raw form contains e.g.
 
             marriageplace.0.s: s1
             husbandname.0.s  : s2
 
         In this case, convert_form should be called with prefix='' or None.
-        In composite forms, the raw form contains for example
+        In composite forms, the raw form contains e.g.
 
             family.marriageplace.0.s: s1
             family.husbandname.0.s  : s2
@@ -951,8 +979,11 @@ class ItemView(BareItemView):
         else:
             raw_form = {key:value for key, value in params.items()
                         if (value or keep_empty) and not key.startswith('_')}
-        # logger.debug('convert_form: raw form=%s', show_dict(raw_form))
-        return model.convert(raw_form, partial=True)
+        logger.debug('convert_form: raw form=%s', show_dict(raw_form))
+        result = model.convert(raw_form, partial=True)
+        # fields of 'itemref' type should be disabled in the form, which also results
+        # in them being absent from the request body (see W3C Specification for HTML 5)
+        return result
 
     def build_form(self, description, action, bound=False, postproc=None, method='POST',
                    clear=False, keep_empty=False, diff=False):
@@ -978,18 +1009,17 @@ class ItemView(BareItemView):
         tree = self.tree
         validation = []
         # keys to be deleted prior to writing
-        delete_keys = ['_buttons', '_hidden', '_hide', '_prefix']
+        delete_keys = ['_buttons', '_hidden', '_iprefix', '_ilabel']
         if bound:
             delta = []
             for item in tree.data:
                 old = item.copy()
-                if not item['_hide']:
-                    result = self.convert_form(model=type(item), prefix=item['_prefix'],
-                                               keep_empty=keep_empty)
-                    item.update(result)
-                    # logger.debug('build_form: updated item=%s', show_dict(item))
-                    delta.append(format_json_diff(old, item))
-                    validation.append(item.validate(item))
+                result = self.convert_form(model=type(item), prefix=item.get('_iprefix', ''),
+                                           keep_empty=keep_empty)
+                item.update(result)
+                logger.debug('build_form: updated item=%s', show_dict(item))
+                delta.append(format_json_diff(old, item))
+                validation.append(item.validate(item))
             if all([v['status'] == SUCCESS for v in validation]):
                 if callable(postproc):
                     postproc(tree)
@@ -1009,8 +1039,8 @@ class ItemView(BareItemView):
                                format(description, str(tree.data[0]), errors)
                 tree.style = 1
         tree.add_form_buttons(action, method)
-        tree.display_items(in_form=True)
-        tree.prune_items(in_form=True, clear=clear)
+        tree.display_items(form_type='modify')
+        tree.prune_items(clear=clear)
         tree.dump('build_form')
         return tree()
 
