@@ -38,7 +38,6 @@
         "meta":{"auto":false,"enum":null,"control":"input","multiple":false,"formtype":"boolean","schema":"boolean","label":"Actief"}},
       "_buttons":[],
       "_prefix":"",
-      "_hide":false,
       "_hidden":[],
       "_keys":["firstname","prefix","lastname","nickname","birthdate","birthplace",
         "deathdate","deathplace","gender","religion","notes.0","tags.0","pid","id","ctime","mtime","active"]}],

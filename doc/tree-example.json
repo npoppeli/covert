@@ -4,7 +4,7 @@
   "cursor":null,
   "data":[
     {
-      "__buttons":[], "__prefix":"", "__hide":false, "__hidden":[],
+      "__buttons":[], "__prefix":"", "__hidden":[],
       "firstname":{"meta":"PROPLIST", "buttons":[],"value":"Adrianus"},
       "prefix":{"meta":"PROPLIST", "buttons":[], "value":"van"},
       "lastname":{"meta":"PROPLIST","buttons":[],"value":"Aalst"},
