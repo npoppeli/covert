@@ -52,6 +52,7 @@ def get_value(path, context, root):
                 return step
         else:
             path_1.append(part)
+    # logger.debug('get_value: path_1={}'.format(path_1))
     path_2 = UserList()
     for part in path_1:
         if repeat_variable.match(part):
@@ -63,6 +64,7 @@ def get_value(path, context, root):
                 return step
         else:
             path_2.append(part)
+    # logger.debug('get_value: path_2={}'.format(path_2))
     for part in path_2:
         if part[0] == '[' and part[-1] == ']':
             part = part[1:-1]
@@ -77,8 +79,7 @@ def get_value(path, context, root):
             logger.error("No {} in context {}\npath={} part={} value={}".\
                            format(route, short(context), str(path_2), part, str(value)))
             raise KeyError("No {} in context {}".format(route, short(context)))
-    #if path[0] not in ('content', 'verbose'):
-    #    logger.debug('get_value (3): path={} value={}'.format(path, str(value)))
+    # logger.debug('get_value (3): path={} value={}'.format(path, str(value)))
     return value
 
 # Node classes for parse tree
@@ -267,6 +268,20 @@ setting.templates['if'] = if_block
 def unless_block(context, children, args, root):
     return if_unless_block(context, children, args, root, reverse=True)
 setting.templates['unless'] = unless_block
+
+def take_partial(context, children, args, root):
+    arg0, arg_type0 = args[0], argtype(args[0])
+    arg1, arg_type1 = args[1], argtype(args[1])
+    if arg_type0 == 'path':
+        if arg_type1 == 'path':
+            value1 = get_value(arg1, context, root)
+        else:
+            raise ValueError("take: incorrect 2nd argument {}".format(str(arg1)))
+        value0 = get_value(arg0, value1, root)
+        return str(value0)
+    else:
+        raise ValueError("take: incorrect 1st argument {}".format(str(arg0)))
+setting.templates['take'] = take_partial
 
 def with_block(context, children, args, root):
     arg, arg_type = args[0], argtype(args[0])
