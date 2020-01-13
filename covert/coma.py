@@ -328,10 +328,10 @@ def before_block(context, children, args, root):
     return repeat_block(context, children, args, root, before=int(args[1]))
 setting.templates['before'] = before_block
 
-def foreach_block(context, children, args, root):
+def witheach_block(context, children, args, root):
     arg, arg_type = args[0], argtype(args[0])
     if arg_type == 'number' or arg_type == 'string':
-        raise ValueError("foreach: incorrect argument '{}'".format(str(arg)))
+        raise ValueError("witheach: incorrect argument '{}'".format(str(arg)))
     result = []
     sequence = get_value(arg, context, root)
     if isinstance(sequence, list):
@@ -341,8 +341,8 @@ def foreach_block(context, children, args, root):
             result.append(''.join(child(element, children, args) for child in children))
         return ''.join(result)
     else:
-        raise ValueError("foreach: component {} should be list of dict's".format(arg))
-setting.templates['foreach'] = foreach_block
+        raise ValueError("witheach: component {} should be list of dict's".format(arg))
+setting.templates['witheach'] = witheach_block
 
 # Lexical analyzer
 def split_group(tag):
