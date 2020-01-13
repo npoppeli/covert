@@ -880,7 +880,7 @@ def read_models(model_defs):
         model_def = model_defs[model_name]
         class_dict = {}
         pm = parse_model_def(model_def, model_defs, model_transl.gettext)
-        pm.names.extend(Item.fields)
+        pm.names[0:0] = Item.fields
         index = BareItem.index.copy()
         index.extend(pm.index)
         schema = BareItem.schema.copy()
