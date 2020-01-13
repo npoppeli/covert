@@ -64,7 +64,6 @@ def url_for(name, item, query=None):
         url += '?' + urlencode(query)
     return url
 
-
 class Button:
     """Representation of a button.
 
@@ -383,7 +382,7 @@ def preprocess_form(form):
             x, y = params[0] + '#0', params[0] + '#1'
             value = form[params[0]]
             if value:
-                logger.debug("{}: key='{}' value='{}'".format(date_param, params[0], value))
+                # logger.debug("{}: key='{}' value='{}'".format(date_param, params[0], value))
                 begin, end = re.split(r'[,;]', value)
                 begin = begin.strip()
                 end = end.strip()
@@ -505,7 +504,7 @@ class Cursor:
                     self.form[key] = ('in', value[0], value[1])
                 else:  # if value is a list, use the first element
                     actual_value = value[0] if isinstance(value, list) else value
-                    logger.debug('Cursor.init: key={} actual_value={}'.format(key, actual_value))
+                    # logger.debug('Cursor.init: key={} actual_value={}'.format(key, actual_value))
                     self.form[key] = (model.qmap[key], actual_value)
 
     def __str__(self):
@@ -701,17 +700,17 @@ class RenderTree:
             path = key.split('.')
             field = path[0]
             field_meta = item_meta[field]
+            scalar = field_meta.schema != 'itemref'
             multiple = field_meta.multiple
             button_list = []
             if multiple: # add push/pop buttons (in certain conditions)
-                # TODO: simulate relations: {'role': '', 'name': ''}, including
-                # TODO  buttons or do that in logic layer?
                 if '#' in key:
                     index = int(key[key.find('#')+1:])
-                else: # defined as multiple, but value is empty list
+                else: # actual value is empty list
                     index = 0
-                if form_type == 'modify' and index == 0 and not has_buttons[field]:
+                if form_type == 'modify' and scalar and index == 0 and not has_buttons[field]:
                     # add buttons to first element in group (examples: notes.0.s#0)
+                    # itemref fields are excluded from this at the moment
                     # TODO: view_name + '_' + action_name -> function
                     push = Button(self.view_name+'_push', action='', name='push')
                     pop  = Button(self.view_name+'_pop' , action='', name='pop' )
@@ -735,10 +734,11 @@ class RenderTree:
                 field_formtype = 'daterange'
             else:
                 field_formtype = field_meta.formtype
-            proplist = {'label': label, 'enum': field_meta.enum, 'schema': field_meta.schema,
-                        'multiple': field_meta.multiple, 'scalar': field_meta.schema!='itemref',
+            proplist = {'label': label, 'enum': field_meta.enum, 'index': index+1,
+                        'schema': field_meta.schema, 'multiple': field_meta.multiple,
+                        'locked': field_meta.schema == 'itemref', 'scalar': scalar,
                         'formid': item_prefix + key, 'formtype': field_formtype,
-                        'auto': field_meta.auto, 'control': field_meta.control, 'index': index+1}
+                        'auto': field_meta.auto, 'control': field_meta.control}
             new_item[key] = {'value':value, 'meta':proplist, 'buttons':button_list}
         new_item['_keys'] = [k for k in new_item.keys() if not k.startswith('_')]
         self.data[nr] = new_item
@@ -1016,8 +1016,9 @@ class ItemView(BareItemView):
                 old = item.copy()
                 result = self.convert_form(model=type(item), prefix=item.get('_iprefix', ''),
                                            keep_empty=keep_empty)
+                # logger.debug('build_form: converted form=%s', show_dict(item))
                 item.update(result)
-                logger.debug('build_form: updated item=%s', show_dict(item))
+                # logger.debug('build_form: updated item=%s', show_dict(item))
                 delta.append(format_json_diff(old, item))
                 validation.append(item.validate(item))
             if all([v['status'] == SUCCESS for v in validation]):
