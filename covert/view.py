@@ -687,9 +687,7 @@ class RenderTree:
         item_meta = item.meta
         disp_item = item.display()
         item_prefix = item.get('_iprefix', '')
-        # TODO: adding '.' should be done in one place
-        if item_prefix:
-            item_prefix += '.'
+        logger.debug("display_item: item prefix ='{}'".format(item_prefix))
         new_item = OrderedDict()
         has_buttons = defaultdict(bool)
         for key, value in disp_item.items():
@@ -743,7 +741,7 @@ class RenderTree:
         new_item['_keys'] = [k for k in new_item.keys() if not k.startswith('_')]
         self.data[nr] = new_item
 
-    def display_items(self, form_type=False):
+    def display_items(self, form_type=''):
         """Display all items in the render tree."""
         for nr in range(len(self.data)):
             self.display_item(nr=nr, form_type=form_type)
@@ -856,22 +854,24 @@ class BareItemView:
     """
     model = 'BareItem'
     view_name = ''
+    tree_class = RenderTree
 
     def __init__(self, request, params, model, action):
         """Constructor method for BareItemView.
-
-        Forbidden method names: request, params, model, tree.
+        The tree class is a parameter, so that applications can define their
+        own view classes and render-tree classes.
 
         Attributes:
             * request (Request):    HTTP request (WebOb)
             * params  (MultiDict):  route parameters (match.groupdict)
             * model   (Item):       model class
             * tree    (RenderTree): render tree object
+        Do not use the attribute names above as method names in a sub-class!
         """
         self.request = request
         self.params = params
         self.model = model
-        self.tree = RenderTree(request, model, self.view_name, action)
+        self.tree = self.tree_class(request, model, self.view_name, action)
         self.form = {}
 
 class ItemView(BareItemView):
@@ -886,7 +886,7 @@ class ItemView(BareItemView):
     item_buttons = 3
     omit_from_index = []
 
-    def buttons(self, vars=None, ignore=[]):
+    def buttons(self, vars=None, ignore=None):
         """Make list of buttons for this view. Ignore buttons in `ignore`"""
         selection = [button for key, button in setting.buttons.items()
                      if button.method not in ('PUT', 'POST') and
@@ -952,15 +952,15 @@ class ItemView(BareItemView):
         """Show the result list of a search."""
         return self.show_items('match')
 
-    def convert_form(self, model, prefix=None, keep_empty=False):
-        """Convert (part of) form to document. This method is used by the
-        build_form() method - see below - but can also be used by applications.
+    def extract_form(self, model, prefix=None, keep_empty=False, raw=False):
+        """Extract information from (part of) form to document. This method is used
+        by the process_form() method - see below - but can also be used by applications.
         In simple forms, the raw form contains e.g.
 
             marriageplace.0.s: s1
             husbandname.0.s  : s2
 
-        In this case, convert_form should be called with prefix='' or None.
+        In this case, extract_form should be called with prefix='' or None.
         In composite forms, the raw form contains e.g.
 
             family.marriageplace.0.s: s1
@@ -968,7 +968,7 @@ class ItemView(BareItemView):
             partner.firstname.0.s   : s3
             partner.birthplace.0.s  : s4
 
-        In that case, convert_form should be called twice, once with prefix='family.'
+        In that case, extract_form should be called twice, once with prefix='family.'
         and once with prefix='partner.'.
         """
         params = self.request.params
@@ -979,14 +979,17 @@ class ItemView(BareItemView):
         else:
             raw_form = {key:value for key, value in params.items()
                         if (value or keep_empty) and not key.startswith('_')}
-        logger.debug('convert_form: raw form=%s', show_dict(raw_form))
-        result = model.convert(raw_form, partial=True)
-        # fields of 'itemref' type should be disabled in the form, which also results
-        # in them being absent from the request body (see W3C Specification for HTML 5)
-        return result
+        # Fields of 'itemref' type should be disabled in a form. Disabled fields are
+        # not present in the request body (see W3C Specification for HTML 5).
+        logger.debug('extract_form: raw form=%s', show_dict(raw_form))
+        if raw:
+            return raw_form
+        else:
+            result = model.convert(raw_form, partial=True)
+            return result
 
-    def build_form(self, description, action, bound=False, postproc=None, method='POST',
-                   clear=False, keep_empty=False, diff=False):
+    def process_form(self, description, action, bound=False, postproc=None, method='POST',
+                     clear=False, keep_empty=False, diff=False):
         """Prepare render tree for rendering as a form.
 
         This function handles simple forms (single item) and multi-faceted forms (multiple items,
@@ -1004,24 +1007,22 @@ class ItemView(BareItemView):
             keep_empty  (bool): keep empty values (used in modify/update forms).
 
         Returns:
-            None.
+            dictionary form of tree.
         """
         tree = self.tree
-        validation = []
+        validations = []
         # keys to be deleted prior to writing
         delete_keys = ['_buttons', '_hidden', '_iprefix', '_ilabel']
         if bound:
             delta = []
             for item in tree.data:
                 old = item.copy()
-                result = self.convert_form(model=type(item), prefix=item.get('_iprefix', ''),
+                result = self.extract_form(model=type(item), prefix=item.get('_iprefix', ''),
                                            keep_empty=keep_empty)
-                # logger.debug('build_form: converted form=%s', show_dict(item))
                 item.update(result)
-                # logger.debug('build_form: updated item=%s', show_dict(item))
                 delta.append(format_json_diff(old, item))
-                validation.append(item.validate(item))
-            if all([v['status'] == SUCCESS for v in validation]):
+                validations.append(item.validate(item))
+            if all([validation['status'] == SUCCESS for validation in validations]):
                 if callable(postproc):
                     postproc(tree)
                 for item in tree.data:
@@ -1035,7 +1036,7 @@ class ItemView(BareItemView):
                     tree.message += ''.join(delta)
                 return self.show_item(tree.data[0])
             else:
-                errors = '\n'.join([v['data'] for v in validation])
+                errors = '\n'.join([v['data'] for v in validations])
                 tree.message = c._('{} {} has validation errors {}').\
                                format(description, str(tree.data[0]), errors)
                 tree.style = 1
@@ -1049,8 +1050,8 @@ class ItemView(BareItemView):
     def modify(self):
         """Make a form for modify/update action."""
         self.tree.add_item(self.model.lookup(self.params['id']))
-        return self.build_form(description=c._('Modified item'),
-                               action='update', method='PUT')
+        return self.process_form(description=c._('Modified item'),
+                                 action='update', method='PUT')
 
     @route('/{id:objectid}', method='PUT', template='show;form')
     def update(self):
@@ -1058,8 +1059,8 @@ class ItemView(BareItemView):
         submit = self.request.params['_submit']
         if submit == 'ok': # modify item and show this
             self.tree.add_item(self.model.lookup(self.params['id']))
-            return self.build_form(description=c._('Modified item'), bound=True,
-                                   action='update', method='PUT', keep_empty=True, diff=True)
+            return self.process_form(description=c._('Modified item'), bound=True,
+                                     action='update', method='PUT', keep_empty=True, diff=True)
         else: # leave item unmodified and show this
             self.tree.message = c._('Item was not modified')
             return self.show_item(self.params['id'])
@@ -1068,8 +1069,8 @@ class ItemView(BareItemView):
     def new(self):
         """Make a form for new/create action."""
         self.tree.add_item(self.model())
-        return self.build_form(description=c._('New item'),
-                               action='create', clear=True)
+        return self.process_form(description=c._('New item'),
+                                 action='create', clear=True)
 
     @route('', method='POST', template='show;form;index')
     def create(self):
@@ -1077,8 +1078,8 @@ class ItemView(BareItemView):
         submit = self.request.params['_submit']
         if submit == 'ok': # modify item and show this
             self.tree.add_item(self.model())
-            return self.build_form(description=c._('New item'),
-                                   action='create', clear=True, bound=True)
+            return self.process_form(description=c._('New item'),
+                                     action='create', clear=True, bound=True)
         else: # show index page
             self.tree.style = 2
             self.tree.message = c._('No new item was created')
