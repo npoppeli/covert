@@ -80,7 +80,7 @@ class TemplateLoader:
                 setting.templates[name] = self.factory(text)
             except Exception as e:
                 logger.error(c._("Error in template '{0}' in file {1}").format(name, path))
-                # logger.error(exception_report(e, ashtml=False))
+                logger.error(exception_report(e, ashtml=False))
     def load(self, all=False):
         if self.reload or all:
             self.find()

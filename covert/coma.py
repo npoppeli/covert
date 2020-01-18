@@ -28,7 +28,10 @@ def abbrev(s):
     return s0[0:50] + '...' if len(s0)>50 else s0
 
 def short(context):
-    return "{}".format(', '.join(context.keys()))
+    if isinstance(context, dict):
+        return "{}".format(', '.join(context.keys()))
+    else:
+        return str(context)
 
 macro_parameter = re.compile(r'^_(?:\d)$')
 repeat_variable = re.compile(r'^@(?:\d|index|first)$')
@@ -294,6 +297,7 @@ def with_block(context, children, args, root):
                      format(arg, short(context), str(new_context)))
         raise ValueError('with: new context is not dictionary')
     for key in context.keys():
+        new_context['@parent'] = context
         if repeat_variable.match(key):
             new_context[key] = context[key]
     return ''.join(child(new_context, children, args) for child in children)
@@ -351,8 +355,10 @@ def witheach_block(context, children, args, root):
     sequence = get_value(arg, context, root)
     if isinstance(sequence, list):
         for key, element in enumerate(sequence):
-            context['@first'] = key == 0
-            context['@index'] = key
+            if isinstance(element, dict):
+                element['@first']  = key == 0
+                element['@index']  = key
+                element['@parent'] = context
             result.append(''.join(child(element, children, args) for child in children))
         return ''.join(result)
     else:
