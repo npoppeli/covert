@@ -201,6 +201,8 @@ def ifdef_block(context, children, args, root):
     arg, arg_type = args[0], argtype(args[0])
     if arg_type != 'path':
         raise ValueError("ifdef: incorrect argument '{}'".format(str(arg)))
+    if arg[0] not in context:
+        return ''
     arg = get_value(arg, context, root)
     if arg is None:
         return ''
