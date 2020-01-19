@@ -687,7 +687,7 @@ class RenderTree:
         item_meta = item.meta
         disp_item = item.display()
         item_prefix = item.get('_iprefix', '')
-        logger.debug("display_item: item prefix ='{}'".format(item_prefix))
+        # logger.debug("display_item: item prefix ='{}'".format(item_prefix))
         new_item = OrderedDict()
         has_buttons = defaultdict(bool)
         for key, value in disp_item.items():
@@ -751,11 +751,13 @@ class RenderTree:
         item = self.data[nr]
         hidden = item['_hidden']
         new_item = OrderedDict()
+        item_prefix = item.get('_iprefix', '')
         for key, field in item.items():
             if key.startswith('_'):
                 new_item[key] = field
             else:
-                excluded = key in hidden
+                excluded = key in hidden or \
+                           (item_prefix and field['meta']['schema'] == 'itemref')
                 if not excluded:
                     if clear: field['value'] = ''
                     new_item[key] = field
@@ -981,7 +983,7 @@ class ItemView(BareItemView):
                         if (value or keep_empty) and not key.startswith('_')}
         # Fields of 'itemref' type should be disabled in a form. Disabled fields are
         # not present in the request body (see W3C Specification for HTML 5).
-        logger.debug('extract_form: raw form=%s', show_dict(raw_form))
+        # logger.debug('extract_form: raw form=%s', show_dict(raw_form))
         if raw:
             return raw_form
         else:
