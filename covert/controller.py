@@ -99,13 +99,13 @@ class CondRouter:
             request.path_info = path_info[path_info.find('/', 1):]
         try:
             response = request.get_response(app)
-            logger.debug('{} "{} {}" {} {}'.format(date_time, request.method, request.path_info,
+            logger.debug('"{} {}" {} {}'.format(request.method, request.path_info,
                          response.status, response.content_length))
         except Exception as e:
             response = Response()
             response.text = exception_report(e)
-            logger.error(c._('{}: {} {} [mode {}] results in exception {}\n').format(date_time,
-                         req_method, request.path_qs, mode, exception_report(e, False)))
+            logger.error(c._('{} {} [mode {}] results in exception {}\n').\
+                         format(req_method, request.path_qs, mode, exception_report(e, False)))
         return response(environ, start_response)
 
 
