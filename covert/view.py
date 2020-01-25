@@ -603,7 +603,7 @@ class RenderTree:
         term (if present) needs to be looked at for possible adjustment.
         """
         cursor = self.cursor
-        logger.debug("move_cursor: cursor.form = {}".format(cursor.form))
+        # logger.debug("move_cursor: cursor.form = {}".format(cursor.form))
         initial_post = '_skip' not in self.request.params
         if initial_post and not cursor.filter:
            # cursor.form contains query specifications with real values
@@ -974,6 +974,8 @@ class ItemView(BareItemView):
         and once with prefix='partner.'.
         """
         params = self.request.params
+        # logger.debug("extract_form: params={}".format(params))
+        # logger.debug("extract_form: prefix='{}'".format(prefix))
         if prefix:
             raw_form = {key.replace(prefix, '', 1):value for key, value in params.items()
                         if (value or keep_empty) and key.startswith(prefix) and
@@ -981,6 +983,7 @@ class ItemView(BareItemView):
         else:
             raw_form = {key:value for key, value in params.items()
                         if (value or keep_empty) and not key.startswith('_')}
+        # logger.debug('extract_form: raw form=' + str(raw_form))
         # Fields of 'itemref' type should be disabled in a form. Disabled fields are
         # not present in the request body (see W3C Specification for HTML 5).
         # logger.debug('extract_form: raw form=%s', show_dict(raw_form))
@@ -988,6 +991,7 @@ class ItemView(BareItemView):
             return raw_form
         else:
             result = model.convert(raw_form, partial=True)
+            # logger.debug('extract_form: converted form='+str(result))
             return result
 
     def process_form(self, description, action, bound=False, postproc=None, method='POST',
@@ -1022,7 +1026,8 @@ class ItemView(BareItemView):
                 result = self.extract_form(model=type(item), prefix=item.get('_iprefix', ''),
                                            keep_empty=keep_empty)
                 item.update(result)
-                delta.append(format_json_diff(old, item))
+                if diff:
+                    delta.append(format_json_diff(old, item))
                 validations.append(item.validate(item))
             if all([validation['status'] == SUCCESS for validation in validations]):
                 if callable(postproc):
