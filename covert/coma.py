@@ -197,12 +197,20 @@ class Partial(Node):
             return template(context, self.children, self.args)
 
 # Built-in helpers
+def contains_block(context, children, args, root):
+    arg, arg_type = args[0], argtype(args[0])
+    if arg_type != 'path':
+        raise ValueError("contains: incorrect argument '{}'".format(str(arg)))
+    if arg[0] in context:
+        return ''.join(child(context, children, args) for child in children)
+    else:
+        return ''
+setting.templates['contains'] = contains_block
+
 def ifdef_block(context, children, args, root):
     arg, arg_type = args[0], argtype(args[0])
     if arg_type != 'path':
         raise ValueError("ifdef: incorrect argument '{}'".format(str(arg)))
-    if arg[0] not in context:
-        return ''
     arg = get_value(arg, context, root)
     if arg is None:
         return ''
