@@ -3,14 +3,19 @@
 
 This includes JSON and YAML functions, but also reporting and logging.
 
-For logging we use the 'logging' module. Logging levels are DEBUG, INFO, WARNING, ERROR,
-CRITICAL. Covert uses logging level INFO by default, and DEBUG if called with --debug. Since the
-Waitress package is one of the dependencies, we can re-use the logger object of that package.
-The Waitress logger does not define handlers itself. It inherits the handler from the root logger.
+For logging we use the 'logging' module. Logging levels are DEBUG, INFO,
+WARNING, ERROR, CRITICAL. Covert uses logging level INFO by default, and
+DEBUG if called with --debug.
+
+Since the Waitress package is one of the dependencies, we can re-use the
+logger object of that package. The Waitress logger does not define handlers
+itself. It inherits the handler from the root logger.
 """
 
 import gettext, json, logging, sys, traceback
-from os.path import dirname, join
+from datetime import datetime
+from os import getcwd, mkdir
+from os.path import dirname, join, exists
 from . import setting
 from urllib.parse import urlparse, urljoin
 from webob.exc import HTTPTemporaryRedirect
@@ -26,7 +31,14 @@ except ImportError:
 # Logging
 # basicConfig adds a StreamHandler with default Formatter to the root logger. This function
 # does nothing if the root logger already has handlers configured for it.
-logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
+# This module is imported before the 'controller' module, which imports the 'waitress' module.
+# The first call to basisConfig 'wins', and in theory that should be the one below.
+logdir = getcwd() + '/log' # assumption: cwd == site directory
+if not exists(logdir):
+    mkdir(logdir)
+setting.logfile = '{}/{}.log'.format(logdir, datetime.now().strftime("%Y%m%d_%H%M%S"))
+logging.basicConfig(filename=setting.logfile, datefmt='%H:%M:%S',
+                    format='%(asctime)s %(levelname)s: %(message)s', level=logging.INFO)
 logger = logging.getLogger('waitress')
 
 def exception_report(exc, ashtml=True):
