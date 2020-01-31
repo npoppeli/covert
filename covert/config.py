@@ -14,9 +14,11 @@ from . import setting
 from .model import read_models
 from .view import read_views, Button
 from .layout import load_templates
-from .common import read_yaml_file, InternalError, logger
+from .common import read_yaml_file, InternalError
 from . import common as c
 from .engine.hashfs import HashFS
+
+logger = logging.getLogger('covert')
 
 extra_arguments = {}
 
@@ -71,7 +73,7 @@ def read_configuration():
         doc0 = read_yaml_file(config_file)
         config.update(doc0)
     else:
-        logger.error(c._("Current directory does not contain a 'config' file"))
+        print(c._("Current directory does not contain a 'config' file"))
         sys.exit()
     if 'debug'    in config: setting.debug    = config['debug']
     if 'nostore'  in config: setting.nostore  = config['nostore']

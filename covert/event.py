@@ -2,10 +2,11 @@
 """Objects and functions related to events.
 """
 
-from .common import logger
+import logging
 from . import setting
 from . import common as c
 
+logger = logging.getLogger('covert')
 event_handler = {}
 
 def add_handler(evnt, handler):

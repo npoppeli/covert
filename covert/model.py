@@ -49,7 +49,7 @@ https://github.com/MaastrichtUniversity/irods_avu_json.
 """
 
 from copy import deepcopy
-import gettext, re
+import gettext, logging, re
 from os.path import join, realpath
 from collections import OrderedDict
 # Schema validation with voluptuous:
@@ -78,11 +78,12 @@ except ImportError:
         return result
 
 from .atom import atom_map, EMPTY_DATETIME, atom_codemap
-from .common import InternalError, SUCCESS, FAIL, logger, show_document
+from .common import InternalError, SUCCESS, FAIL, show_document
 from .controller import exception_report
 from .event import event
 from . import common as c
 from . import setting
+logger = logging.getLogger('covert')
 
 # I18N: translator for model
 model_transl = None

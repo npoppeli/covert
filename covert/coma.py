@@ -12,12 +12,12 @@ Conventions:
   which get their values from the argument list of the template root (global scope)
 """
 
-import operator, re, string
+import logging, operator, re, string
 from inspect import isfunction
 from collections import UserList
 from . import setting
 # TODO: I18N from . import common as c
-from .common import logger
+logger = logging.getLogger('covert')
 
 multiple_newline = re.compile(r'\n *\n')
 list_index = re.compile(r'\[\d+\]')

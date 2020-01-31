@@ -9,19 +9,20 @@ In the present implementation, form validation is performed on the server. Alter
 do form validation in the client, using Parsley.js (jQuery) for example.
 """
 
-import calendar, re
+import calendar, logging, re
 from collections import OrderedDict, defaultdict
 from datetime import datetime
 from inspect import getmembers, isclass, isfunction
 from itertools import chain
 from urllib.parse import urlencode
 from .atom import empty_scalar, empty_dict, empty_list
-from .common import SUCCESS, write_file, logger, str2int, show_dict
+from .common import SUCCESS, write_file, str2int, show_dict
 from .common import encode_dict, CATEGORY_READ, format_json_diff
 from .model import empty_reference
 from .event import event
 from . import common as c
 from . import setting
+logger = logging.getLogger('covert')
 
 # Routes and buttons
 setting.labels = {
@@ -377,22 +378,20 @@ def preprocess_form(form):
             date_params.add(path[0])
     for date_param in date_params:
         params = [key for key in form_keys if key.startswith(date_param)]
-        # TODO: remove old solution for date ranges
         if len(params) == 1:
             x, y = params[0] + '#0', params[0] + '#1'
             value = form[params[0]]
             if value:
-                # logger.debug("{}: key='{}' value='{}'".format(date_param, params[0], value))
-                begin, end = re.split(r'[,;]', value)
+                try:
+                    begin, end = re.split(r'[,;]', value)
+                except ValueError:
+                    begin, end = value, ''
                 begin = begin.strip()
                 end = end.strip()
             else:
                 begin, end = '', ''
             del form[params[0]]
             form[x], form[y] = begin, end
-        elif len(params) == 2:
-            x, y = params[0], params[1]
-            begin, end = form[x].strip(), form[y].strip()
         else:
             raise ValueError('Date parameter has too many parts: '+date_param)
         # convert to proper date range
@@ -614,7 +613,6 @@ class RenderTree:
            filter_spec.update(cursor.form)
            # translate filter dictionary to expression
            terms = []
-           logger.debug("move_cursor (initial): filter_spec = {}".format(filter_spec))
            for key, value in filter_spec.items():
                emap = self.model.emap.get(key, None)
                if len(value) == 3:

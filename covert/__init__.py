@@ -30,10 +30,10 @@ Classes:
     * Visitor:        base class for Visitors
 """
 
+from .common     import *
 from .           import setting
 from .atom       import EMPTY_DATE, EMPTY_DATETIME, EMPTY_TIME, define_atom, atom_codemap
 from .coma       import parse, get_value, argtype, convert_arg
-from .common     import *
 from .config     import read_configuration, parse_cmdline, initialize_kernel, add_argument
 from .controller import http_server, CondRouter, MapRouter, PageRouter, JSONRouter, exception_report
 from .event      import add_handler, event

@@ -7,7 +7,7 @@ depending on the request parameters.
 The mapping router creates a response object based on route patterns.
 """
 
-import re, waitress
+import logging, re, waitress
 from datetime import datetime
 # we use BaseRequest instead of Request because of performance reasons
 from webob import BaseRequest as Request, Response
@@ -15,8 +15,9 @@ from webob.static import DirectoryApp
 from collections import deque
 from . import setting
 from . import common as c
-from .common import encode_dict, logger, exception_report
+from .common import encode_dict, exception_report
 from .layout import templates_changed, reload_templates
+logger = logging.getLogger('covert')
 
 def http_server(app, **kwarg):
     """HTTP server for development purposes"""

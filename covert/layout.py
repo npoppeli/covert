@@ -6,13 +6,14 @@ In the current implementation Chameleon templates are supported out-of-the-box.
 Other template engines can be added by the application.
 """
 
-import sys
+import logging, sys
 from datetime import datetime
 from os import walk
 from os.path import join, splitext, relpath, getmtime
 from . import setting
 from . import common as c
-from .common import logger, exception_report
+from .common import exception_report
+logger = logging.getLogger('covert')
 
 # By default, there is two template factories: ComaTemplateFile (built-in) and
 # chameleon.PageTemplateFile.

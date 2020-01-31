@@ -4,17 +4,13 @@
 This includes JSON and YAML functions, but also reporting and logging.
 
 For logging we use the 'logging' module. Logging levels are DEBUG, INFO,
-WARNING, ERROR, CRITICAL. Covert uses logging level INFO by default, and
+WARNING, ERROR, CRITICAL. We use logging level INFO by default, and
 DEBUG if called with --debug.
-
-Since the Waitress package is one of the dependencies, we can re-use the
-logger object of that package. The Waitress logger does not define handlers
-itself. It inherits the handler from the root logger.
 """
 
 import gettext, json, logging, sys, traceback
 from datetime import datetime
-from os import getcwd, mkdir
+from os import mkdir, getcwd
 from os.path import dirname, join, exists
 from . import setting
 from urllib.parse import urlparse, urljoin
@@ -29,17 +25,19 @@ except ImportError:
 # see http://jtauber.com/2005/02/trie.py for Python implementation
 
 # Logging
-# basicConfig adds a StreamHandler with default Formatter to the root logger. This function
-# does nothing if the root logger already has handlers configured for it.
+# basicConfig adds a StreamHandler with default Formatter to the root logger. This
+# function does nothing if the root logger already has handlers configured for it.
 # This module is imported before the 'controller' module, which imports the 'waitress' module.
 # The first call to basisConfig 'wins', and in theory that should be the one below.
-logdir = getcwd() + '/log' # assumption: cwd == site directory
+logdir = getcwd() + '/log'  # assumption: cwd == site directory
 if not exists(logdir):
     mkdir(logdir)
-setting.logfile = '{}/{}.log'.format(logdir, datetime.now().strftime("%Y%m%d_%H%M%S"))
-logging.basicConfig(filename=setting.logfile, datefmt='%H:%M:%S',
-                    format='%(asctime)s %(levelname)s: %(message)s', level=logging.INFO)
-logger = logging.getLogger('waitress')
+logfile = '{}/{}.log'.format(logdir, datetime.now().strftime("%Y%m%d"))
+logging.basicConfig(filename=logfile, datefmt='%Y-%m-%d %H:%M:%S', style='{',
+                    format='{asctime} {levelname:7}: {message}',
+                    level=logging.INFO)
+logger = logging.getLogger('covert')
+print('covert.common: call logging.basicConfig; log to file {}'.format(logfile))
 
 def exception_report(exc, ashtml=True):
     """Generate exception traceback, as plain text or HTML
@@ -125,7 +123,7 @@ def redirect_location(request):
 
 def redirect_back(request, default):
     target = request.params['_next']
-    if not target or not is_safe_url(target):
+    if not target or not is_safe_url(target, request):
         target = default
     raise HTTPTemporaryRedirect(location=target)
 
@@ -254,7 +252,6 @@ def format_json_diff(a, b):
     for key, value in diff.items():
         if not value:
             continue
-        logger.debug('json_diff: {}={}'.format(key, value))
         # TODO: translate `k` (field name) to application language
         details = '; '.join('{}: {}'.format(k, v) for k, v in value.items())
         if key == '$insert':
