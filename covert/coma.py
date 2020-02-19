@@ -19,9 +19,6 @@ from . import setting
 # TODO: I18N from . import common as c
 logger = logging.getLogger('covert')
 
-multiple_newline = re.compile(r'\n *\n')
-list_index = re.compile(r'\[\d+\]')
-
 # various auxiliary functions
 def abbrev(s):
     s0 = s.strip().replace('\n', ' ')
@@ -33,8 +30,8 @@ def short(context):
     else:
         return str(context)
 
-macro_parameter = re.compile(r'^_(?:\d)$')
-repeat_variable = re.compile(r'^@(?:\d|index|first)$')
+macro_parameter = re.compile('^_(?:\d)$')
+repeat_variable = re.compile('^@(?:\d|index|first)$')
 
 def get_value(path, context, root):
     """This function performs most of the magic of retrieving information
@@ -125,7 +122,7 @@ class Template(Node):
         for child in self.children:
             fragment = child(context, self.children, self.args)
             result.append(fragment)
-        return multiple_newline.sub('\n', ''.join(result))
+        return ''.join(result)
 
 class Text(Node):
     def __init__(self, text):
@@ -429,7 +426,7 @@ def convert_arg(arg):
     elif arg.startswith('"') and arg.endswith('"'):
         return arg.strip('"')
     else:
-        return UserList(re.split(r'[:;/]', arg))
+        return UserList(re.split('[:;/]', arg))
 
 def argtype(arg):
     """Determine type of argument: number, string, path or other(wise)"""
