@@ -81,7 +81,7 @@ EMPTY_DATE     = date(MINYEAR, 1, 1)
 MIDNIGHT       = time(0, 0, 0, 0)
 
 def empty_scalar(a):
-    return a == '' or a is None or a == 0 or \
+    return a == '' or a is None or \
            a == EMPTY_DATE or a == EMPTY_DATETIME or a == EMPTY_TIME
 
 def empty_dict(d):
