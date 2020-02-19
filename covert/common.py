@@ -37,7 +37,6 @@ logging.basicConfig(filename=logfile, datefmt='%Y-%m-%d %H:%M:%S', style='{',
                     format='{asctime} {levelname:7}: {message}',
                     level=logging.INFO)
 logger = logging.getLogger('covert')
-print('covert.common: call logging.basicConfig; log to file {}'.format(logfile))
 
 def exception_report(exc, ashtml=True):
     """Generate exception traceback, as plain text or HTML
