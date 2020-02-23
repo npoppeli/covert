@@ -7,8 +7,8 @@ The Item class encapsulates the details of the storage engine.
 
 import ast
 from datetime import datetime
-from pymongo import MongoClient, DESCENDING, ASCENDING
-from ..common import SUCCESS, ERROR, FAIL, logger, InternalError, show_dict
+from pymongo import MongoClient
+from ..common import SUCCESS, ERROR, FAIL, logger, InternalError
 from .. import common as c
 from ..event import event
 from ..model import BareItem, mapdoc
