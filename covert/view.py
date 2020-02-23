@@ -490,10 +490,12 @@ class Cursor:
                 setattr(self, key[1:], str2int(value) if key[1:] in self.default else value)
             else:
                 form[key] = value
+        # logger.debug('cursor.init: raw form={}'.format(str(form)))
         if initial_post:
             # Preprocess form: take care of empty values, and parameters of date type
             date_params = preprocess_form(form)
             converted_form = model.convert(form, partial=True)
+            # logger.debug('cursor.init: converted form={}'.format(str(converted_form)))
             for key, value in converted_form.items():
                 # ignore values that are empty in a functional sense
                 if empty_scalar(value) or empty_reference(value) or \
@@ -503,7 +505,7 @@ class Cursor:
                     self.form[key] = ('in', value[0], value[1])
                 else:  # if value is a list, use the first element
                     actual_value = value[0] if isinstance(value, list) else value
-                    # logger.debug('Cursor.init: key={} actual_value={}'.format(key, actual_value))
+                    # logger.debug('cursor.init: key={} actual_value={}'.format(key, actual_value))
                     self.form[key] = (model.qmap[key], actual_value)
 
     def __str__(self):
@@ -672,7 +674,7 @@ class RenderTree:
         else:
             origin = self.request.cookies.get('search-origin', 'index')
             self.add_return_button(origin)
-            self.message += 'Geen resultaten voor zoekopdracht:\n{}'.format(self.cursor.filter)
+            self.message += c._('Geen resultaten voor zoekopdracht:') + '\n' + str(self.cursor.filter)
 
     def display_item(self, nr=0, form_type=''):
         """Display one item in the render tree.
