@@ -490,12 +490,10 @@ class Cursor:
                 setattr(self, key[1:], str2int(value) if key[1:] in self.default else value)
             else:
                 form[key] = value
-        # logger.debug('cursor.init: raw form={}'.format(str(form)))
         if initial_post:
             # Preprocess form: take care of empty values, and parameters of date type
             date_params = preprocess_form(form)
             converted_form = model.convert(form, partial=True)
-            # logger.debug('cursor.init: converted form={}'.format(str(converted_form)))
             for key, value in converted_form.items():
                 # ignore values that are empty in a functional sense
                 if empty_scalar(value) or empty_reference(value) or \
@@ -505,7 +503,6 @@ class Cursor:
                     self.form[key] = ('in', value[0], value[1])
                 else:  # if value is a list, use the first element
                     actual_value = value[0] if isinstance(value, list) else value
-                    # logger.debug('cursor.init: key={} actual_value={}'.format(key, actual_value))
                     self.form[key] = (model.qmap[key], actual_value)
 
     def __str__(self):
@@ -604,7 +601,6 @@ class RenderTree:
         term (if present) needs to be looked at for possible adjustment.
         """
         cursor = self.cursor
-        # logger.debug("move_cursor: cursor.form = {}".format(cursor.form))
         initial_post = '_skip' not in self.request.params
         if initial_post and not cursor.filter:
            # cursor.form contains query specifications with real values
@@ -625,7 +621,6 @@ class RenderTree:
                    term = "({} {} {})".format(key, value[0], v1)
                terms.append(term)
            cursor.filter = ' and '.join(terms)
-           logger.debug("move_cursor (initial): cursor.filter = {}".format(cursor.filter))
         else:
             # cursor.incl == 1: remove term 'active=True' (if present) from filter
             #             == 0: add term 'active=True' (if not present) to filter
@@ -634,7 +629,6 @@ class RenderTree:
                     cursor.filter = remove_active(cursor.filter)
             elif 'active' not in cursor.filter:
                 cursor.filter += " and (active == '1')"
-            logger.debug('move_cursor (follow-up): cursor.filter={}'.format(cursor.filter))
         cursor.count = self.model.count(cursor.filter)
         cursor.skip = max(0, min(cursor.count, cursor.skip+cursor.dir*cursor.limit))
         cursor.prev = cursor.skip>0
@@ -687,7 +681,6 @@ class RenderTree:
         item_meta = item.meta
         disp_item = item.display()
         item_prefix = item.get('_iprefix', '')
-        # logger.debug("display_item: item prefix ='{}'".format(item_prefix))
         new_item = OrderedDict()
         has_buttons = defaultdict(bool)
         for key, value in disp_item.items():
@@ -905,10 +898,10 @@ class ItemView(BareItemView):
         sub_selection = sorted(sub_selection, key=lambda b: b.order)
         return sub_selection
 
-    def show_item(self, item_or_id):
+    def show_item(self, item):
         """Prepare render tree for showing one item."""
         tree = self.tree
-        tree.add_item(item_or_id)
+        tree.add_item(item)
         tree.add_buttons(self.buttons(['id'], ignore=['show', 'delete']))
         tree.display_item()
         tree.prune_item()
@@ -927,10 +920,18 @@ class ItemView(BareItemView):
         tree.dump('show_items')
         return tree()
 
-    @route('/{id:objectid}', template='show')
+    @route('/{id:objectid}', template='show;empty')
     def show(self):
-        """Show one item."""
-        return self.show_item(self.params['id'])
+        """Show item identified by object id."""
+        oid = self.params['id']
+        item = self.model.lookup(oid)
+        if item:
+            return self.show_item(item)
+        else:
+            tree = self.tree
+            tree.message = _('Nothing found for id={}').format(oid)
+            tree.style = 1
+            return tree()
 
     @route('/index', method='GET,POST', template='index')
     def index(self):
@@ -974,8 +975,6 @@ class ItemView(BareItemView):
         and once with prefix='partner.'.
         """
         params = self.request.params
-        # logger.debug("extract_form: params={}".format(params))
-        # logger.debug("extract_form: prefix='{}'".format(prefix))
         if prefix:
             raw_form = {key.replace(prefix, '', 1):value for key, value in params.items()
                         if (value or keep_empty) and key.startswith(prefix) and
@@ -983,15 +982,12 @@ class ItemView(BareItemView):
         else:
             raw_form = {key:value for key, value in params.items()
                         if (value or keep_empty) and not key.startswith('_')}
-        # logger.debug('extract_form: raw form=' + str(raw_form))
         # Fields of 'itemref' type should be disabled in a form. Disabled fields are
         # not present in the request body (see W3C Specification for HTML 5).
-        # logger.debug('extract_form: raw form=%s', show_dict(raw_form))
         if raw:
             return raw_form
         else:
             result = model.convert(raw_form, partial=True)
-            # logger.debug('extract_form: converted form='+str(result))
             return result
 
     def process_form(self, description, action, bound=False, postproc=None, method='POST',
@@ -1050,7 +1046,7 @@ class ItemView(BareItemView):
         tree.add_form_buttons(action, method)
         tree.display_items(form_type='modify')
         tree.prune_items(clear=clear)
-        tree.dump('build_form')
+        tree.dump('process_form')
         return tree()
 
     @route('/{id:objectid}/modify', template='form')
