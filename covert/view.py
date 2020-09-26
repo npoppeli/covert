@@ -668,7 +668,7 @@ class RenderTree:
         else:
             origin = self.request.cookies.get('search-origin', 'index')
             self.add_return_button(origin)
-            self.message += c._('Geen resultaten voor zoekopdracht:') + '\n' + str(self.cursor.filter)
+            self.message += c._('No results for search query:') + '\n' + str(self.cursor.filter)
 
     def display_item(self, nr=0, form_type=''):
         """Display one item in the render tree.
