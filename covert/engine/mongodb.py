@@ -239,19 +239,20 @@ class Item(BareItem):
             return list(cursor)
 
     @classmethod
-    def lookup(cls, oid):
+    def lookup(cls, oid, key='id'):
         """Retrieve one item from collection.
 
-        Retrieve first item in collection matching the given primary key (id),
-        or None if no item matches this key.
+        Retrieve first item in collection matching the given uniquely
+        identifying key (preferably 'id'), or None if no item matches this key.
 
         Arguments:
-           oid (str): value of 'id' attribute.
+           key (str): name of uniquely identifying attribute.
+           oid (str): value of this attribute.
 
         Returns:
             'cls' instance
         """
-        item = setting.item_db[cls.name].find_one({'id':oid})
+        item = setting.item_db[cls.name].find_one({key:oid})
         if item is None:
             return item
         else:
