@@ -85,7 +85,6 @@ class CondRouter:
     def __call__(self, environ, start_response):
         request = Request(environ)
         req_method = request.params.get('_method', request.method).upper()
-        date_time = datetime.strftime(datetime.now(), "%Y-%m-%d %H:%M:%S")
         # path rewrite in case of index page
         if request.path_info == '/' and self.index_page:
             request.path_info = self.index_page
@@ -142,8 +141,18 @@ class MapRouter:
         # interpret request
         request = Request(environ)
         req_method = request.params.get('_method', request.method).upper()
-        req_path = request.path_info
+        response = Response(content_type=self.content_type, status=200)
+        # primitive CORS support
+        if 'origin' in request.headers:
+            response.headers['Access-Control-Allow-Origin'] = request.headers['Origin']
+        # special treatment for OPTIONS requests
+        if req_method == 'OPTIONS':
+            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, DELETE, OPTIONS'
+            response.headers['Access-Control-Allow-Headers'] = 'x-requested-with'
+            response.headers['Access-Control-Max-Age'] = '86400'
+            return response(environ, start_response)
         # find first route that matches request
+        req_path = request.path_info
         view_cls = None
         # route is tuple (pattern, method, templates, regex, cls, name)
         for route in setting.routes:
@@ -152,7 +161,6 @@ class MapRouter:
             if route.method == req_method and match:
                 view_cls, route_name, route_templates = route.cls, route.name, route.templates
                 break
-        response = Response(content_type=self.content_type, status=200)
         # run route or send error report
         if view_cls:
             try:
@@ -168,9 +176,9 @@ class MapRouter:
                 response.cache_control.max_age = 0
             except Exception as e:
                 result = exception_report(e, ashtml=(self.content_type=='text/html'))
-                print(c._('{}: exception occurred in {}').format(controller_name, route_name))
+                logger.error(c._('{}: exception occurred in {}').format(controller_name, route_name))
                 if self.content_type != 'text/html':
-                    print(result)
+                    logger.error(result)
                 response.status = 500
         else: # no match in the known routes
             result = c._('{}: nothing found for {} {}').\
