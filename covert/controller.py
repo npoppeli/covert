@@ -99,7 +99,7 @@ class CondRouter:
             request.path_info = path_info[path_info.find('/', 1):]
         try:
             response = request.get_response(app)
-            logger.debug('"{} {}" {} {}'.format(request.method, request.path_info,
+            logger.debug('"{} {}" {} {}'.format(request.method, request.path_qs,
                          response.status, response.content_length))
         except Exception as e:
             response = Response()
