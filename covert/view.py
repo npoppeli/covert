@@ -448,16 +448,23 @@ class Cursor:
         2. operator vector (operators in query, optional)
         3. cursor (used by the 'index' and 'search' routes)
 
-        Request parameters can be found in the body of a POST request or in the
+        Request parameters are taken from the body of a POST request and the
         URL string of a GET request:
 
         field1=value1&field2=value2&field3=value3...
 
-        Characters that cannot be converted to the correct charset are replaced with HTML numeric
-        character references. SPACE is encoded as '+' or '%20'. Letters (A–Z and a–z), numbers (
-        0–9) and the characters '*','-','.' and '_' are left as-is, + is encoded by %2B. All
-        other characters are encoded as %HH hex representation with any non-ASCII characters
-        first encoded as UTF-8 (or other specified encoding)
+        On an initial request for multiple items, either /item/index or /item/search,
+        the request parameter _filter is absent. On follow-up requests, this parameter
+        should be present.
+
+        * Letters (A–Z and a–z), numbers (0–9) are left as-is.
+        * The characters '*','-','.' and '_' are left as-is.
+        * Characters that cannot be converted to the correct charset are replaced by
+          HTML numeric character references.
+        * The plus sign '+' is encoded by %2B.
+        * SPACE is encoded as '+' or '%20'
+        * All other characters are encoded as %HH hex representation with any non-ASCII
+          characters first encoded as UTF-8 (or other specified encoding).
 
         Attributes:
             * skip      (int):     skip this number of items in query
@@ -466,7 +473,7 @@ class Cursor:
             * incl      (int):     1 if inactive items are included, 0 otherwise
             * dir       (int):     direction of browsing
             * filter    (str):     filter to pass to storage engine
-            * operator  (dict):    boolean operators for filter
+            * operator  (dict):    boolean operators for filter (unused feature)
             * form      (str):     transformed dictionary
             * prev      (bool):    True if 'previous' button enabled
             * next      (bool):    True if 'next' button enabled
@@ -474,21 +481,23 @@ class Cursor:
             * method    (str):     form method
             * submit    (str):     value of the form button that was pressed
         """
-        initial_post = '_skip' not in request.params
+        initial_post = '_filter' not in request.params
         for key, value in self.default.items():
             setattr(self, key, value)
         self.form = {}
+        # TODO: apply this feature somewhere
         self.operator = {}
         self.filter = ''
         form = {}
         for key, value in request.params.items():
-            if key == '_filter': # (re)use filter that is included in request
+            if key == '_filter': # reuse filter that is included in request
                 self.filter = value
-            elif key =='_skey':
+            elif key =='_skey': # standard field of Item that can be used in a search query
                 form[key] = value
-            elif key.startswith('_'):
-                setattr(self, key[1:], str2int(value) if key[1:] in self.default else value)
-            else:
+            elif key.startswith('_'): # cursor attribute
+                attval = str2int(value) if key[1:] in self.default else value
+                setattr(self, key[1:], attval)
+            else: # form attribute
                 form[key] = value
         if initial_post:
             # Preprocess form: take care of empty values, and parameters of date type
@@ -598,12 +607,13 @@ class RenderTree:
         Initially, the filter used in the search is built from the form contents,
         and an extra condition depending on the value of cursor.incl.
         On follow-up posts, the filter is rebuilt from a pickle, and only the 'active'
-        term (if present) needs to be looked at for possible adjustment.
+        term (if present) needs to be inspected for possible adjustment.
         """
         cursor = self.cursor
-        initial_post = '_skip' not in self.request.params
-        if initial_post and not cursor.filter:
+        initial_post = '_filter' not in self.request.params
+        if initial_post:
            # cursor.form contains query specifications with real values
+           logger.debug('move_cursor form: ' + str(cursor.form))
            for key, value in cursor.form.items():
                if isinstance(value, list):
                    cursor.form[key] = ('in', value[0], value[1])
@@ -631,7 +641,7 @@ class RenderTree:
                 cursor.filter += " and (active == '1')"
         cursor.count = self.model.count(cursor.filter)
         cursor.skip = max(0, min(cursor.count, cursor.skip+cursor.dir*cursor.limit))
-        cursor.prev = cursor.skip>0
+        cursor.prev = cursor.skip > 0
         cursor.next = cursor.skip+cursor.limit < cursor.count
 
     def add_item(self, oid_or_item, prefix='', label='', hide=None):
