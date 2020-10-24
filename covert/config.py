@@ -186,7 +186,7 @@ def initialize_kernel():
         print(c._('Application has {0} routes').format(len(setting.routes)))
         fmt = "{:>5} {:<30} {:<10} {:<15} {:<20} {:<15} {:<30}"
         print(fmt.format('order', 'pattern', 'method', 'view', 'name', 'vars', 'templates'))
-        print('-' * 120)
+        print('-' * 125)
         for route in sorted(setting.routes, key=lambda r: r.order):
             print(fmt.format(route.order, route.pattern, route.method,
                              route.cls.__name__, route.name,
@@ -196,7 +196,7 @@ def initialize_kernel():
         print(c._('Application has {0} buttons').format(len(setting.buttons)))
         fmt = "{:<25} {:<15} {:<25} {:<35} {:<10} {:<15} {:<10}"
         print(fmt.format('uid', 'label', 'icon', 'action', 'method', 'vars', 'name'))
-        print('-' * 130)
+        print('-' * 140)
         for button in setting.buttons.values():
             print(fmt.format(button.uid, button.label, button.icon, button.action,
                              button.method, ', '.join(button.vars), button.name))
