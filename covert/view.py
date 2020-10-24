@@ -893,20 +893,19 @@ class ItemView(BareItemView):
 
     def buttons(self, vars=None, ignore=None):
         """Make list of buttons for this view. Ignore buttons in `ignore`"""
-        selection = [button for key, button in setting.buttons.items()
-                     if button.method not in ('PUT', 'POST') and
+        def usable(uid):
+            return all(not uid.startswith(i) for i in ignore)
+
+        selection = [btn for key, btn in setting.buttons.items()
+                     if btn.method not in ('PUT', 'POST') and
                         key.startswith(self.view_name)]
         if vars:
-            sub_selection = [button for button in selection
-                             if set(button.vars) == set(vars)]
+            sub_selection = [btn for btn in selection if set(btn.vars) == set(vars)]
         else:
-            sub_selection = [button for button in selection
-                             if set(button.vars) == set() and not button.param]
+            sub_selection = [btn for btn in selection if set(btn.vars) == set() and not btn.param]
         if ignore:
-            sub_selection = [button for button in sub_selection
-                             if button.uid.split('_')[-1] not in ignore]
-        sub_selection = sorted(sub_selection, key=lambda b: b.order)
-        return sub_selection
+            sub_selection = [btn for btn in sub_selection if usable(btn.uid.split('_', 1)[1])]
+        return sorted(sub_selection, key=lambda btn: btn.order)
 
     def show_item(self, item):
         """Prepare render tree for showing one item."""
