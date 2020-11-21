@@ -11,7 +11,7 @@ from inspect import getmembers, isclass
 from os import getcwd, mkdir
 from os.path import join, exists, isfile, splitext
 from . import setting
-from .model import read_models
+from .model import read_models, BareItem, ItemRef
 from .view import read_views, Button
 from .layout import load_templates
 from .common import read_yaml_file, InternalError
@@ -158,9 +158,9 @@ def initialize_kernel():
         if extension == '.py':
             mod = import_module(name)
             for class_name, model_class in getmembers(mod, isclass):
-                if class_name in ['BareItem', 'Item', 'ItemRef']:
-                    continue
-                setting.models[class_name] = model_class
+                if issubclass(model_class, BareItem) or \
+                        issubclass(model_class, ItemRef):
+                    setting.models[class_name] = model_class
         elif extension == '.yml':
             models = read_yaml_file(item)
             read_models(models)
@@ -209,6 +209,9 @@ def initialize_kernel():
                 ref_classes.append(name)
             else:
                 model = setting.models[name]
+                if not issubclass(model, BareItem):
+                    print('{0} is not a sub-class of BareItem'.format(name))
+                    continue
                 print('{0}\n{1}'.format(name, '='*len(name)))
                 fmt = "{:<15} {:<20} {:<10} {!s:<10} {!s:<10} {!s:<10} {!s:<10}"
                 print(fmt.format('name', 'label', 'schema', 'optional',
