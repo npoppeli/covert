@@ -88,10 +88,11 @@ class CondRouter:
         # path rewrite in case of index page
         if request.path_info == '/' and self.index_page:
             request.path_info = self.index_page
-        # check available routes, where each route is a tuple (condition, mode, app)
+        # check available routes, where each route is a tuple (condition, mode, app).
+        # the first match we find is the one we use
         mode, app = '', not_found
         for route in self.routes:
-            if route[0](request): # first route with 'True' condition is our target
+            if route[0](request):
                 mode, app = route[1], route[2]
                 break
         if mode == 'MOUNT': # remove mount point from path_info
@@ -99,8 +100,8 @@ class CondRouter:
             request.path_info = path_info[path_info.find('/', 1):]
         try:
             response = request.get_response(app)
-            logger.debug('"{} {}" {} {}'.format(request.method, request.path_qs,
-                         response.status, response.content_length))
+            logger.debug('"{} {}" {} {} {}'.format(request.method, request.path_qs,
+                         response.status, response.content_length, mode))
         except Exception as e:
             response = Response()
             response.text = exception_report(e)
