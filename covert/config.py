@@ -194,11 +194,11 @@ def initialize_kernel():
         print('')
         # print all buttons (tabular)
         print(c._('Application has {0} buttons').format(len(setting.buttons)))
-        fmt = "{:<25} {:<15} {:<25} {:<35} {:<10} {:<15} {:<10}"
-        print(fmt.format('uid', 'label', 'icon', 'action', 'method', 'vars', 'name'))
-        print('-' * 140)
+        fmt = "{:>5} {:<25} {:<15} {:<25} {:<35} {:<10} {:<15} {:<10}"
+        print(fmt.format('order', 'uid', 'label', 'icon', 'action', 'method', 'vars', 'name'))
+        print('-' * 150)
         for button in setting.buttons.values():
-            print(fmt.format(button.uid, button.label, button.icon, button.action,
+            print(fmt.format(button.order, button.uid, button.label, button.icon, button.action,
                              button.method, ', '.join(button.vars), button.name))
         print('')
         # print all models (tabular)
