@@ -613,7 +613,7 @@ class RenderTree:
         initial_post = '_filter' not in self.request.params
         if initial_post:
            # cursor.form contains query specifications with real values
-           logger.debug('move_cursor form: ' + str(cursor.form))
+           # logger.debug('move_cursor form: ' + str(cursor.form))
            for key, value in cursor.form.items():
                if isinstance(value, list):
                    cursor.form[key] = ('in', value[0], value[1])
