@@ -148,8 +148,8 @@ class MapRouter:
             response.headers['Access-Control-Allow-Origin'] = request.headers['Origin']
         # special treatment for OPTIONS requests
         if req_method == 'OPTIONS':
-            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, DELETE, OPTIONS'
-            response.headers['Access-Control-Allow-Headers'] = 'x-requested-with'
+            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+            response.headers['Access-Control-Allow-Headers'] = 'x-requested-with, content-type'
             response.headers['Access-Control-Max-Age'] = '86400'
             return response(environ, start_response)
         # find first route that matches request
