@@ -149,13 +149,15 @@ class Expr(Node):
             return arg
         # so it's a path-like argument
         value = get_value(arg, context, self.root)
+        # logger.debug('Expr path: value={}'.format(str(value)))
         if isinstance(value, tuple):
             if self.raw:
-                # logger.debug('Expr raw: value={}'.format(str(value)))
                 return "{0} {1} {3}".format(*value)
-            else:
-                # logger.debug('Expr not raw: value={}'.format(str(value)))
+            elif len(value)==4:
                 return "{0} <a href='{2}'>{1}</a> {3}".format(*value)
+            else:
+                logger.debug('Expr: tuple not of length 4 {}'.format(str(value)))
+                return str(value)
         else:
             return str(value)
 
@@ -320,9 +322,10 @@ def repeat_block(context, children, args, root, before=None, after=None):
         sequence = sequence[:before]
     elif after is not None:
         sequence = sequence[after+1:]
-    if isinstance(sequence, list):
+    if isinstance(sequence, list) or isinstance(sequence, tuple):
         for key, element in enumerate(sequence):
             context['@0'] = element
+            # logger.debug("each: @0 =| {} |".format(str(element)))
             context['@first'] = key == 0
             context['@index'] = key
             result.append(''.join(child(context, children, args) for child in children))
@@ -334,7 +337,7 @@ def repeat_block(context, children, args, root, before=None, after=None):
             result.append(''.join(child(context, children, args) for child in children))
         return ''.join(result)
     else:
-        raise ValueError("each: component {} should be list or dict".format(arg))
+        raise ValueError("each: component {} should be list, tuple or dict".format(arg))
 
 def each_block(context, children, args, root):
     return repeat_block(context, children, args, root)
