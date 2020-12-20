@@ -1088,7 +1088,7 @@ class ItemView(BareItemView):
     def create(self):
         """Create a new item."""
         submit = self.request.params['_submit']
-        if submit == 'ok': # modify item and show this
+        if submit == 'ok': # create item and show this
             self.tree.add_item(self.model())
             return self.process_form(description=c._('New item'),
                                      action='create', clear=True, bound=True)
