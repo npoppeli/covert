@@ -132,7 +132,12 @@ class MapRouter:
     def serialize(self, result, template):
         if setting.debug and templates_changed():
             reload_templates()
-        return setting.templates[template](result)
+        try:
+            html =setting.templates[template](result)
+            return html
+        except Exception as e:
+            logger.error(c._('Evaluation of template {} results in exception {}\n').\
+                         format(template, exception_report(e, False)))
 
     def finalize(self, result):
         return result
