@@ -322,7 +322,8 @@ class BareItem(dict):
             if list_index is not None and field not in result:
                 result[field] = []
             if field in result and isinstance(result[field], list):
-                result[field].insert(list_index, value)
+                if value:
+                    result[field].insert(list_index, value)
             else:
                 result[field] = value
         return result
