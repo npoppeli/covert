@@ -702,6 +702,8 @@ class RenderTree:
             field = path[0]
             field_meta = item_meta[field]
             scalar = field_meta.schema != 'itemref'
+            if form_type == 'search' and not scalar:
+                continue
             multiple = field_meta.multiple
             button_list = []
             if multiple: # add push/pop buttons (in certain conditions)
@@ -1028,8 +1030,10 @@ class ItemView(BareItemView):
             delta = []
             for item in tree.data:
                 old = item.copy()
-                result = self.extract_form(model=type(item), prefix=item.get('_iprefix', ''),
+                prefix = item.get('_iprefix', '')
+                result = self.extract_form(model=type(item), prefix=prefix,
                                            keep_empty=keep_empty)
+                # logger.debug(f"process_form: prefix={prefix} result={result}")
                 item.update(result)
                 if diff:
                     delta.append(format_json_diff(old, item))
@@ -1038,7 +1042,7 @@ class ItemView(BareItemView):
                 if callable(postproc):
                     postproc(tree)
                 for item in tree.data:
-                    # cleaning up: remove the keys we added temporarily
+                    # before persisting the item: remove the keys we added temporarily
                     for key in delete_keys:
                         if key in item: del item[key]
                     item.write(validate=False)
@@ -1049,6 +1053,7 @@ class ItemView(BareItemView):
                 return self.show_item(tree.data[0])
             else:
                 errors = '\n'.join([v['data'] for v in validations])
+                logger.debug(f"process_form: {description} has validation errors {errors}")
                 tree.message = c._('{} {} has validation errors {}').\
                                format(description, str(tree.data[0]), errors)
                 tree.style = 1
