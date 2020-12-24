@@ -147,16 +147,15 @@ class Expr(Node):
             return str(arg)
         elif arg_type == 'string':
             return arg
-        # so it's a path-like argument
+        # If we reach this point, we're dealing with a path-like argument
         value = get_value(arg, context, self.root)
-        # logger.debug('Expr path: value={}'.format(str(value)))
         if isinstance(value, tuple):
             if self.raw:
-                return "{0} {1} {3}".format(*value)
-            elif len(value)==4:
-                return "{0} <a href='{2}'>{1}</a> {3}".format(*value)
+                return "{} {} {}".format(value[0], value[1], value[3])
+            elif len(value) > 3:
+                return "{} <a href='{}'>{}</a> {}".format(value[0], value[2], value[1], value[3])
             else:
-                logger.debug('Expr: tuple not of length 4 {}'.format(str(value)))
+                logger.debug('Expr: tuple too short {}'.format(str(value)))
                 return str(value)
         else:
             return str(value)
@@ -266,7 +265,12 @@ def if_unless_block(context, children, args, root, reverse=False):
     if arg_type == 'number' or arg_type == 'string':
         value = arg
     else:
-        value = get_value(arg, context, root)
+        try:
+            value = get_value(arg, context, root)
+        except Exception as e:
+            logger.debug('if_unless: exception occurred with arg={} context={}'.\
+                         format(arg, ', '.join(context.keys())))
+            return '<if_unless exception>'
     condition = not bool(value) if reverse else bool(value)
     if condition:
         return ''.join(child(context, children, args) for child in children)
@@ -300,7 +304,12 @@ def with_block(context, children, args, root):
     # logger.debug('With: arg={} ({})'.format(str(arg), arg_type))
     if arg_type == 'number' or arg_type == 'string':
         raise ValueError("with: incorrect argument '{}'".format(str(arg)))
-    new_context = get_value(arg, context, root)
+    try:
+        new_context = get_value(arg, context, root)
+    except Exception as e:
+        logger.debug('with: exception occurred with arg={} context={}'. \
+                     format(arg, ', '.join(context.keys())))
+        return '<with exception>'
     if not isinstance(new_context, dict):
         logger.error('with: arg={} old context={} new context={}'.\
                      format(arg, short(context), str(new_context)))
@@ -317,7 +326,12 @@ def repeat_block(context, children, args, root, before=None, after=None):
     if arg_type == 'number' or arg_type == 'string':
         raise ValueError("each: incorrect argument '{}'".format(str(arg)))
     result = []
-    sequence = get_value(arg, context, root)
+    try:
+        sequence = get_value(arg, context, root)
+    except Exception as e:
+        logger.debug('repeat: exception occurred with arg={} context={}'. \
+                     format(arg, ', '.join(context.keys())))
+        return '<repeat exception>'
     if before is not None:
         sequence = sequence[:before]
     elif after is not None:
