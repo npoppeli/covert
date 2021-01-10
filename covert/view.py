@@ -336,12 +336,12 @@ def read_views(module):
                         templates.append('default')
                 if member.icon:
                     if member_name in setting.icons:
-                        logger.debug("Attempt to redefine icon for '%s'", member_name)
+                        pass # logger.debug("Attempt to redefine icon for '%s'", member_name)
                     else:
                         setting.icons[member_name] = member.icon
                 if member.label:
                     if member_name in setting.labels:
-                        logger.debug("Attempt to redefine label for '%s'", member_name)
+                        pass # logger.debug("Attempt to redefine label for '%s'", member_name)
                     else:
                         setting.labels[member_name] = member.label
                 for method in member.method.split(','):
@@ -821,16 +821,18 @@ class RenderTree:
             if method:
                 self.method = method
 
-    def add_search_button(self, action):
-        """Add search button to render tree."""
+    def add_search_buttons(self, action):
+        """Add search buttons to render tree."""
         if self.data:
             item = self.data[0]
             # TODO: view_name + '_' + action_name should move to a function
             # TODO: also add to item:
             # TODO: _search=1, _placeholder='jjjj-mm-dd' I18N, label='t/m' I18N
             button = button_for(self.view_name+'_'+action)
-            go = button(item, name='search', label=c._('Search'), icon=icon_for('search'))
-            self.buttons.append(go)
+            search = button(item, name='search', label=c._('Search'), icon=icon_for('search'))
+            cancel = button(item, name='cancel', label=c._('Cancel'), icon=icon_for('cancel'))
+            self.buttons.append(search)
+            self.buttons.append(cancel)
 
     def add_return_button(self, location):
         """Add return button to render tree."""
@@ -954,7 +956,7 @@ class ItemView(BareItemView):
         """Make a search form, using an empty item to populate the form."""
         tree = self.tree
         tree.add_item(self.model())
-        tree.add_search_button('match')
+        tree.add_search_buttons('match')
         tree.display_item(form_type='search')
         tree.prune_item(clear=True)
         tree.cookies.append(Cookie('search-origin', self.request.referer, path='/', expires=120))
