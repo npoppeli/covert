@@ -21,6 +21,8 @@ def report_db_action(result):
         message += result['message']
     if setting.debug > 1:
         logger.debug(message)
+    elif result['status'] != SUCCESS:
+        logger.info(c._('Item could not be written: ') + message)
 
 class Translator(ast.NodeVisitor):
     """Instances of this class translate a filter in the form of a compiled
@@ -69,6 +71,8 @@ class Translator(ast.NodeVisitor):
     def visit_List        (self, n): return self.visit_elts(n)
     def visit_Tuple       (self, n): return self.visit_elts(n)
     # complex nodes
+    def visit_Attribute(self, n):
+        return '{}.{}'.format(self.visit(n.value), n.attr)
     def visit_Dict(self, n):
         return dict(zip(self.visit_keys(n), self.visit_values(n)))
     def visit_BinOp(self, n):
@@ -146,17 +150,17 @@ class Item(BareItem):
         try:
             root = compile(expr, '', 'eval', ast.PyCF_ONLY_AST)
         except SyntaxError as e:
-            logger.debug(c._("Item.filter: expr = {}").format(expr))
-            logger.debug(c._("Exception '{}'").format(e))
+            logger.info(c._("Item.filter: expr = {}").format(expr))
+            logger.info(c._("Exception '{}'").format(e))
             raise
         translator = Translator(cls.cmap, cls.wmap)
         try:
             result = translator.visit(root.body)
             return result
         except Exception as e:
-            logger.debug(str(e))
-            logger.debug(c._("Item.filter: expr = {}").format(expr))
-            logger.debug(c._("Item.filter: root = {}").format(ast.dump(root)))
+            logger.info(str(e))
+            logger.info(c._("Item.filter: expr = {}").format(expr))
+            logger.info(c._("Item.filter: root = {}").format(ast.dump(root)))
             return None
 
     @classmethod
