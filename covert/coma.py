@@ -292,11 +292,14 @@ def take_partial(context, children, args, root):
         if arg_type1 == 'path':
             value1 = get_value(arg1, context, root)
         else:
-            raise ValueError("take: incorrect 2nd argument {}".format(str(arg1)))
+            return "take: 2nd argument {} should be path-like".format(str(arg1))
         value0 = get_value(arg0, value1, root)
-        return str(value0)
+        if isinstance(value0, tuple) and len(value0) > 3:
+            return "{} <a href='{}'>{}</a> {}".format(value0[0], value0[2], value0[1], value0[3])
+        else:
+            return value0
     else:
-        raise ValueError("take: incorrect 1st argument {}".format(str(arg0)))
+        return "take: 1st argument {} should be path-like".format(str(arg0))
 setting.templates['take'] = take_partial
 
 def with_block(context, children, args, root):
