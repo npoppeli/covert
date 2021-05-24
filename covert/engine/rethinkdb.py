@@ -9,7 +9,7 @@ import ast
 from datetime import datetime
 import rethinkdb as r
 from ..common import SUCCESS, ERROR, FAIL, logger, InternalError
-from ..model import BareItem, mapdoc, Visitor
+from ..model import BareItem, mapdoc
 from .. import setting
 from .. import common as c
 from ..event import event
@@ -21,6 +21,8 @@ def report_db_action(result):
         message += result['message']
     if setting.debug > 1:
         logger.debug(message)
+    elif result['status'] != SUCCESS:
+        logger.info(c._('Item could not be written: ') + message)
 
 class Translator(ast.NodeVisitor):
     """Instances of this class translate a filter in the form of a compiled
