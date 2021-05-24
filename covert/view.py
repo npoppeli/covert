@@ -5,8 +5,8 @@ Views are classes consisting of route methods and other methods. The route metho
 are decorated by '@route'. Each route has a URL pattern, one or more HTTP methods,
 and one or more templates.
 
-In the present implementation, form validation is performed on the server. Alternative:
-do form validation in the client, using Parsley.js (jQuery) for example.
+In the present implementation, form validation is performed on the server.
+Alternative: do form validation in the client, using a suitable JavaScript library or framework.
 """
 
 import calendar, logging, re
@@ -336,12 +336,12 @@ def read_views(module):
                         templates.append('default')
                 if member.icon:
                     if member_name in setting.icons:
-                        pass # logger.debug("Attempt to redefine icon for '%s'", member_name)
+                        pass
                     else:
                         setting.icons[member_name] = member.icon
                 if member.label:
                     if member_name in setting.labels:
-                        pass # logger.debug("Attempt to redefine label for '%s'", member_name)
+                        pass
                     else:
                         setting.labels[member_name] = member.label
                 for method in member.method.split(','):
@@ -498,7 +498,7 @@ class Cursor:
                 attval = str2int(value) if key[1:] in self.default else value
                 setattr(self, key[1:], attval)
             else: # form attribute
-                form[key] = value
+                form[key] = value.replace('\n', ' ').replace('\t', ' ')
         if initial_post:
             # Preprocess form: take care of empty values, and parameters of date type
             date_params = preprocess_form(form)
@@ -510,9 +510,14 @@ class Cursor:
                     continue
                 if key in date_params:
                     self.form[key] = ('in', value[0], value[1])
-                else:  # if value is a list, use the first element
-                    actual_value = value[0] if isinstance(value, list) else value
-                    self.form[key] = (model.qmap[key], actual_value)
+                else:
+                    value0 = value[0] if isinstance(value, list) else value
+                    if isinstance(value0, dict):
+                        for (subkey, subvalue) in value0.items():
+                            self.form[key+'.'+subkey] = (model.qmap[subkey], subvalue)
+                    else:
+                        self.form[key] = (model.qmap[key], value0)
+            # logger.debug('cursor.init: converted form={}'.format(self.form))
 
     def __str__(self):
         d = dict([(key, getattr(self, key, '')) for key in self.__slots__])
@@ -622,7 +627,7 @@ class RenderTree:
            # translate filter dictionary to expression
            terms = []
            for key, value in filter_spec.items():
-               emap = self.model.emap.get(key, None)
+               emap = self.model.emap.get(key.split('.')[-1], None)
                if len(value) == 3:
                    v1, v2 = (emap(value[1]), emap(value[2])) if emap else (value[1], value[2])
                    term = "({} {} ({}, {}))".format(key, value[0], v1, v2)
@@ -639,6 +644,7 @@ class RenderTree:
                     cursor.filter = remove_active(cursor.filter)
             elif 'active' not in cursor.filter:
                 cursor.filter += " and (active == '1')"
+        # logger.debug('move_cursor: filter={}'.format(cursor.filter))
         cursor.count = self.model.count(cursor.filter)
         cursor.skip = max(0, min(cursor.count, cursor.skip+cursor.dir*cursor.limit))
         cursor.prev = cursor.skip > 0
@@ -700,7 +706,11 @@ class RenderTree:
             # path structure is: [field].[sequence_number].[atom_type](#[index])?
             path = key.split('.')
             field = path[0]
-            field_meta = item_meta[field]
+            if field in item_meta:
+                field_meta = item_meta[field]
+            else:
+                logger.debug("Unknown meta field '{}' in item; key={}".format(field, key))
+                continue
             scalar = field_meta.schema != 'itemref'
             if form_type == 'search' and not scalar:
                 continue
@@ -755,34 +765,35 @@ class RenderTree:
         """Prune one item in the render tree."""
         item = self.data[nr]
         hidden = item['_hidden']
-        new_item = OrderedDict()
         item_prefix = item.get('_iprefix', '')
+        pruned_keys = []
         for key, field in item.items():
             if key.startswith('_'):
-                new_item[key] = field
+                pass # do not add this key to pruned_keys
             else:
+                if clear:
+                    item[key]['value'] = ''
                 excluded = key in hidden or \
                            (item_prefix and field['meta']['schema'] == 'itemref')
                 if not excluded:
-                    if clear: field['value'] = ''
-                    new_item[key] = field
-        new_item['_keys'] = [k for k in new_item.keys() if not k.startswith('_')]
-        self.data[nr] = new_item
+                    pruned_keys.append(key)
+        # logger.debug(f'prune_item: _ikeys={pruned_keys}')
+        item['_ikeys'] = pruned_keys
 
     def prune_items(self, clear=False, omit=None):
         """Prune all items in the render tree."""
-        omit_from_index = [] if omit is None else omit
+        omit_from_index = omit or []
         if self.poly:
             for nr in range(len(self.data)):
                 self.prune_item(nr=nr, clear=clear)
         else:
+            pruned_keys = []
             for nr, item in enumerate(self.data):
                 hidden = item['_hidden']
-                new_item = OrderedDict()
                 for key, field in item.items():
                     path = key.split('.')
                     if key.startswith('_'):
-                        new_item[key] = field
+                        pass # do not add this key to pruned_keys
                     else:
                         field_meta = field['meta']
                         excluded = key in hidden or key in omit_from_index or \
@@ -790,9 +801,10 @@ class RenderTree:
                                    field_meta['auto'] or path[1] != '0' or \
                                    field_meta['schema'] in ('text', 'memo')
                         if not excluded:
-                            new_item[key] = field
-                new_item['_keys'] = [k for k in new_item.keys() if not k.startswith('_')]
-                self.data[nr] = new_item
+                            pruned_keys.append(key)
+                item['_ikeys'] = pruned_keys
+                pruned_keys = []
+            logger.debug(f'prune_items: _ikeys={pruned_keys}')
 
     def add_buttons(self, buttons):
         """Add buttons to render tree."""
