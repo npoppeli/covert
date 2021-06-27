@@ -1,3 +1,11 @@
+Version 0.13
+------------
+
+### Features
+ - API change: prune has been simplified. No information is removed from the
+   render tree: only the list of item keys is pruned. Templates should take
+   care of showing only the reduced set of keys.
+
 Version 0.12
 ------------
 

@@ -8,7 +8,7 @@ setup(
     author='Nico Poppelier',
     author_email='n.poppelier@xs4all.nl',
     license='MIT',
-    url='http://schier7.home.xs4all.nl/bass',
+    url='http://schier7.home.xs4all.nl/covert',
     description='Web framework',
     long_description=
         "Covert is a storage-agnostic web framework.",
@@ -18,20 +18,18 @@ setup(
         "License :: OSI Approved :: MIT License",
         'Operating System :: POSIX',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.2',
-        'Programming Language :: Python :: 3.3',
-        'Programming Language :: Python :: 3.4',
+        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8'
     ],
     install_requires=[
-        'Chameleon>=2.18',
+        'chameleon>=3.0',
         'mongodb-org>=3.2', # plus mongo tools
         'pymongo>=3.0.0',
-        'webOb>=1.5.0',
-        'pyyaml>=...',
-        'voluptuous >=...',
-        'waitress   >=...',
-        'tonnikala  >= 1.0.0b3', # optional
-        'mako       >= ...'  # optional
+        'webOb>=1.7.0',
+        'pyyaml>=5.1',
+        'voluptuous>=0.10',
+        'waitress>=1.0.0'
     ],
     packages=['covert']
 )

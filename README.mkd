@@ -28,10 +28,13 @@ For development Mercurial is needed as well.
 - *WebOb*
 - *Waitress*
 - *Chameleon*
+- *PyBabel*
+- *PyYAML*
+- *Voluptuous*
 - either *MongoDB* or *RethinkDB*
 
 #### Optional
-- jsondiff
+- jsondiff, GridFS
 
 About
 -----
