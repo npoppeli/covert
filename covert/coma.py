@@ -26,7 +26,9 @@ def abbrev(s):
 
 def short(context):
     if isinstance(context, dict):
-        return "{}".format(', '.join(context.keys()))
+        return "dict with keys {}".format(', '.join(context.keys()))
+    elif isinstance(context, str):
+        return "str {} ...".format(str(context)[0:40])
     else:
         return str(context)
 
@@ -71,14 +73,22 @@ def get_value(path, context, root):
         if isinstance(value, dict) and part in value:
             value = value[part]
         elif isinstance(value, list) and part.isnumeric():
-            value = value[int(part)]
+            index = int(part)
+            if index < len(value):
+                value = value[int(part)]
+            else:
+                value = 'No element {} in list {}'.format(index, value)
         elif isinstance(value, tuple) and part.isnumeric():
-            value = value[int(part)]
+            index = int(part)
+            if index < len(value):
+                value = value[int(part)]
+            else:
+                value = 'No element {} in tuple {}'.format(index, value)
         else:
             route = ':'.join(path_2)
-            logger.error("No {} in context {}\npath={} part={} value={}".\
-                           format(route, short(context), str(path_2), part, str(value)))
-            raise KeyError("No {} in context {}".format(route, short(context)))
+            logger.error("No {} in context {}\npath={} part={} value={} ...".\
+                           format(route, short(context), str(path_2), part, str(value)[0:40]))
+            value = "No {} in context {}".format(route, short(context))
     # logger.debug('get_value (3): path={} value={}'.format(path, str(value)))
     return value
 
