@@ -16,7 +16,7 @@ from inspect import getmembers, isclass, isfunction
 from itertools import chain
 from urllib.parse import urlencode
 from .atom import empty_scalar, empty_dict, empty_list
-from .common import SUCCESS, write_file, str2int, show_dict
+from .common import SUCCESS, FAIL, ERROR, write_file, str2int, show_dict
 from .common import encode_dict, CATEGORY_READ, format_json_diff
 from .model import empty_reference
 from .event import event
@@ -507,7 +507,7 @@ class Cursor:
                 # ignore values that are empty in a functional sense
                 if empty_scalar(value) or empty_reference(value) or \
                    empty_dict(value) or empty_list(value):
-                    continue
+                    logger.debug('cursor: ignored empty value {}'.format(value))
                 if key in date_params:
                     self.form[key] = ('in', value[0], value[1])
                 else:
@@ -517,7 +517,7 @@ class Cursor:
                             self.form[key+'.'+subkey] = (model.qmap[subkey], subvalue)
                     else:
                         self.form[key] = (model.qmap[key], value0)
-            # logger.debug('cursor.init: converted form={}'.format(self.form))
+            # logger.debug('cursor: converted form={}'.format(self.form))
 
     def __str__(self):
         d = dict([(key, getattr(self, key, '')) for key in self.__slots__])
@@ -560,6 +560,76 @@ def remove_active(s):
     """Remove term active == 'foo' from filter expression `s`"""
     return regex_andand.sub(' and ', regex_active.sub('', s))
 
+def display_item(item, form_type, view_name):
+    """Prepare display form of one item for insertion into the render tree.
+    The `form_type` parameter is used for additions to the render tree in a few cases:
+      - form_type '': no additions
+      - form_type 'modify': add push/pop buttons, pre-process empty lists
+      - form_type 'search': substitute form type of date fields.
+    """
+    item_meta = item.meta
+    disp_item = item.display()
+    item_prefix = item.get('_iprefix', '')
+    new_item = OrderedDict()
+    has_buttons = defaultdict(bool)
+    for key, value in disp_item.items():
+        if key.startswith('_'):
+            new_item[key] = value
+            continue
+        # path structure is: [field].[sequence_number].[atom_type](#[index])?
+        path = key.split('.')
+        field, atom_type = path[0], path[2]
+        if field in item_meta:
+            field_meta = item_meta[field]
+        else:
+            logger.debug("Unknown meta field '{}' in item; key={}".format(field, key))
+            continue
+        schema = field_meta.schema
+        is_itemref = schema == 'itemref'
+        # TODO: disable, later remove this exception
+        # if form_type == 'search' and is_itemref: continue
+        multiple = field_meta.multiple
+        button_list = []
+        if multiple: # add push/pop buttons (in certain conditions)
+            if '#' in key:
+                index = int(key[key.find('#')+1:])
+            else: # actual value is empty list
+                index = 0
+            if form_type == 'modify' and not is_itemref and index == 0 and not has_buttons[field]:
+                # add buttons to first element in group (examples: notes.0.s#0)
+                # itemref fields are excluded from this at the moment
+                # TODO: view_name + '_' + action_name -> function
+                push = Button(view_name+'_push', action='', name='push')
+                pop  = Button(view_name+'_pop' , action='', name='pop' )
+                button_list.append(push(item))
+                button_list.append(pop(item))
+                has_buttons[field] = True
+            # set label and metadata
+            if field not in item_meta:
+                logger.info('display_item: discard extra field {}={} (multiple)'.format(key, value))
+                continue
+            label = field_meta.label if index == 0 else str(index+1)
+        else:
+            index = -1
+            if field not in item_meta:
+                logger.info('display_item: discard extra field {}={} (not multiple)'.format(key, value))
+                continue
+            label = field_meta.label
+        if field_meta.auto:
+            field_formtype = 'hidden'
+        elif form_type == 'search'  and field_meta.formtype == 'date':
+            field_formtype = 'daterange'
+        else:
+            field_formtype = field_meta.formtype
+        proplist = {'label': label, 'enum': field_meta.enum, 'index': index+1,
+                    'schema': field_meta.schema, 'multiple': field_meta.multiple,
+                    'locked': is_itemref, 'scalar': is_itemref,
+                    'formid': item_prefix + key, 'formtype': field_formtype,
+                    'auto': field_meta.auto, 'control': field_meta.control}
+        new_item[key] = {'value':value, 'meta':proplist, 'buttons':button_list}
+    new_item['_keys'] = [k for k in new_item.keys() if not k.startswith('_')]
+    return new_item
+
 class RenderTree:
     """Tree representation of information created by a route.
 
@@ -597,7 +667,7 @@ class RenderTree:
         self.message = ''
         self.method = ''
         self.poly = True
-        self.status = '' # success, fail, error
+        self.status = '' # see 'common module': SUCCESS, FAIL, ERROR
         self.style = 0
         self.title = ''
 
@@ -652,7 +722,9 @@ class RenderTree:
 
     def add_item(self, oid_or_item, prefix='', label='', hide=None):
         """Add item to render tree."""
-        if isinstance(oid_or_item, str):
+        if oid_or_item is None:
+            raise ValueError(f'add_item: oid_or_item is None')
+        elif isinstance(oid_or_item, str):
             item = self.model.lookup(oid_or_item)
         else:
             item = oid_or_item
@@ -693,68 +765,7 @@ class RenderTree:
           - form_type 'modify': add push/pop buttons
           - form_type 'search': scan form type of date fields.
         """
-        item = self.data[nr]
-        item_meta = item.meta
-        disp_item = item.display()
-        item_prefix = item.get('_iprefix', '')
-        new_item = OrderedDict()
-        has_buttons = defaultdict(bool)
-        for key, value in disp_item.items():
-            if key.startswith('_'):
-                new_item[key] = value
-                continue
-            # path structure is: [field].[sequence_number].[atom_type](#[index])?
-            path = key.split('.')
-            field = path[0]
-            if field in item_meta:
-                field_meta = item_meta[field]
-            else:
-                logger.debug("Unknown meta field '{}' in item; key={}".format(field, key))
-                continue
-            scalar = field_meta.schema != 'itemref'
-            if form_type == 'search' and not scalar:
-                continue
-            multiple = field_meta.multiple
-            button_list = []
-            if multiple: # add push/pop buttons (in certain conditions)
-                if '#' in key:
-                    index = int(key[key.find('#')+1:])
-                else: # actual value is empty list
-                    index = 0
-                if form_type == 'modify' and scalar and index == 0 and not has_buttons[field]:
-                    # add buttons to first element in group (examples: notes.0.s#0)
-                    # itemref fields are excluded from this at the moment
-                    # TODO: view_name + '_' + action_name -> function
-                    push = Button(self.view_name+'_push', action='', name='push')
-                    pop  = Button(self.view_name+'_pop' , action='', name='pop' )
-                    button_list.append(push(item))
-                    button_list.append(pop(item))
-                    has_buttons[field] = True
-                # set label and metadata
-                if field not in item_meta:
-                    logger.info('display_item: discard extra field {}={} (multiple)'.format(key, value))
-                    continue
-                label = field_meta.label if index == 0 else str(index+1)
-            else:
-                index = -1
-                if field not in item_meta:
-                    logger.info('display_item: discard extra field {}={} (not multiple)'.format(key, value))
-                    continue
-                label = field_meta.label
-            if field_meta.auto:
-                field_formtype = 'hidden'
-            elif form_type == 'search'  and field_meta.formtype == 'date':
-                field_formtype = 'daterange'
-            else:
-                field_formtype = field_meta.formtype
-            proplist = {'label': label, 'enum': field_meta.enum, 'index': index+1,
-                        'schema': field_meta.schema, 'multiple': field_meta.multiple,
-                        'locked': field_meta.schema == 'itemref', 'scalar': scalar,
-                        'formid': item_prefix + key, 'formtype': field_formtype,
-                        'auto': field_meta.auto, 'control': field_meta.control}
-            new_item[key] = {'value':value, 'meta':proplist, 'buttons':button_list}
-        new_item['_keys'] = [k for k in new_item.keys() if not k.startswith('_')]
-        self.data[nr] = new_item
+        self.data[nr] = display_item(self.data[nr], form_type, self.view_name)
 
     def display_items(self, form_type=''):
         """Display all items in the render tree."""
@@ -930,6 +941,7 @@ class ItemView(BareItemView):
         tree.add_buttons(self.buttons(['id'], ignore=['show', 'delete']))
         tree.display_item()
         tree.prune_item()
+        tree.title = "{} {}".format(self.model.trname(), str(item))
         tree.dump('show_item')
         return tree()
 
@@ -1007,12 +1019,16 @@ class ItemView(BareItemView):
         else:
             raw_form = {key:value for key, value in params.items()
                         if (value or keep_empty) and not key.startswith('_')}
-        # Fields of 'itemref' type should be disabled in a form. Disabled fields are
+        # Fields of 'itemref' type should not be in the request parameters.
+        # If the application uses HTML forms, disabled fields are
         # not present in the request body (see W3C Specification for HTML 5).
+        logger.debug(f"extract_form: raw_form={raw_form}")
         if raw:
             return raw_form
         else:
+            logger.debug(f"extract_form: raw_form={raw_form}")
             result = model.convert(raw_form, partial=True)
+            logger.debug(f"extract_form: converted form={result}")
             return result
 
     def process_form(self, description, action, bound=False, postproc=None, method='POST',
@@ -1047,7 +1063,7 @@ class ItemView(BareItemView):
                 prefix = item.get('_iprefix', '')
                 result = self.extract_form(model=type(item), prefix=prefix,
                                            keep_empty=keep_empty)
-                # logger.debug(f"process_form: prefix={prefix} result={result}")
+                logger.debug(f"process_form: prefix={prefix} result={result}")
                 item.update(result)
                 if diff:
                     delta.append(format_json_diff(old, item))
@@ -1060,7 +1076,7 @@ class ItemView(BareItemView):
                     for key in delete_keys:
                         if key in item: del item[key]
                     item.write(validate=False)
-                tree.title = ''
+                tree.status = SUCCESS
                 tree.message = '{} {}. '.format(description, str(tree.data[0]))
                 if diff:
                     tree.message += ''.join(delta)
@@ -1071,6 +1087,8 @@ class ItemView(BareItemView):
                 tree.message = c._('{} {} has validation errors {}').\
                                format(description, str(tree.data[0]), errors)
                 tree.style = 1
+                tree.status = ERROR
+        tree.title = "{} {} {}".format(description, self.model.trname(), str(tree.data[0]))
         tree.add_form_buttons(action, method)
         tree.display_items(form_type='modify')
         tree.prune_items(clear=clear)
@@ -1080,7 +1098,10 @@ class ItemView(BareItemView):
     @route('/{id:objectid}/modify', template='form')
     def modify(self):
         """Make a form for modify/update action."""
-        self.tree.add_item(self.model.lookup(self.params['id']))
+        tree = self.tree
+        item = self.model.lookup(self.params['id'])
+        tree.add_item(item)
+        tree.title = "{} {}".format(self.model.trname(), str(item))
         return self.process_form(description=c._('Modified item'),
                                  action='update', method='PUT')
 
@@ -1089,7 +1110,8 @@ class ItemView(BareItemView):
         """Update an existing item."""
         submit = self.request.params['_submit']
         if submit == 'ok': # modify item and show this
-            self.tree.add_item(self.model.lookup(self.params['id']))
+            item = self.model.lookup(self.params['id'])
+            self.tree.add_item(item)
             return self.process_form(description=c._('Modified item'), bound=True,
                                      action='update', method='PUT', keep_empty=True, diff=True)
         else: # leave item unmodified and show this
@@ -1099,7 +1121,9 @@ class ItemView(BareItemView):
     @route('/new', template='form')
     def new(self):
         """Make a form for new/create action."""
-        self.tree.add_item(self.model())
+        tree = self.tree
+        tree.add_item(self.model())
+        tree.title = "{} {}".format(self.model.trname(), 'new')
         return self.process_form(description=c._('New item'),
                                  action='create', clear=True)
 
