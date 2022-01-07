@@ -39,5 +39,5 @@ from .controller import http_server, CondRouter, MapRouter, PageRouter, JSONRout
 from .event      import add_handler, event
 from .layout     import add_template_type, TemplateLoader, templates_changed
 from .model      import ItemRef, Visitor, json_diff
-from .view       import route, BareItemView, ItemView, url_for, icon_for
+from .view       import route, BareItemView, ItemView, url_for, icon_for, display_item
 from .view       import route2pattern, route2regex, RenderTree, Cursor, Button
