@@ -520,13 +520,17 @@ class BareItem(dict):
     def format_with(cls, func):
         cls._formatter = func
 
+    @classmethod
+    def trname(cls):
+        return model_transl.gettext(cls.name)
+
     def __str__(self):
-        """Informal string representation of item.
+        """Informal string representation of item (with multiple whitespace collapse).
 
         Returns:
             str: human-readable representation.
         """
-        return self._formatter()
+        return ' '.join(self._formatter().split())
 
     def __xor__(self, other):
         """Compute difference between two Item instances.
@@ -745,6 +749,7 @@ def parse_model_def(model_def, model_defs, transl):
         model_def (dict):  model definition to be parsed
         model_defs (list): list of all model definitions
                            (needed for forward references to inner classes)
+        transl:            translator function (I18N)
     """
     pm = ParsedModel() # parsed model definition
     for line in model_def:
@@ -777,7 +782,7 @@ def parse_model_def(model_def, model_defs, transl):
                 pm.empty[field_name] = embedded.empty
             pm.schema[schema_key] = [embedded.schema] if multiple_field else embedded.schema
             pm.meta[field_name] = Field(label=field_label, schema='dict',
-                                        formtype='dict', control='input',
+                                        formtype='dict', control='input', enum=embedded.names,
                                         auto=False, atomic=False, code='_',
                                         optional=optional_field, multiple=multiple_field)
             pm.names.extend(embedded.names)
