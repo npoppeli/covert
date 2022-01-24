@@ -15,7 +15,7 @@ from datetime import datetime
 from inspect import getmembers, isclass, isfunction
 from itertools import chain
 from urllib.parse import urlencode
-from .atom import empty_scalar, empty_dict, empty_list
+from .atom import empty_scalar, empty_dict, empty_list, atom_codemap
 from .common import SUCCESS, FAIL, ERROR, write_file, str2int, show_dict
 from .common import encode_dict, CATEGORY_READ, format_json_diff
 from .model import empty_reference
@@ -409,19 +409,19 @@ def preprocess_form(form):
         elif re_year_month.match(end):
             eyear, emonth = end.split('-')
             eday = str(calendar.monthrange(int(eyear), int(emonth))[1])
-            form[y] = '{}-{}'.format(end, eday)
+            form[y] = f'{end}-{eday}'
         elif re_year.match(end):
             eyear = end
             emonth = int(bmonth) if bmonth else 12
             eday = str(calendar.monthrange(int(eyear), emonth)[1])
             emonth = str(emonth).zfill(2)
-            form[y] = '{}-{}-{}'.format(end, emonth, eday)
+            form[y] = f'{end}-{emonth}-{eday}'
         elif end == '' and byear:
             eyear = byear
             emonth = int(bmonth) if bmonth else 12
             eday = str(calendar.monthrange(int(eyear), emonth)[1])
             emonth = str(emonth).zfill(2)
-            form[y] = '{}-{}-{}'.format(eyear, emonth, eday)
+            form[y] = f'{eyear}-{emonth}-{eday}'
     # Step 2: remove empty (key, value) pairs
     form_keys = sorted(form.keys())
     for key in form_keys:
@@ -507,7 +507,7 @@ class Cursor:
                 # ignore values that are empty in a functional sense
                 if empty_scalar(value) or empty_reference(value) or \
                    empty_dict(value) or empty_list(value):
-                    logger.debug('cursor: ignored empty value {}'.format(value))
+                    logger.debug(f'cursor: ignored empty value {value}')
                 if key in date_params:
                     self.form[key] = ('in', value[0], value[1])
                 else:
@@ -517,7 +517,7 @@ class Cursor:
                             self.form[key+'.'+subkey] = (model.qmap[subkey], subvalue)
                     else:
                         self.form[key] = (model.qmap[key], value0)
-            # logger.debug('cursor: converted form={}'.format(self.form))
+            # logger.debug(f'cursor: converted form={self.form}')
 
     def __str__(self):
         d = dict([(key, getattr(self, key, '')) for key in self.__slots__])
@@ -557,8 +557,23 @@ regex_active = re.compile("\(active\s*=\s*'.+?'\)")
 regex_andand = re.compile('and\s*and')
 
 def remove_active(s):
-    """Remove term active == 'foo' from filter expression `s`"""
+    """Remove term `active == 'foo'` from filter expression `s`"""
     return regex_andand.sub(' and ', regex_active.sub('', s))
+
+def preprocess_lists(item):
+    """"Pre-process empty lists: add one element with default value(s)."""
+    item_meta = item.meta
+    for key in item.keys():
+        value = item[key]
+        if key not in item_meta: continue
+        field_meta = item_meta[key]
+        if not field_meta.multiple or value or field_meta.code == '^': continue
+        if field_meta.schema == 'dict':
+            default = {k: atom_codemap[item_meta[k].code].default for k in field_meta.enum}
+        else:
+            default = atom_codemap[field_meta.code].default
+        item[key].append(default)
+        logger.debug(f"preprocess_lists: field '{key}' has modified value '{item[key]}'")
 
 def display_item(item, form_type, view_name):
     """Prepare display form of one item for insertion into the render tree.
@@ -567,6 +582,8 @@ def display_item(item, form_type, view_name):
       - form_type 'modify': add push/pop buttons, pre-process empty lists
       - form_type 'search': substitute form type of date fields.
     """
+    if form_type == 'modify':
+        preprocess_lists(item)
     item_meta = item.meta
     disp_item = item.display()
     item_prefix = item.get('_iprefix', '')
@@ -576,13 +593,13 @@ def display_item(item, form_type, view_name):
         if key.startswith('_'):
             new_item[key] = value
             continue
-        # path structure is: [field].[sequence_number].[atom_type](#[index])?
+        # keys are built up like this: [field].[sequence_number].[atom_type](#[index])?
         path = key.split('.')
         field, atom_type = path[0], path[2]
         if field in item_meta:
             field_meta = item_meta[field]
         else:
-            logger.debug("Unknown meta field '{}' in item; key={}".format(field, key))
+            logger.debug(f"Unknown meta field '{field}' in item; key={key}")
             continue
         schema = field_meta.schema
         is_itemref = schema == 'itemref'
@@ -606,13 +623,13 @@ def display_item(item, form_type, view_name):
                 has_buttons[field] = True
             # set label and metadata
             if field not in item_meta:
-                logger.info('display_item: discard extra field {}={} (multiple)'.format(key, value))
+                logger.info(f'display_item: discard extra field {key}={value} (multiple)')
                 continue
             label = field_meta.label if index == 0 else str(index+1)
         else:
             index = -1
             if field not in item_meta:
-                logger.info('display_item: discard extra field {}={} (not multiple)'.format(key, value))
+                logger.info(f'display_item: discard extra field {key}={value} (not multiple)')
                 continue
             label = field_meta.label
         if field_meta.auto:
@@ -700,10 +717,10 @@ class RenderTree:
                emap = self.model.emap.get(key.split('.')[-1], None)
                if len(value) == 3:
                    v1, v2 = (emap(value[1]), emap(value[2])) if emap else (value[1], value[2])
-                   term = "({} {} ({}, {}))".format(key, value[0], v1, v2)
+                   term = f"({key} {value[0]} ({v1}, {v2}))"
                else:
                    v1 = emap(value[1]) if emap else value[1]
-                   term = "({} {} {})".format(key, value[0], v1)
+                   term = f"({key} {value[0]} {v1})"
                terms.append(term)
            cursor.filter = ' and '.join(terms)
         else:
@@ -714,7 +731,7 @@ class RenderTree:
                     cursor.filter = remove_active(cursor.filter)
             elif 'active' not in cursor.filter:
                 cursor.filter += " and (active == '1')"
-        # logger.debug('move_cursor: filter={}'.format(cursor.filter))
+        # logger.debug(f'move_cursor: filter={cursor.filter}')
         cursor.count = self.model.count(cursor.filter)
         cursor.skip = max(0, min(cursor.count, cursor.skip+cursor.dir*cursor.limit))
         cursor.prev = cursor.skip > 0
@@ -815,7 +832,7 @@ class RenderTree:
                             pruned_keys.append(key)
                 item['_ikeys'] = pruned_keys
                 pruned_keys = []
-            logger.debug(f'prune_items: _ikeys={pruned_keys}')
+            # logger.debug(f'prune_items: _ikeys={pruned_keys}')
 
     def add_buttons(self, buttons):
         """Add buttons to render tree."""
@@ -941,6 +958,7 @@ class ItemView(BareItemView):
         tree.add_buttons(self.buttons(['id'], ignore=['show', 'delete']))
         tree.display_item()
         tree.prune_item()
+        tree.status = SUCCESS
         tree.title = "{} {}".format(self.model.trname(), str(item))
         tree.dump('show_item')
         return tree()
@@ -954,6 +972,7 @@ class ItemView(BareItemView):
         tree.add_buttons(self.buttons([]))
         tree.display_items()
         tree.prune_items(omit=self.omit_from_index)
+        tree.status = SUCCESS
         tree.dump('show_items')
         return tree()
 
@@ -966,6 +985,7 @@ class ItemView(BareItemView):
             return self.show_item(item)
         else:
             tree = self.tree
+            tree.status = ERROR
             tree.message = _('Nothing found for id={}').format(oid)
             tree.style = 1
             return tree()
@@ -1022,11 +1042,10 @@ class ItemView(BareItemView):
         # Fields of 'itemref' type should not be in the request parameters.
         # If the application uses HTML forms, disabled fields are
         # not present in the request body (see W3C Specification for HTML 5).
-        logger.debug(f"extract_form: raw_form={raw_form}")
         if raw:
+            logger.debug(f"extract_form: raw_form={raw_form}")
             return raw_form
         else:
-            logger.debug(f"extract_form: raw_form={raw_form}")
             result = model.convert(raw_form, partial=True)
             logger.debug(f"extract_form: converted form={result}")
             return result
@@ -1101,6 +1120,7 @@ class ItemView(BareItemView):
         tree = self.tree
         item = self.model.lookup(self.params['id'])
         tree.add_item(item)
+        tree.status = SUCCESS
         tree.title = "{} {}".format(self.model.trname(), str(item))
         return self.process_form(description=c._('Modified item'),
                                  action='update', method='PUT')
@@ -1109,13 +1129,15 @@ class ItemView(BareItemView):
     def update(self):
         """Update an existing item."""
         submit = self.request.params['_submit']
+        tree = self.tree
+        tree.status = SUCCESS
         if submit == 'ok': # modify item and show this
             item = self.model.lookup(self.params['id'])
-            self.tree.add_item(item)
+            tree.add_item(item)
             return self.process_form(description=c._('Modified item'), bound=True,
                                      action='update', method='PUT', keep_empty=True, diff=True)
         else: # leave item unmodified and show this
-            self.tree.message = c._('Item was not modified')
+            tree.message = c._('Item was not modified')
             return self.show_item(self.params['id'])
 
     @route('/new', template='form')
@@ -1123,6 +1145,7 @@ class ItemView(BareItemView):
         """Make a form for new/create action."""
         tree = self.tree
         tree.add_item(self.model())
+        tree.status = SUCCESS
         tree.title = "{} {}".format(self.model.trname(), 'new')
         return self.process_form(description=c._('New item'),
                                  action='create', clear=True)
@@ -1131,13 +1154,15 @@ class ItemView(BareItemView):
     def create(self):
         """Create a new item."""
         submit = self.request.params['_submit']
+        tree = self.tree
+        tree.status = SUCCESS
         if submit == 'ok': # create item and show this
-            self.tree.add_item(self.model())
+            tree.add_item(self.model())
             return self.process_form(description=c._('New item'),
                                      action='create', clear=True, bound=True)
         else: # show index page
-            self.tree.style = 2
-            self.tree.message = c._('No new item was created')
+            tree.style = 2
+            tree.message = c._('No new item was created')
             return self.show_items('index')
 
     @route('/{id:objectid}', method='DELETE', template='delete')
@@ -1152,7 +1177,7 @@ class ItemView(BareItemView):
         result = item.set_field('active', False)
         event('delete:post', item, self)
         if result['status'] == SUCCESS:
-            result['data'] = 'item {} set to inactive'.format(str(item))
+            result['data'] = f'item {item} set to inactive'
         else:
-            result['data'] = 'item {} not modified'.format(str(item))
+            result['data'] = f'item {item} not modified'
         return result
