@@ -1,4 +1,15 @@
-Version 0.13
+Version 0.20
+------------
+
+### Features
+ - API changes: none.
+ - Python version compatibility: at least version 3.6 should be used
+ - Other changes: various improvements to support a Tkinter GUI; 
+   all names in models are now also in the set of I18N terms;
+   the 'take' helper function was improved; errors in writing to the 
+   database are now reported in all cases.
+ 
+#Version 0.13
 ------------
 
 ### Features

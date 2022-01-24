@@ -8,8 +8,7 @@ The mapping router creates a response object based on route patterns.
 """
 
 import logging, re, waitress
-from datetime import datetime
-# we use BaseRequest instead of Request because of performance reasons
+# This module uses BaseRequest instead of Request because of performance reasons
 from webob import BaseRequest as Request, Response
 from webob.static import DirectoryApp
 from collections import deque

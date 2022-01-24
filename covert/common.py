@@ -66,8 +66,10 @@ def exception_report(exc, ashtml=True):
 
 # I18N
 # After every update that involves strings:
-#  pybabel extract *.py engine/*.py -o locales/covert.pot
-#  pybabel update -i locales/covert.pot -D 'covert' -d locales
+# 1. pybabel extract *.py engine/*.py -o locales/covert.pot
+# 2. pybabel update -i locales/covert.pot -D 'covert' -d locales
+# 3. manually adjust the associated *.po files
+
 setting.locales = join(dirname(setting.__file__), 'locales')
 translator = gettext.translation('covert', localedir=setting.locales, languages=['en'])
 _ = translator.gettext

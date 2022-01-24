@@ -376,37 +376,39 @@ class BareItem(dict):
             value = dct[key]
             if isinstance(value, dict):
                 self._dict_number += 1
-                object_label = 'o'+str(self._dict_number)
-                self._display.append(('{}.{}.o{}{}'.\
-                              format(key, parent, self._dict_number, index), object_label))
-                self._display_dict(value, self._dict_number)
+                dn = self._dict_number
+                object_label = f'o{dn}'
+                self._display.append((f'{key}.{parent}.{object_label}{index}', object_label))
+                self._display_dict(value, dn)
             elif value is None:
-                self._display.append(('{}.{}.{}'.format(key, parent, 'z'), ''))
+                self._display.append((f'{key}.{parent}.z', ''))
             elif isinstance(value, list):
                 if value:
                     self._display_list(key, value, parent, index)
                 else:
-                    self._display.append(('{}.{}.{}'.format(key, parent, 'a'), ''))
+                    self._display.append((f'{key}.{parent}.a', ''))
             else: # scalar
-                # atom type 's' implies cmap == dmap == identity
+                # atoms of type 's' have the property: cmap == dmap == identity
                 code = self.meta[key].code if key in self.meta else 's'
-                self._display.append(('{}.{}.{}'.format(key, parent, code),
+                self._display.append((f'{key}.{parent}.{code}',
                                      self.dmap[key](value) if key in self.dmap else value))
 
     def _display_list(self, key, lst, parent, index=''):
         if isinstance(lst[0], dict): # list of dictionaries, involves recursion
             for n, value in enumerate(lst):
-                new_index = '{}#{}'.format(index, n)
+                new_index = f'{index}#{n}'
                 self._dict_number += 1
-                self._display.append(('{}.{}.o{}{}'.format(key, parent, self._dict_number, new_index),
-                                      'o'+str(self._dict_number)))
+                dn = self._dict_number
+                object_label = f'o{dn}'
+                self._display.append((f'{key}.{parent}.{object_label}{new_index}',
+                                      object_label))
                 self._display_dict(value, self._dict_number, new_index)
         else: # list of scalars
             # atom type 's' implies cmap == dmap == identity
             code = self.meta[key].code if key in self.meta else 's'
             for n, value in enumerate(lst):
-                new_index = '{}#{}'.format(index, n)
-                self._display.append(('{}.{}.{}{}'.format(key, parent, code, new_index),
+                new_index = f'{index}#{n}'
+                self._display.append((f'{key}.{parent}.{code}{new_index}',
                                      self.dmap[key](value) if key in self.dmap else value))
 
     def follow(self, key):
@@ -615,21 +617,18 @@ class ItemRef:
         Returns:
             (str, str, str, str, str): prefix, infix, URL, postfix, class+id.
         """
+        name = self.__class__.__name__
         if self.refid is None:
-            return '', '', '#', '', \
-                   '{}.0'.format(self.__class__.__name__)
+            return '', '', '#', '', f'{name}.0'
         model = setting.models[self.collection]
         item = model.lookup(self.refid)
         event('display:pre', self, None)
         if item is None:
-            return '', '', '#', '', \
-                   '{}.0'.format(self.__class__.__name__)
+            return '', '', '#', '', f'{name}.0'
         else:
-            return self.pre, \
-                   str(item), \
-                   '/{}/{}'.format(self.collection.lower(), self.refid), \
-                   self.post, \
-                   '{}.{}'.format(self.__class__.__name__, self.refid)
+            cname = self.collection.lower()
+            return self.pre, str(item), f'/{cname}/{self.refid}', \
+                   self.post, f'{name}.{self.refid}'
 
     def lookup(self, field=None):
         """Retrieve item referenced by itemref object from storage.
@@ -686,7 +685,8 @@ class ItemRef:
         Returns:
             str: representation for Python interpreter.
         """
-        return "{}({},{})".format(self.__class__.__name__, self.collection, self.refid)
+        name = self.__class__.__name__
+        return f"{name}({self.collection},{self.refid})"
 
     def __str__(self):
         """Informal string representation of item reference.
@@ -694,7 +694,7 @@ class ItemRef:
         Returns:
             str: human-readable representation.
         """
-        return "{}.{}".format(self.collection, self.refid)
+        return f"{self.collection}.{self.refid}"
 
 
 # Auxiliary classes: Visitor

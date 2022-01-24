@@ -50,7 +50,7 @@ def get_value(path, context, root):
             if isinstance(step, UserList):
                 path_1.extend(step)
             else:
-                # logger.debug('get_value (1): path={} value={}'.format(path, str(step)))
+                # logger.debug(f'get_value (1): path={path} value={step}')
                 return step
         else:
             path_1.append(part)
@@ -62,11 +62,11 @@ def get_value(path, context, root):
             if isinstance(step, UserList):
                 path_2.extend(step)
             else:
-                # logger.debug('get_value (2): path={} value={}'.format(path, str(step)))
+                # logger.debug(f'get_value (2): path={path} value={step}')
                 return step
         else:
             path_2.append(part)
-    # logger.debug('get_value: path_2={}'.format(path_2))
+    # logger.debug(f'get_value: path_2={path_2}')
     for part in path_2:
         if part[0] == '[' and part[-1] == ']':
             part = part[1:-1]
@@ -77,19 +77,19 @@ def get_value(path, context, root):
             if index < len(value):
                 value = value[int(part)]
             else:
-                value = 'No element {} in list {}'.format(index, value)
+                value = f'No element {index} in list {value}'
         elif isinstance(value, tuple) and part.isnumeric():
             index = int(part)
             if index < len(value):
                 value = value[int(part)]
             else:
-                value = 'No element {} in tuple {}'.format(index, value)
+                value = f'No element {index} in tuple {value}'
         else:
-            route = ':'.join(path_2)
-            logger.error("No {} in context {}\npath={} part={} value={} ...".\
-                           format(route, short(context), str(path_2), part, str(value)[0:40]))
-            value = "No {} in context {}".format(route, short(context))
-    # logger.debug('get_value (3): path={} value={}'.format(path, str(value)))
+            route, ctx, value_head = ':'.join(path_2), short(context), str(value)[0:40]
+            logger.error(f"No {route} in context {ctx}\n"
+                         "path={path_2} part={part} value={value_head} ...")
+            value = f"No {route} in context {ctx}"
+    # logger.debug(f'get_value (3): path={path} value={value}')
     return value
 
 # Node classes for parse tree
@@ -161,11 +161,11 @@ class Expr(Node):
         value = get_value(arg, context, self.root)
         if isinstance(value, tuple):
             if self.raw:
-                return "{} {} {}".format(value[0], value[1], value[3])
+                return f"{value[0]} {value[1]} {value[3]}"
             elif len(value) > 3:
-                return "{} <a href='{}'>{}</a> {}".format(value[0], value[2], value[1], value[3])
+                return f"{value[0]} <a href='{value[2]}'>{value[1]}</a> {value[3]}"
             else:
-                logger.debug('Expr: tuple too short {}'.format(str(value)))
+                logger.debug(f'Expr: tuple too short {value}')
                 return str(value)
         else:
             return str(value)
@@ -180,7 +180,7 @@ class Block(Node):
         return "{} #{} {}".format(self.kind(), self.name, self.source)
     def __call__(self, context, children, args):
         if self.name not in setting.templates:
-            raise KeyError("Unknown block '{}'".format(self.name))
+            raise KeyError(f"Unknown block '{self.name}'")
         template = setting.templates[self.name]
         if isfunction(template):
             return template(context, self.children, self.args, self.root)
@@ -197,7 +197,7 @@ class Partial(Node):
         return "{} >{} {}".format(self.kind(), self.name, self.source)
     def __call__(self, context, children, args):
         if self.name not in setting.templates:
-            raise KeyError("Unknown partial '{}'".format(self.name))
+            raise KeyError(f"Unknown partial '{self.name}'")
         template = setting.templates[self.name]
         if isfunction(template):
             return template(context, self.children, self.args, self.root)
@@ -208,7 +208,7 @@ class Partial(Node):
 def contains_block(context, children, args, root):
     arg, arg_type = args[0], argtype(args[0])
     if arg_type != 'path':
-        raise ValueError("contains: incorrect argument '{}'".format(str(arg)))
+        raise ValueError(f"contains: incorrect argument '{arg}'")
     if arg[0] in context:
         return ''.join(child(context, children, args) for child in children)
     else:
@@ -218,7 +218,7 @@ setting.templates['contains'] = contains_block
 def ifdef_block(context, children, args, root):
     arg, arg_type = args[0], argtype(args[0])
     if arg_type != 'path':
-        raise ValueError("ifdef: incorrect argument '{}'".format(str(arg)))
+        raise ValueError(f"ifdef: incorrect argument '{arg}'")
     arg = get_value(arg, context, root)
     if arg is None:
         return ''
@@ -236,15 +236,13 @@ def compare_block(context, children, args, root, oper, name):
         elif arg_type1 == 'path':
             value1 = get_value(arg1, context, root)
         else:
-            raise ValueError("{}: incorrect 2nd argument {}".format(name, str(arg1)))
+            raise ValueError(f"{name}: incorrect 2nd argument {arg1}")
         if oper(value0, value1):
-            # logger.debug('{} {}={} {}={}: condition true'.format(name, arg0, value0, arg1, value1))
             return ''.join(child(context, children, args) for child in children)
         else:
-            # logger.debug('{} {}={} {}={}: condition false'.format(name, arg0, value0, arg1, value1))
             return ''
     else:
-        raise ValueError("{}: incorrect 1st argument {}".format(name, str(arg0)))
+        raise ValueError(f"{name}: incorrect 1st argument {arg0}")
 
 def eq_block(context, children, args, root):
     return compare_block(context, children, args, root, operator.eq, 'eq')
@@ -302,21 +300,21 @@ def take_partial(context, children, args, root):
         if arg_type1 == 'path':
             value1 = get_value(arg1, context, root)
         else:
-            return "take: 2nd argument {} should be path-like".format(str(arg1))
-        value0 = get_value(arg0, value1, root)
-        if isinstance(value0, tuple) and len(value0) > 3:
-            return "{} <a href='{}'>{}</a> {}".format(value0[0], value0[2], value0[1], value0[3])
+            return f"take: 2nd argument {arg1} should be path-like"
+        value = get_value(arg0, value1, root)
+        if isinstance(value, tuple) and len(value) > 3:
+            return f"{value[0]} <a href='{value[2]}'>{value[1]}</a> {value[3]}"
         else:
-            return value0
+            return value
     else:
-        return "take: 1st argument {} should be path-like".format(str(arg0))
+        return f"take: 1st argument {arg0} should be path-like"
 setting.templates['take'] = take_partial
 
 def with_block(context, children, args, root):
     arg, arg_type = args[0], argtype(args[0])
     # logger.debug('With: arg={} ({})'.format(str(arg), arg_type))
     if arg_type == 'number' or arg_type == 'string':
-        raise ValueError("with: incorrect argument '{}'".format(str(arg)))
+        raise ValueError(f"with: incorrect argument '{arg}'")
     try:
         new_context = get_value(arg, context, root)
     except Exception as e:
@@ -337,7 +335,7 @@ setting.templates['with'] = with_block
 def repeat_block(context, children, args, root, before=None, after=None):
     arg, arg_type = args[0], argtype(args[0])
     if arg_type == 'number' or arg_type == 'string':
-        raise ValueError("each: incorrect argument '{}'".format(str(arg)))
+        raise ValueError(f"each: incorrect argument '{arg}'")
     result = []
     try:
         sequence = get_value(arg, context, root)
@@ -364,7 +362,7 @@ def repeat_block(context, children, args, root, before=None, after=None):
             result.append(''.join(child(context, children, args) for child in children))
         return ''.join(result)
     else:
-        raise ValueError("each: component {} should be list, tuple or dict".format(arg))
+        raise ValueError(f"each: component {arg} should be list, tuple or dict")
 
 def each_block(context, children, args, root):
     return repeat_block(context, children, args, root)
@@ -373,21 +371,21 @@ setting.templates['each'] = each_block
 def after_block(context, children, args, root):
     arg, arg_type = args[1], argtype(args[1])
     if arg_type != 'number':
-        raise ValueError("after: incorrect argument '{}'".format(str(arg)))
+        raise ValueError(f"after: incorrect argument '{arg}'")
     return repeat_block(context, children, args, root, after=int(args[1]))
 setting.templates['after']  = after_block
 
 def before_block(context, children, args, root):
     arg, arg_type = args[1], argtype(args[1])
     if arg_type != 'number':
-        raise ValueError("before: incorrect argument '{}'".format(str(arg)))
+        raise ValueError(f"before: incorrect argument '{arg}'")
     return repeat_block(context, children, args, root, before=int(args[1]))
 setting.templates['before'] = before_block
 
 def witheach_block(context, children, args, root):
     arg, arg_type = args[0], argtype(args[0])
     if arg_type == 'number' or arg_type == 'string':
-        raise ValueError("witheach: incorrect argument '{}'".format(str(arg)))
+        raise ValueError(f"witheach: incorrect argument '{arg}'")
     result = []
     sequence = get_value(arg, context, root)
     if isinstance(sequence, list):
@@ -399,7 +397,7 @@ def witheach_block(context, children, args, root):
             result.append(''.join(child(element, children, args) for child in children))
         return ''.join(result)
     else:
-        raise ValueError("witheach: component {} should be list of dict's".format(arg))
+        raise ValueError(f"witheach: component {arg} should be list of dictionaries")
 setting.templates['witheach'] = witheach_block
 
 # Lexical analyzer
@@ -476,7 +474,8 @@ def parse(source, name):
     current_node.root = current_node
     for group in tokenize(source): # tokenize() returns groups of tokens
         if group[0] == 'STAG':
-            new_node = Block(group[1], [convert_arg(token) for token in group[2:]],
+            new_node = Block(group[1],
+                             [convert_arg(token) for token in group[2:]],
                              ' '.join(group[1:]))
             current_node.add(new_node)
             stack.append(current_node)
@@ -487,8 +486,7 @@ def parse(source, name):
                 current_node = stack.pop()
                 level -= 1
             else:
-                raise ValueError("Tag '{}' does not close current block '{}'".\
-                                 format(group[1], current_node.name))
+                raise ValueError(f"Tag '{group[1]}' does not close current block '{current_node.name}'")
         elif group[0] == 'ZTAG':
             new_node = Partial(group[1], [convert_arg(token) for token in group[2:]],
                                ' '.join(group[1:]))
@@ -503,8 +501,7 @@ def parse(source, name):
             new_node = Text(group[1])
             current_node.add(new_node)
         else:
-            raise ValueError("Unrecognized token '{}'".format(group[0]))
+            raise ValueError(f"Unrecognized token '{group[0]}'")
     if stack:
-        raise ValueError("Missing closing tag(s): current block is '{}'". \
-                         format(current_node.name))
+        raise ValueError(f"Missing closing tag(s): current block is '{current_node.name}'")
     return current_node

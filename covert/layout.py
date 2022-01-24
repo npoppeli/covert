@@ -34,11 +34,11 @@ def add_template_type(loader):
         None
     """
     if loader.extension in template_loader:
-        logger.debug(c._('Cannot redefine template type %s'), loader.extension)
+        logger.debug(c._('Cannot redefine template type {}').format(loader.extension))
     else:
         template_loader[loader.extension] = loader
         if setting.debug >= 2:
-            logger.debug(c._('Define new template type %s'), loader.extension)
+            logger.debug(c._('Define new template type {}').format(loader.extension))
 
 class TemplateLoader:
     """Instances of this class define a template loader.
