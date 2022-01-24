@@ -4,7 +4,7 @@
 </div>
 <!--! data -->
 <table class='table table-bordered table-sm'
-       tal:define="item this['data'][0]; fields item['_keys']; computed this['computed']">
+       tal:define="item this['data'][0]; fields item['_ikeys']; computed this['computed']">
   <tbody id="item01" tal:attributes="class default if item['active']['value'] else 'text-muted'">
     <span tal:repeat="key fields" tal:omit-tag="">
       <tr tal:condition="not item[key]['meta']['auto']">

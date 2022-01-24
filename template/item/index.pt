@@ -34,7 +34,7 @@
 <div class="w-100"></div> <!-- break to new row -->
 <div tal:condition="len(this['data'])>0">
   <table class='table table-sm'
-    tal:define="data this['data']; top data[0]; fields top['_keys']; computed this['computed']">
+    tal:define="data this['data']; top data[0]; fields top['_ikeys']; computed this['computed']">
   <thead class="thead-light">
   <tr>
     <th tal:repeat="field fields">${top[field]['meta']['label']}</th>

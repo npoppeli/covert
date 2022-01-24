@@ -7,7 +7,7 @@
   <fieldset class="data">
     <input tal:condition="this['method']" type="hidden" name="_method" value="${this['method']}"/>
     <div tal:repeat="item this['data']" tal:omit-tag="">
-      <span tal:define="fields item['_keys']"
+      <span tal:define="fields item['_ikeys']"
             tal:repeat="key [key for key in fields if item[key]['meta']['formtype'] == 'hidden']" tal:omit-tag="">
         <input type="hidden" name="${key}" value="${item[key]['value']}"/>
       </span>
@@ -15,7 +15,7 @@
         <label class="col-sm-3 control-label">&nbsp;</label>
         <div class="col-sm-7"><p class="form-control-static">${prefix}</p></div>
       </div>
-      <div class="form-row" tal:define="fields item['_keys']"
+      <div class="form-row" tal:define="fields item['_ikeys']"
            tal:repeat="key [key for key in fields if item[key]['meta']['formtype'] != 'hidden']">
         <label for="${key}" class="col-sm-3 control-label">${item[key]['meta']['label']}</label>
         <div class="col-sm-7"
