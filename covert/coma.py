@@ -86,8 +86,8 @@ def get_value(path, context, root):
                 value = f'No element {index} in tuple {value}'
         else:
             route, ctx, value_head = ':'.join(path_2), short(context), str(value)[0:40]
-            logger.error(f"No {route} in context {ctx}\n"
-                         "path={path_2} part={part} value={value_head} ...")
+            logger.error(f"No {route} in context {ctx}\n"+
+                         f"path={path_2} part={part} value={value_head} ...")
             value = f"No {route} in context {ctx}"
     # logger.debug(f'get_value (3): path={path} value={value}')
     return value
@@ -347,7 +347,7 @@ def repeat_block(context, children, args, root, before=None, after=None):
         sequence = sequence[:before]
     elif after is not None:
         sequence = sequence[after+1:]
-    if isinstance(sequence, list) or isinstance(sequence, tuple):
+    if isinstance(sequence, (tuple, list)):
         for key, element in enumerate(sequence):
             context['@0'] = element
             # logger.debug("each: @0 =| {} |".format(str(element)))
@@ -362,7 +362,7 @@ def repeat_block(context, children, args, root, before=None, after=None):
             result.append(''.join(child(context, children, args) for child in children))
         return ''.join(result)
     else:
-        raise ValueError(f"each: component {arg} should be list, tuple or dict")
+        raise ValueError(f"each: component {sequence} should be list, tuple or dict")
 
 def each_block(context, children, args, root):
     return repeat_block(context, children, args, root)
