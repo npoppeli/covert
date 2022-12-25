@@ -112,7 +112,7 @@ class Item(BareItem):
         Returns:
             None
         """
-        coll_list = setting.item_db.collection_names()
+        coll_list = setting.item_db.list_collection_names()
         if cls.name not in coll_list:
             setting.item_db.create_collection(cls.name)
 
@@ -178,7 +178,7 @@ class Item(BareItem):
         return cursor[0][field]
 
     @classmethod
-    def count(cls, expr):
+    def count(cls, expr=''):
         """Count items in collection that match a given query.
 
         Find zero or more items (documents) in collection, and count them.
@@ -189,8 +189,7 @@ class Item(BareItem):
         Returns:
             int: number of matching items.
         """
-        cursor = setting.item_db[cls.name].find(filter=cls.filter(expr))
-        return cursor.count()
+        return setting.item_db[cls.name].count_documents(filter=cls.filter(expr))
 
     @classmethod
     def find(cls, expr=None, skip=0, limit=0, sort=None):
@@ -214,7 +213,7 @@ class Item(BareItem):
         return [cls(item) for item in cursor]
 
     @classmethod
-    def project(cls, field, expr, sort=None, bare=False):
+    def project(cls, field, expr, sort=None, limit=0, bare=False):
         """Retrieve items from collection, and return selection of fields.
 
         Find zero or more items in collection, and return these in the
@@ -224,6 +223,7 @@ class Item(BareItem):
             expr  (str)         : Python expression.
             field (string, list): name(s) of field(s) to include.
             sort  (list)        : sort specification.
+            limit (int)         : maximum number of items to retrieve.
             bare  (bool)        : if True, return only bare values.
 
         Returns:
@@ -232,7 +232,7 @@ class Item(BareItem):
         mono = isinstance(field, str)
         sort_spec = sort if sort else [('_skey',1)]
         proj_spec = {field: 1} if mono else dict.fromkeys(field, 1)
-        cursor = setting.item_db[cls.name].find(filter=cls.filter(expr),
+        cursor = setting.item_db[cls.name].find(filter=cls.filter(expr), limit=limit,
                                                 projection=proj_spec, sort=sort_spec)
         if bare:
             if mono:
