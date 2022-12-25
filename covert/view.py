@@ -481,7 +481,6 @@ class Cursor:
             * method    (str):     form method
             * submit    (str):     value of the form button that was pressed
         """
-        initial_post = '_filter' not in request.params
         for key, value in self.default.items():
             setattr(self, key, value)
         self.form = {}
@@ -491,6 +490,7 @@ class Cursor:
         form = {}
         for key, value in request.params.items():
             if key == '_filter': # reuse filter that is included in request
+                # logger.debug(f'init_cursor: filter={value}')
                 self.filter = value
             elif key =='_skey': # standard field of Item that can be used in a search query
                 form[key] = value
@@ -499,7 +499,7 @@ class Cursor:
                 setattr(self, key[1:], attval)
             else: # form attribute
                 form[key] = value.replace('\n', ' ').replace('\t', ' ')
-        if initial_post:
+        if '_filter' not in request.params:
             # Preprocess form: take care of empty values, and parameters of date type
             date_params = preprocess_form(form)
             converted_form = model.convert(form, partial=True)
@@ -517,7 +517,7 @@ class Cursor:
                             self.form[key+'.'+subkey] = (model.qmap[subkey], subvalue)
                     else:
                         self.form[key] = (model.qmap[key], value0)
-            # logger.debug(f'cursor: converted form={self.form}')
+            # logger.debug(f'cursor: converted form parameters={self.form}')
 
     def __str__(self):
         d = dict([(key, getattr(self, key, '')) for key in self.__slots__])
@@ -553,12 +553,18 @@ class Cookie:
         return "Cookie(name='{}', value='{}', path='{}', expires='{}')".\
                 format(self.name, self.value, self.path, self.expires)
 
-regex_active = re.compile("\(active\s*=\s*'.+?'\)")
+regex_active = re.compile("\(active\s*=\s*.+?\)")
 regex_andand = re.compile('and\s*and')
 
 def remove_active(s):
-    """Remove term `active == 'foo'` from filter expression `s`"""
-    return regex_andand.sub(' and ', regex_active.sub('', s))
+    """Remove term `(active == foo)` from filter expression `s`"""
+    result = regex_andand.sub(' and ', regex_active.sub('', s)).strip()
+    # remove loose 'and' at begin or end of string
+    if result.startswith('and'):
+        result = result[3:]
+    if result.endswith('and'):
+        result = result[:-3]
+    return result.strip()
 
 def preprocess_lists(item):
     """"Pre-process empty lists: add one element with default value(s)."""
@@ -702,10 +708,10 @@ class RenderTree:
         term (if present) needs to be inspected for possible adjustment.
         """
         cursor = self.cursor
-        initial_post = '_filter' not in self.request.params
-        if initial_post:
+        create_filter = '_filter' not in self.request.params
+        if create_filter:
            # cursor.form contains query specifications with real values
-           # logger.debug('move_cursor form: ' + str(cursor.form))
+           # logger.debug(f'move_cursor: form={cursor.form}')
            for key, value in cursor.form.items():
                if isinstance(value, list):
                    cursor.form[key] = ('in', value[0], value[1])
@@ -724,8 +730,8 @@ class RenderTree:
                terms.append(term)
            cursor.filter = ' and '.join(terms)
         else:
-            # cursor.incl == 1: remove term 'active=True' (if present) from filter
-            #             == 0: add term 'active=True' (if not present) to filter
+            # cursor.incl == 1: remove term 'active=1' (if present) from filter
+            #             == 0: add term 'active=1' (if not present) to filter
             if cursor.incl == 1:
                 if 'active' in cursor.filter:
                     cursor.filter = remove_active(cursor.filter)
