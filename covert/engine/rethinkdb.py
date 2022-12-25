@@ -210,18 +210,18 @@ class Item(BareItem):
         return result[field]
 
     @classmethod
-    def count(cls, fltr):
+    def count(cls, expr=''):
         """Count items in collection that match a given query.
 
         Find zero or more items (documents) in collection, and count them.
 
         Arguments:
-            fltr (str): Python expression.
+            expr (str): Python expression.
 
         Returns:
             int: number of matching items.
         """
-        rql_query = cls.filter(fltr)
+        rql_query = cls.filter(expr)
         query = r.table(cls.name).filter(rql_query)
         result = query.count().run(setting.connection)
         logger.debug('Item.count: query gives {} items'.format(result))
@@ -258,7 +258,7 @@ class Item(BareItem):
         return [cls(item) for item in cursor]
 
     @classmethod
-    def project(cls, field, fltr, sort=None, bare=False):
+    def project(cls, field, fltr, sort=None, limit=0, bare=False):
         """Retrieve items from collection, and return selection of fields.
 
         Find zero or more items in collection, and return these in the
@@ -268,6 +268,7 @@ class Item(BareItem):
             fltr  (str)         : Python expression.
             field (string, list): name(s) of field(s) to include.
             sort  (list)        : sort specification.
+            limit (int)         : maximum number of items to retrieve.
             bare  (bool)        : if True, return only bare values.
 
         Returns:
@@ -286,6 +287,7 @@ class Item(BareItem):
             query = query.pluck(field)
         else:
             query = query.pluck(*field)
+        if limit: query = query.limit(limit)
         query = query.order_by(*sort_spec)
         cursor = query.run(setting.connection)
         if bare:
