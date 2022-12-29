@@ -507,11 +507,15 @@ class Cursor:
                 # ignore values that are empty in a functional sense
                 if empty_scalar(value) or empty_reference(value) or \
                    empty_dict(value) or empty_list(value):
-                    logger.debug(f'cursor: ignored empty value {value}')
+                    logger.debug(f"cursor: key '{key}' has empty value '{value}' - ignored")
+                    continue
                 if key in date_params:
                     self.form[key] = ('in', value[0], value[1])
                 else:
-                    value0 = value[0] if isinstance(value, list) else value
+                    if isinstance(value, list):
+                        value0 = value[0] if value else ''
+                    else:
+                        value0 = value
                     if isinstance(value0, dict):
                         for (subkey, subvalue) in value0.items():
                             self.form[key+'.'+subkey] = (model.qmap[subkey], subvalue)
