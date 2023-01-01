@@ -182,17 +182,17 @@ class Item(BareItem):
         try:
             root = compile(expr, '', 'eval', ast.PyCF_ONLY_AST)
         except SyntaxError as e:
-            logger.debug(c._("Item.filter: expr = {}").format(expr))
-            logger.debug(c._("Exception '{}'").format(e))
+            logger.warning(c._("Item.filter: expr = {}").format(expr))
+            logger.warning(c._("Exception '{}'").format(e))
             raise
         translator = Translator(cls.cmap, cls.wmap, cls.meta)
         try:
             result = translator.visit(root.body)
             return result
         except Exception as e:
-            logger.debug(str(e))
-            logger.debug(c._("Item.filter: expr = {}").format(expr))
-            logger.debug(c._("Item.filter: root = {}").format(ast.dump(root)))
+            logger.warning(str(e))
+            logger.warning(c._("Item.filter: expr = {}").format(expr))
+            logger.warning(c._("Item.filter: root = {}").format(ast.dump(root)))
             return None
 
     @classmethod
