@@ -146,7 +146,7 @@ class Item(BareItem):
             dict: query document in MongoDB form.
         """
         if not expr:
-            return None
+            return {}
         try:
             root = compile(expr, '', 'eval', ast.PyCF_ONLY_AST)
         except SyntaxError as e:
@@ -161,7 +161,7 @@ class Item(BareItem):
             logger.info(str(e))
             logger.info(c._("Item.filter: expr = {}").format(expr))
             logger.info(c._("Item.filter: root = {}").format(ast.dump(root)))
-            return None
+            return {}
 
     @classmethod
     def max(cls, field):
