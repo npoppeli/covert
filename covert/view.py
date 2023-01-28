@@ -583,7 +583,7 @@ def preprocess_lists(item):
         else:
             default = atom_codemap[field_meta.code].default
         item[key].append(default)
-        logger.debug(f"preprocess_lists: field '{key}' has modified value '{item[key]}'")
+        # logger.debug(f"preprocess_lists: field '{key}' has modified value '{item[key]}'")
 
 def display_item(item, form_type, view_name):
     """Prepare display form of one item for insertion into the render tree.
@@ -694,7 +694,7 @@ class RenderTree:
         self.message = ''
         self.method = ''
         self.poly = True
-        self.status = '' # see 'common module': SUCCESS, FAIL, ERROR
+        self.status = SUCCESS # sensible default; other values are FAIL, ERROR
         self.style = 0
         self.title = ''
 
@@ -713,9 +713,10 @@ class RenderTree:
         """
         cursor = self.cursor
         create_filter = '_filter' not in self.request.params
+        debug_filter = setting.debug > 1
         if create_filter:
            # cursor.form contains query specifications with real values
-           # logger.debug(f'move_cursor: form={cursor.form}')
+           if debug_filter: logger.debug(f'move_cursor: create filter from form={cursor.form}')
            for key, value in cursor.form.items():
                if isinstance(value, list):
                    cursor.form[key] = ('in', value[0], value[1])
@@ -733,15 +734,15 @@ class RenderTree:
                    term = f"({key} {value[0]} {v1})"
                terms.append(term)
            cursor.filter = ' and '.join(terms)
+           if debug_filter: logger.debug(f'move_cursor: filter built from form={cursor.filter}')
         else:
-            # cursor.incl == 1: remove term 'active=1' (if present) from filter
-            #             == 0: add term 'active=1' (if not present) to filter
-            if cursor.incl == 1:
+            if debug_filter: logger.debug(f'move_cursor: filter passed with request={cursor.filter}')
+            if cursor.incl == 1: # remove term 'active=1' from filter (if present)
                 if 'active' in cursor.filter:
                     cursor.filter = remove_active(cursor.filter)
-            elif 'active' not in cursor.filter:
+            elif 'active' not in cursor.filter: # add term 'active=1' to filter (unless already present)
                 cursor.filter += " and (active == '1')"
-        # logger.debug(f'move_cursor: filter={cursor.filter}')
+            if debug_filter: logger.debug(f'move_cursor: adjusted filter={cursor.filter}')
         cursor.count = self.model.count(cursor.filter)
         cursor.skip = max(0, min(cursor.count, cursor.skip+cursor.dir*cursor.limit))
         cursor.prev = cursor.skip > 0
@@ -968,7 +969,6 @@ class ItemView(BareItemView):
         tree.add_buttons(self.buttons(['id'], ignore=['show', 'delete']))
         tree.display_item()
         tree.prune_item()
-        tree.status = SUCCESS
         tree.title = "{} {}".format(self.model.trname(), str(item))
         tree.dump('show_item')
         return tree()
@@ -982,7 +982,6 @@ class ItemView(BareItemView):
         tree.add_buttons(self.buttons([]))
         tree.display_items()
         tree.prune_items(omit=self.omit_from_index)
-        tree.status = SUCCESS
         tree.dump('show_items')
         return tree()
 
@@ -1053,11 +1052,11 @@ class ItemView(BareItemView):
         # If the application uses HTML forms, disabled fields are
         # not present in the request body (see W3C Specification for HTML 5).
         if raw:
-            logger.debug(f"extract_form: raw_form={raw_form}")
+            # logger.debug(f"extract_form: raw_form={raw_form}")
             return raw_form
         else:
             result = model.convert(raw_form, partial=True)
-            logger.debug(f"extract_form: converted form={result}")
+            # logger.debug(f"extract_form: converted form={result}")
             return result
 
     def process_form(self, description, action, bound=False, postproc=None, method='POST',
@@ -1105,7 +1104,6 @@ class ItemView(BareItemView):
                     for key in delete_keys:
                         if key in item: del item[key]
                     item.write(validate=False)
-                tree.status = SUCCESS
                 tree.message = '{} {}. '.format(description, str(tree.data[0]))
                 if diff:
                     tree.message += ''.join(delta)
@@ -1130,9 +1128,8 @@ class ItemView(BareItemView):
         tree = self.tree
         item = self.model.lookup(self.params['id'])
         tree.add_item(item)
-        tree.status = SUCCESS
         tree.title = "{} {}".format(self.model.trname(), str(item))
-        return self.process_form(description=c._('Modified item'),
+        return self.process_form(description=c._('Modify item'),
                                  action='update', method='PUT')
 
     @route('/{id:objectid}', method='PUT', template='show;form')
@@ -1140,7 +1137,6 @@ class ItemView(BareItemView):
         """Update an existing item."""
         submit = self.request.params['_submit']
         tree = self.tree
-        tree.status = SUCCESS
         if submit == 'ok': # modify item and show this
             item = self.model.lookup(self.params['id'])
             tree.add_item(item)
@@ -1155,7 +1151,6 @@ class ItemView(BareItemView):
         """Make a form for new/create action."""
         tree = self.tree
         tree.add_item(self.model())
-        tree.status = SUCCESS
         tree.title = "{} {}".format(self.model.trname(), 'new')
         return self.process_form(description=c._('New item'),
                                  action='create', clear=True)
@@ -1165,11 +1160,10 @@ class ItemView(BareItemView):
         """Create a new item."""
         submit = self.request.params['_submit']
         tree = self.tree
-        tree.status = SUCCESS
         if submit == 'ok': # create item and show this
             tree.add_item(self.model())
-            return self.process_form(description=c._('New item'),
-                                     action='create', clear=True, bound=True)
+            return self.process_form(description=c._('New item'), bound=True,
+                                     action='create', clear=True)
         else: # show index page
             tree.style = 2
             tree.message = c._('No new item was created')
