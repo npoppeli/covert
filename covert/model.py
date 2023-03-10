@@ -491,7 +491,7 @@ class BareItem(dict):
         """
         validator = cls._validate
         try:
-            _result = validator(doc)
+            _ = validator(doc)
             return {'status': SUCCESS, 'data': ''}
         except MultipleInvalid as e:
             error = '; '.join([str(el) for el in e.errors ])
@@ -916,7 +916,7 @@ def read_models(model_defs):
         class_dict['_format'] = pm.fmt
         class_dict['meta']    = meta
         # Note: the way we define validation here does not forbid extra fields, because
-        # # we need e.g. '_id' and '_rev'. This creates the risk of unwanted fields in
+        # we need e.g. '_id' and '_rev'. This creates the risk of unwanted fields in
         # the database. The application must check for this.
         class_dict['_validate'] = Schema(schema, required=True, extra=ALLOW_EXTRA)
         model_class = type(model_name, (Item,), class_dict)
