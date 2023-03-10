@@ -378,9 +378,9 @@ class Item(BareItem):
             if validate_result['status'] != SUCCESS:
                 message = c._("{} {}\ndoes not validate because of error\n{}\n").\
                     format(self.name, self, validate_result['data'])
-                result = {'status':FAIL, 'data':message}
-                report_db_action(result)
-                return result
+                reply = {'status':FAIL, 'data':message}
+                report_db_action(reply)
+                return reply
         doc = {key:value for key, value in mapdoc(self.wmap, self).items()
                          if not key.startswith('__')}
         collection = r.table(self.name)
