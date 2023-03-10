@@ -33,9 +33,8 @@ logdir = getcwd() + '/log'  # assumption: cwd == site directory
 if not exists(logdir):
     mkdir(logdir)
 logfile = '{}/{}.log'.format(logdir, datetime.now().strftime("%Y%m%d"))
-logging.basicConfig(filename=logfile, datefmt='%Y-%m-%d %H:%M:%S', style='{',
-                    format='{asctime} {levelname:7}: {message}',
-                    level=logging.INFO)
+logging.basicConfig(filename=logfile, datefmt='%Y%m%d.%H%M%S', style='{',
+                    format='{asctime} {levelname:7}: {message}', level=logging.INFO)
 logger = logging.getLogger('covert')
 
 def exception_report(exc, ashtml=True):
