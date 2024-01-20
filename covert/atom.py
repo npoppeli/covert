@@ -10,9 +10,11 @@ ISO 8601 datetime notation:
 * datetime: <date>T<time>
 """
 
+import logging
 from datetime import datetime, date, time
 from .common import InternalError, escape_squote
 from . import common as c
+logger = logging.getLogger('covert')
 
 class Atom:
     """Instances of this class define the atomic constituents of items.
@@ -113,8 +115,11 @@ define_atom('boolean',
 def date_convert(x):
     if not x or x == '????-??-??':
         return EMPTY_DATE
-    else:
+    try:
         return datetime.strptime(x, "%Y-%m-%d").date()
+    except Exception as e:
+        logger.debug(f"date_convert: date value {x} results in exception {e}")
+        return EMPTY_DATE
 
 def date_display(x):
     if x.year == MINYEAR:
@@ -139,9 +144,12 @@ define_atom('date',
             )
 
 def datetime_convert(x):
-    if x:
+    if not x:
+        return EMPTY_DATETIME
+    try:
         return datetime.strptime(x, "%Y-%m-%dT%H:%M:%S")
-    else:
+    except Exception as e:
+        logger.debug(f"datetime_convert: datetime value {x} results in exception {e}")
         return EMPTY_DATETIME
 
 def datetime_display(x):
@@ -224,7 +232,13 @@ define_atom('text',
             )
 
 def time_convert(x):
-    return datetime.strptime(x, "%H:%M:%S")
+    if not x:
+        return EMPTY_DATETIME
+    try:
+        return datetime.strptime(x, "%H:%M:%S")
+    except Exception as e:
+        logger.debug(f"time_convert: time value {x} results in exception {e}")
+        return EMPTY_DATETIME
 
 def time_display(x):
     return '{0:02d}:{1:02d}:{2:02d}'.format(x.hour, x.minute, x.second)
