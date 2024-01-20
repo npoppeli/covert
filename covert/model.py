@@ -258,12 +258,19 @@ class BareItem(dict):
         Returns:
             instance of current class, or dictionary
         """
-        result = cls._convert(doc, 0)
+        try:
+            result = cls._convert(doc, 0)
+        except Exception as e:
+            logger.debug(f"convert: _convert gave exception {e}")
+            result = cls()
         if partial:
             return result
         else:
             doc = cls()
-            doc.update(result)
+            try:
+                doc.update(result)
+            except Exception as e:
+                logger.debug(f"convert: update gave exception {e}")
             return doc
 
     @classmethod
