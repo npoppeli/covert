@@ -1,0 +1,391 @@
+# Translations template for PROJECT.
+# Copyright (C) 2024 ORGANIZATION
+# This file is distributed under the same license as the PROJECT project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2024.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2024-01-29 16:08+0100\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.8.0\n"
+
+#: atom.py:72
+msgid "Atom {0} is already registered"
+msgstr ""
+
+#: common.py:51
+msgid "Internal error"
+msgstr ""
+
+#: common.py:52
+msgid "Traceback (most recent call last)"
+msgstr ""
+
+#: common.py:258
+msgid "Inserted"
+msgstr ""
+
+#: common.py:260
+msgid "Updated"
+msgstr ""
+
+#: common.py:262
+msgid "Deleted"
+msgstr ""
+
+#: config.py:76
+msgid "Current directory does not contain a 'config' file"
+msgstr ""
+
+#: config.py:103
+msgid "Debug option is {}"
+msgstr ""
+
+#: config.py:104
+msgid "Verbose option is {}"
+msgstr ""
+
+#: config.py:105
+msgid "Changes are{}written to the database"
+msgstr ""
+
+#: config.py:105
+msgid " *not* "
+msgstr ""
+
+#: config.py:106
+msgid "Static content is in directory {}"
+msgstr ""
+
+#: config.py:107
+msgid "User interface is in the '{}' language"
+msgstr ""
+
+#: config.py:108
+msgid "Web server listens to {}:{}"
+msgstr ""
+
+#: config.py:125
+msgid "Unknown storage engine: MongoDB and RethinkDB are supported"
+msgstr ""
+
+#: config.py:130
+msgid "Created new folder for media storage: {}"
+msgstr ""
+
+#: config.py:133
+msgid "Initialized content-addressable media storage"
+msgstr ""
+
+#: config.py:141
+msgid "{} should be Python module"
+msgstr ""
+
+#: config.py:167
+msgid "{} should be in YAML or Python form"
+msgstr ""
+
+#: config.py:185
+msgid "Application has {0} routes"
+msgstr ""
+
+#: config.py:195
+msgid "Application has {0} buttons"
+msgstr ""
+
+#: config.py:204
+msgid "Application has {0} models"
+msgstr ""
+
+#: controller.py:23
+msgid "Starting HTTP server"
+msgstr ""
+
+#: controller.py:107
+msgid "{} {} [mode {}] results in exception {}\n"
+msgstr ""
+
+#: controller.py:138
+msgid "Evaluation of template {} results in exception {}\n"
+msgstr ""
+
+#: controller.py:184
+msgid "{}: exception occurred in {}"
+msgstr ""
+
+#: controller.py:189
+msgid "{}: nothing found for {} {}"
+msgstr ""
+
+#: event.py:16
+msgid "Cannot override handler for {}"
+msgstr ""
+
+#: event.py:19
+msgid "New event handler for {}"
+msgstr ""
+
+#: event.py:22
+msgid "Event handler for {} is not a callable"
+msgstr ""
+
+#: layout.py:37
+msgid "Cannot redefine template type {}"
+msgstr ""
+
+#: layout.py:41
+msgid "Define new template type {}"
+msgstr ""
+
+#: layout.py:83 layout.py:144
+msgid "Error in template '{0}' in file {1}"
+msgstr ""
+
+#: layout.py:106
+msgid "Scanning for templates in {0}"
+msgstr ""
+
+#: layout.py:107
+msgid "Template types: {0}"
+msgstr ""
+
+#: layout.py:120
+msgid "Reloading templates"
+msgstr ""
+
+#: layout.py:141
+msgid "Template {} is in file {}"
+msgstr ""
+
+#: layout.py:153
+#, python-format
+msgid "Chameleon template engine not available (%s)"
+msgstr ""
+
+#: model.py:182
+msgid "Sort by"
+msgstr ""
+
+#: model.py:182
+msgid "Created"
+msgstr ""
+
+#: model.py:182
+msgid "Modified"
+msgstr ""
+
+#: model.py:182
+msgid "Active"
+msgstr ""
+
+#: model.py:243
+#, python-format
+msgid ""
+"Error in applying rmap to doc=%s\n"
+"%s"
+msgstr ""
+
+#: model.py:765
+msgid "Field definition '{0}' should have 3 or 4 components"
+msgstr ""
+
+#: model.py:814
+msgid "Reference to unknown model '{0}' in {1}"
+msgstr ""
+
+#: model.py:873
+msgid "Storage engine should be MongoDB or RethinkDB"
+msgstr ""
+
+#: view.py:29
+msgid "Show"
+msgstr ""
+
+#: view.py:30
+msgid "Sort"
+msgstr ""
+
+#: view.py:31
+msgid "Browse"
+msgstr ""
+
+#: view.py:32 view.py:883
+msgid "Search"
+msgstr ""
+
+#: view.py:33
+msgid "Match"
+msgstr ""
+
+#: view.py:34
+msgid "Modify"
+msgstr ""
+
+#: view.py:35
+msgid "Update"
+msgstr ""
+
+#: view.py:36
+msgid "New"
+msgstr ""
+
+#: view.py:37
+msgid "Create"
+msgstr ""
+
+#: view.py:38
+msgid "Delete"
+msgstr ""
+
+#: view.py:39
+msgid "Push"
+msgstr ""
+
+#: view.py:40
+msgid "Pop"
+msgstr ""
+
+#: view.py:41
+msgid "Home"
+msgstr ""
+
+#: view.py:42
+msgid "Info"
+msgstr ""
+
+#: view.py:43 view.py:868
+msgid "OK"
+msgstr ""
+
+#: view.py:44
+msgid "Refresh"
+msgstr ""
+
+#: view.py:45 view.py:892
+msgid "Return"
+msgstr ""
+
+#: view.py:46 view.py:869 view.py:884
+msgid "Cancel"
+msgstr ""
+
+#: view.py:787
+msgid "No results for search query:"
+msgstr ""
+
+#: view.py:998
+msgid "Nothing found for id={}"
+msgstr ""
+
+#: view.py:1114
+msgid "{} {} has validation errors {}"
+msgstr ""
+
+#: view.py:1132
+msgid "Modify item"
+msgstr ""
+
+#: view.py:1143
+msgid "Modified item"
+msgstr ""
+
+#: view.py:1146
+msgid "Item was not modified"
+msgstr ""
+
+#: view.py:1155 view.py:1165
+msgid "New item"
+msgstr ""
+
+#: view.py:1169
+msgid "No new item was created"
+msgstr ""
+
+#: engine/arangodb.py:49 engine/mongodb.py:50 engine/rethinkdb.py:51
+msgid "Translator: no method for "
+msgstr ""
+
+#: engine/arangodb.py:113
+msgid "Create ArangoDB connection, set database to '{}'"
+msgstr ""
+
+#: engine/arangodb.py:177 engine/arangodb.py:186 engine/mongodb.py:153
+#: engine/mongodb.py:162 engine/rethinkdb.py:185 engine/rethinkdb.py:194
+msgid "Item.filter: expr = {}"
+msgstr ""
+
+#: engine/arangodb.py:178 engine/mongodb.py:154 engine/rethinkdb.py:186
+msgid "Exception '{}'"
+msgstr ""
+
+#: engine/arangodb.py:187 engine/mongodb.py:163 engine/rethinkdb.py:195
+msgid "Item.filter: root = {}"
+msgstr ""
+
+#: engine/arangodb.py:342 engine/mongodb.py:319 engine/rethinkdb.py:379
+msgid ""
+"{} {}\n"
+"does not validate because of error\n"
+"{}\n"
+msgstr ""
+
+#: engine/arangodb.py:370 engine/arangodb.py:437 engine/mongodb.py:347
+#: engine/mongodb.py:414 engine/rethinkdb.py:405 engine/rethinkdb.py:472
+msgid ""
+"{} {}\n"
+"not written because of error\n"
+"{}\n"
+msgstr ""
+
+#: engine/arangodb.py:400 engine/arangodb.py:433 engine/mongodb.py:377
+#: engine/mongodb.py:410
+msgid ""
+"{} {}\n"
+"not updated, matched count={}"
+msgstr ""
+
+#: engine/arangodb.py:404 engine/mongodb.py:381 engine/rethinkdb.py:439
+msgid ""
+"{} {}\n"
+"not updated because of error\n"
+"{}\n"
+msgstr ""
+
+#: engine/hashfs.py:114
+msgid "Could not locate file: {0}"
+msgstr ""
+
+#: engine/hashfs.py:209
+msgid "path '{}' is not subdirectory of root '{}'"
+msgstr ""
+
+#: engine/hashfs.py:251
+msgid "Stream: {} is not a valid file path or readable object"
+msgstr ""
+
+#: engine/mongodb.py:25 engine/rethinkdb.py:25
+msgid "Item could not be written: "
+msgstr ""
+
+#: engine/mongodb.py:101
+msgid "Create MongoDB connection, set database to '{}'"
+msgstr ""
+
+#: engine/rethinkdb.py:128
+msgid "Create RethinkDB connection, set database to '{}'"
+msgstr ""
+
+#: engine/rethinkdb.py:435 engine/rethinkdb.py:468
+msgid ""
+"{} {}\n"
+"not updated, replaced={}"
+msgstr ""
+
