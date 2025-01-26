@@ -75,9 +75,9 @@ def read_configuration():
     else:
         print(c._("Current directory does not contain a 'config' file"))
         sys.exit()
-    if 'debug'    in config: setting.debug    = config['debug']
-    if 'nostore'  in config: setting.nostore  = config['nostore']
-    if 'verbose'  in config: setting.verbose  = config['verbose']
+    for option in ['debug', 'nostore', 'verbose']:
+        if option in config:
+            setattr(setting, option, config[option])
     setting.content  = join(setting.site, config['content'])
     setting.layout   = join(setting.site, config['layout'])
     setting.media    = join(setting.site, config['media'])
@@ -91,8 +91,7 @@ def read_configuration():
     # I18N
     setting.language = config['language']
     if setting.language != 'en':  # switch to application language
-        app_trans = gettext.translation('covert', localedir=setting.locales,
-                                        languages=[setting.language])
+        app_trans = gettext.translation('covert', localedir=setting.locales, languages=[setting.language])
         c._ = app_trans.gettext
 
     # keep original configuration
