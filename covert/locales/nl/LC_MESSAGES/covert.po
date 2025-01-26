@@ -7,39 +7,39 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PROJECT VERSION\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2020-09-26 14:54+0200\n"
-"PO-Revision-Date: 2020-09-26 14:57+0200\n"
+"POT-Creation-Date: 2024-01-29 16:08+0100\n"
+"PO-Revision-Date: 2024-01-29 16:12+0100\n"
 "Last-Translator: \n"
-"Language: nl_NL\n"
 "Language-Team: \n"
-"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"Language: nl_NL\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "Generated-By: Babel 2.8.0\n"
-"X-Generator: Poedit 2.0.6\n"
+"X-Generator: Poedit 3.0.1\n"
 
-#: atom.py:70
+#: atom.py:72
 msgid "Atom {0} is already registered"
 msgstr "Atoom {0} is al geregistreerd"
 
-#: common.py:52
+#: common.py:51
 msgid "Internal error"
 msgstr "Interne fout"
 
-#: common.py:53
+#: common.py:52
 msgid "Traceback (most recent call last)"
 msgstr "Foutopsporing (recentste aanroep laatst)"
 
-#: common.py:257
+#: common.py:258
 msgid "Inserted"
 msgstr "Toegevoegd"
 
-#: common.py:259
+#: common.py:260
 msgid "Updated"
 msgstr "Gewijzigd"
 
-#: common.py:261
+#: common.py:262
 msgid "Deleted"
 msgstr "Verwijderd"
 
@@ -47,67 +47,67 @@ msgstr "Verwijderd"
 msgid "Current directory does not contain a 'config' file"
 msgstr "Huidige map bevat geen configuratie-bestand"
 
-#: config.py:104
+#: config.py:103
 msgid "Debug option is {}"
 msgstr "Debug-optie is {}"
 
-#: config.py:105
+#: config.py:104
 msgid "Verbose option is {}"
 msgstr "Verbose-optie is {}"
 
-#: config.py:106
+#: config.py:105
 msgid "Changes are{}written to the database"
 msgstr "Wijzigingen worden{}geschreven naar de database"
 
-#: config.py:106
+#: config.py:105
 msgid " *not* "
 msgstr " *niet* "
 
-#: config.py:107
+#: config.py:106
 msgid "Static content is in directory {}"
 msgstr "Statische content staat in de map {}"
 
-#: config.py:108
+#: config.py:107
 msgid "User interface is in the '{}' language"
 msgstr "Gebruikersinterface is in de '{}' taal"
 
-#: config.py:109
+#: config.py:108
 msgid "Web server listens to {}:{}"
 msgstr "Web-server luistert op {}:{}"
 
-#: config.py:126
+#: config.py:125
 msgid "Unknown storage engine: MongoDB and RethinkDB are supported"
 msgstr "Onbekende opslag-module: MongoDB en RethinkDB worden ondersteund"
 
-#: config.py:131
+#: config.py:130
 msgid "Created new folder for media storage: {}"
 msgstr "Nieuwe map maken voor media-opslag: {}"
 
-#: config.py:134
+#: config.py:133
 msgid "Initialized content-addressable media storage"
 msgstr "Content-addresseerbare media-opslag geinitialiseerd"
 
-#: config.py:142
+#: config.py:141
 msgid "{} should be Python module"
 msgstr "{} moet Python-module zijn"
 
-#: config.py:168
+#: config.py:167
 msgid "{} should be in YAML or Python form"
 msgstr "{} moet in YAML- of Python-vorm zijn"
 
-#: config.py:186
+#: config.py:185
 msgid "Application has {0} routes"
 msgstr "Applicatie heeft {0} routes"
 
-#: config.py:196
+#: config.py:195
 msgid "Application has {0} buttons"
 msgstr "Applicatie heeft {0} knoppen"
 
-#: config.py:205
+#: config.py:204
 msgid "Application has {0} models"
 msgstr "Applicatie heeft {0} modellen"
 
-#: controller.py:24
+#: controller.py:23
 msgid "Starting HTTP server"
 msgstr "HTTP-server wordt gestart"
 
@@ -115,11 +115,15 @@ msgstr "HTTP-server wordt gestart"
 msgid "{} {} [mode {}] results in exception {}\n"
 msgstr "{} {} [modus {}] leidt tot exceptie {}\n"
 
-#: controller.py:179
+#: controller.py:138
+msgid "Evaluation of template {} results in exception {}\n"
+msgstr "Evaluatie van template {} resulteert in exceptie {}\n"
+
+#: controller.py:184
 msgid "{}: exception occurred in {}"
 msgstr "{}: exceptie trad op in {}"
 
-#: controller.py:184
+#: controller.py:189
 msgid "{}: nothing found for {} {}"
 msgstr "{}: niets gevonden voor {} {}"
 
@@ -136,14 +140,12 @@ msgid "Event handler for {} is not a callable"
 msgstr "Event-handler voor {} is niet aanroepbaar"
 
 #: layout.py:37
-#, python-format
-msgid "Cannot redefine template type %s"
-msgstr "Kan sjabloon-type %s niet opnieuw definiëren"
+msgid "Cannot redefine template type {}"
+msgstr "Kan template-type {} niet opnieuw definieren"
 
 #: layout.py:41
-#, python-format
-msgid "Define new template type %s"
-msgstr "Definieer nieuw sjabloon-type %s"
+msgid "Define new template type {}"
+msgstr "Definieer nieuw template-type {}"
 
 #: layout.py:83 layout.py:144
 msgid "Error in template '{0}' in file {1}"
@@ -195,15 +197,15 @@ msgstr ""
 "Fout in toepassen van rmap op doc=%s\n"
 "%s"
 
-#: model.py:752
+#: model.py:765
 msgid "Field definition '{0}' should have 3 or 4 components"
 msgstr "Veld-definitie '{0}' moet 3 of 4 componenten hebben"
 
-#: model.py:801
+#: model.py:814
 msgid "Reference to unknown model '{0}' in {1}"
 msgstr "Verwijzing naar onbekend model '{0}' in {1}"
 
-#: model.py:860
+#: model.py:873
 msgid "Storage engine should be MongoDB or RethinkDB"
 msgstr "Opslag-module moet MongoDB of RethinkDB zijn"
 
@@ -219,7 +221,7 @@ msgstr "Sorteer"
 msgid "Browse"
 msgstr "Blader"
 
-#: view.py:32 view.py:820
+#: view.py:32 view.py:883
 msgid "Search"
 msgstr "Zoek"
 
@@ -263,7 +265,7 @@ msgstr "Thuis"
 msgid "Info"
 msgstr "Info"
 
-#: view.py:43 view.py:805
+#: view.py:43 view.py:868
 msgid "OK"
 msgstr "OK"
 
@@ -271,43 +273,47 @@ msgstr "OK"
 msgid "Refresh"
 msgstr "Ververs"
 
-#: view.py:45 view.py:827
+#: view.py:45 view.py:892
 msgid "Return"
 msgstr "Terug"
 
-#: view.py:46 view.py:806
+#: view.py:46 view.py:869 view.py:884
 msgid "Cancel"
 msgstr "Annuleer"
 
-#: view.py:671
+#: view.py:787
 msgid "No results for search query:"
 msgstr "Geen resultaten vooor zoekopdracht:"
 
-#: view.py:932
+#: view.py:998
 msgid "Nothing found for id={}"
 msgstr "Niets gevonden voor id={}"
 
-#: view.py:1043
+#: view.py:1114
 msgid "{} {} has validation errors {}"
 msgstr "{} {} heeft validatie-fouten {}"
 
-#: view.py:1056 view.py:1065
+#: view.py:1132
+msgid "Modify item"
+msgstr "Wijzig item"
+
+#: view.py:1143
 msgid "Modified item"
 msgstr "Gewijzigd item"
 
-#: view.py:1068
+#: view.py:1146
 msgid "Item was not modified"
 msgstr "Item is niet gewijzigd"
 
-#: view.py:1075 view.py:1084
+#: view.py:1155 view.py:1165
 msgid "New item"
 msgstr "Nieuw item"
 
-#: view.py:1088
+#: view.py:1169
 msgid "No new item was created"
 msgstr "Er is geen nieuw item gemaakt"
 
-#: engine/arangodb.py:49 engine/mongodb.py:48 engine/rethinkdb.py:49
+#: engine/arangodb.py:49 engine/mongodb.py:50 engine/rethinkdb.py:51
 msgid "Translator: no method for "
 msgstr "Translator: geen methode voor "
 
@@ -315,20 +321,20 @@ msgstr "Translator: geen methode voor "
 msgid "Create ArangoDB connection, set database to '{}'"
 msgstr "ArangoDB-connectie maken, database is '{}'"
 
-#: engine/arangodb.py:177 engine/arangodb.py:186 engine/mongodb.py:149
-#: engine/mongodb.py:158 engine/rethinkdb.py:183 engine/rethinkdb.py:192
+#: engine/arangodb.py:177 engine/arangodb.py:186 engine/mongodb.py:153
+#: engine/mongodb.py:162 engine/rethinkdb.py:185 engine/rethinkdb.py:194
 msgid "Item.filter: expr = {}"
 msgstr "Item.filter: expr = {}"
 
-#: engine/arangodb.py:178 engine/mongodb.py:150 engine/rethinkdb.py:184
+#: engine/arangodb.py:178 engine/mongodb.py:154 engine/rethinkdb.py:186
 msgid "Exception '{}'"
 msgstr "Exceptie '{}'"
 
-#: engine/arangodb.py:187 engine/mongodb.py:159 engine/rethinkdb.py:193
+#: engine/arangodb.py:187 engine/mongodb.py:163 engine/rethinkdb.py:195
 msgid "Item.filter: root = {}"
 msgstr "Item.filter: root = {}"
 
-#: engine/arangodb.py:342 engine/mongodb.py:315 engine/rethinkdb.py:375
+#: engine/arangodb.py:342 engine/mongodb.py:319 engine/rethinkdb.py:379
 msgid ""
 "{} {}\n"
 "does not validate because of error\n"
@@ -338,8 +344,8 @@ msgstr ""
 "valideert niet omdat\n"
 "{}\n"
 
-#: engine/arangodb.py:370 engine/arangodb.py:437 engine/mongodb.py:343
-#: engine/mongodb.py:410 engine/rethinkdb.py:401 engine/rethinkdb.py:468
+#: engine/arangodb.py:370 engine/arangodb.py:437 engine/mongodb.py:347
+#: engine/mongodb.py:414 engine/rethinkdb.py:405 engine/rethinkdb.py:472
 msgid ""
 "{} {}\n"
 "not written because of error\n"
@@ -349,8 +355,8 @@ msgstr ""
 "niet geschreven vanwege fout\n"
 "{}\n"
 
-#: engine/arangodb.py:400 engine/arangodb.py:433 engine/mongodb.py:373
-#: engine/mongodb.py:406
+#: engine/arangodb.py:400 engine/arangodb.py:433 engine/mongodb.py:377
+#: engine/mongodb.py:410
 msgid ""
 "{} {}\n"
 "not updated, matched count={}"
@@ -358,7 +364,7 @@ msgstr ""
 "{} {}\n"
 "niet gewijzigd, matched count={}"
 
-#: engine/arangodb.py:404 engine/mongodb.py:377 engine/rethinkdb.py:435
+#: engine/arangodb.py:404 engine/mongodb.py:381 engine/rethinkdb.py:439
 msgid ""
 "{} {}\n"
 "not updated because of error\n"
@@ -380,15 +386,19 @@ msgstr "pad '{}' is geen sub-folder van root '{}'"
 msgid "Stream: {} is not a valid file path or readable object"
 msgstr "Stream: {} is geen geldig bestandspad of leesbaar object"
 
-#: engine/mongodb.py:97
+#: engine/mongodb.py:25 engine/rethinkdb.py:25
+msgid "Item could not be written: "
+msgstr "Item kon niet worden opgeslagen: "
+
+#: engine/mongodb.py:101
 msgid "Create MongoDB connection, set database to '{}'"
 msgstr "MongoDB-verbinding opzetten, database is '{}'"
 
-#: engine/rethinkdb.py:126
+#: engine/rethinkdb.py:128
 msgid "Create RethinkDB connection, set database to '{}'"
 msgstr "RethinkDB-verbinding opzetten, database is '{}'"
 
-#: engine/rethinkdb.py:431 engine/rethinkdb.py:464
+#: engine/rethinkdb.py:435 engine/rethinkdb.py:468
 msgid ""
 "{} {}\n"
 "not updated, replaced={}"
@@ -469,3 +479,9 @@ msgstr ""
 
 #~ msgid "{}: {} {} [mode {}] results in exception {}\n"
 #~ msgstr "{}: {} {} [modus {}] resulteert in exceptie {}\n"
+
+#~ msgid "Cannot redefine template type %s"
+#~ msgstr "Kan sjabloon-type %s niet opnieuw definiëren"
+
+#~ msgid "Define new template type %s"
+#~ msgstr "Definieer nieuw sjabloon-type %s"
